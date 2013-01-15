@@ -1,0 +1,525 @@
+\input texinfo   @c -*-texinfo-*-
+@c %**start of header
+@setfilename manual_eqtlbma.info
+@include version.texi
+@settitle Manual for eQtlBma @value{VERSION}
+@syncodeindex pg cp
+@c %**end of header
+
+@copying
+This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
+which implements Bayesian methods for eQTL detection.
+
+Copyright @copyright{} 2012 Timothee Flutre and Xiaoquan Wen.
+
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.2 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with the Front-Cover Texts being ``A GNU Manual,''
+and with the Back-Cover Texts as in (a) below.  A copy of the
+license is included in the section entitled ``GNU Free Documentation
+License.''
+
+(a) The FSF's Back-Cover Text is: ``You have the freedom to
+copy and modify this GNU manual.  Buying copies from the FSF
+supports it in developing GNU and promoting software freedom.''
+@end quotation
+@end copying
+
+@dircategory Texinfo documentation system
+@direntry
+* sample: (sample)Invoking sample.
+@end direntry
+
+@titlepage
+@title eQtlBma
+@subtitle for version @value{VERSION}, @value{UPDATED}
+@author T. Flutre (@email{tflutre@@uchicago.edu})
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top eQtlBma
+
+This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}).
+@end ifnottex
+
+@menu
+* Overview::
+* Inputs and options::
+* Running the program::
+* Reading the outputs::
+* Running the hierarchical model::
+* Frequently asked questions::
+* GNU Free Documentation License::
+* Index::
+@end menu
+
+
+@node Overview
+@chapter Overview
+
+In genetics, ``QTL'' stands for quantitative trait locus.
+It corresponds to a genotype-phenotype relationship in which variation in the genotype is associated with variation in the phenotype.
+For the moment, this package focuses on the case where genotypes come from single nucleotide polymorphisms (SNP) 
+and phenotypes are gene expression levels, thus explaining the ``e'' in ``eQTL''.
+
+This package provides implementations of Bayesian methods with two goals in mind:
+@itemize
+@item
+to detect eQTLs;
+@item
+to interpret them.
+@end itemize
+
+The implemented methods allow to jointly analyse data sets from multiple subgroups.
+Here subgroups can be different tissues, cell types, populations, platforms, etc.
+Currently two tools are available:
+@itemize
+@item
+@command{eqtlbma} can compute summary statistics in each subgroup, 
+Bayes Factors for the joint analysis using default hyperparameters, 
+as well as perform permutations;
+@item
+@command{hm_em} can fit a hierarchical model, provide Empirical Bayes estimates of hyperparameters 
+and thus use such estimates to re-compute Bayes Factors and provide posterior probabilities.
+@end itemize
+
+More details are available in a preprint on @url{http://arxiv.org/abs/1212.4786,,arXiv}.
+
+@ignore
+@node Typical analysis
+@chapter Typical analysis
+
+Let's imagine that we have expression levels in S tissues for G genes,
+and genotypes at P SNPs, for a total of N individuals.
+
+To answer our first question, detect eQTLs in any subgroup, we can use the tool @command{eqtlbma}.
+Typing @command{eqtlbma --help} or @command{eqtlbma -h} gives the list of options.
+As the help message is long, we may prefer to type @command{eqtlbma -h | less} instead.
+
+For any analysis, we need to use the following options, ``--geno'', ``--pheno'', ``--fcoord'', ``--out'' and ``--step''.
+For many other options, default arguments are provided to help the user.
+Depending on which analysis we want to make, some options may not be optional anymore.
+As genomic data sets can be big, this tool is able to read files compressed with gzip.
+
+In this example, we will use @command{--step 5} to perform both separate and joint analysis, with permutation for both.
+The command-line hence looks like this:
+
+@code{eqtlbma \@*
+--geno file_with_paths_to_genotype_file.txt \@*
+--scoord file_with_SNP_coordinates.bed.gz \@*
+--pheno file_with_paths_to_phenotype_files.txt \@*
+--fcoord file_with_gene_coordinates.bed.gz \@*
+--out output_eqtlbma \@*
+--step 5 \@*
+--outraw \@*
+--qnorm \@*
+--maf 0.05 \@*
+--gridL file_with_large_grid.txt \@*
+--gridS file_with_small_grid.txt \@*
+--bfs all \@*
+--mvlr \@*
+--fitnull \@*
+--nperm 10000 \@*
+--trick \@*
+--pbf all}
+
+The program checks the consistency of its inputs, performs computations and
+writes results in files compressed with gzip.
+By default, the ``--verbose'' is at 1, allowing us to follow on stdout what the program is doing,
+how long it takes to load the data or run the permutations, how much memory is used, etc.
+Errors are reported on stderr, usually with a meaningful message.
+
+Once the program is finished, we can have a look at the results.
+The file ... contains ...
+@end ignore
+
+@c=============================================================================
+
+@node Inputs and options
+@chapter Inputs and options
+
+@cindex inputs
+@cindex options
+
+Typing @command{eqtlbma --help} or @command{eqtlbma -h} gives the list of options.
+As the help message is long, we may prefer to type @command{eqtlbma -h | less} instead.
+
+@section Genotypes
+
+The option @option{-g, --geno} requires a file as argument.
+This file has two columns separated by a space or a tabulation, and one line per subgroup.
+The first column is the identifier of the subgroup.
+The second column is the path to the file containing the genotypes for this subgroup.
+Here is an example:
+@verbatim
+Fibroblasts /data/genotypes.vcf.gz
+LCLs /data/genotypes.vcf.gz
+T-cells /data/genotypes.vcf.gz
+@end verbatim
+
+As you can see, the genotypes can all be in the same file, 
+for instance if subgroups share some or all individuals.
+
+If you want to skip one subgroup, simply add a hashtag at the begining of the line, like this:
+@verbatim
+#Fibroblasts /data/genotypes.vcf.gz
+@end verbatim
+
+The files containing the genotypes can be in three possible formats.
+Even though these formats can handle genetic variants other then SNPs,
+we focus here on SNPs.
+Moreover, for each format, the names of the individuals have to be indicated 
+and they need to be the same as in the phenotype files (see next section).
+
+The program @command{eqtlbma} recognizes the original VCF format.
+See the specificiations on the website of the 1000 Genomes project @url{http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41,here}.
+
+The program @command{eqtlbma} can also handle a format very similar to the genotype format used by the IMPUTE program.
+The exact specification of this format is described @url{http://www.stats.ox.ac.uk/~marchini/software/gwas/file_format.html,here}.
+The only difference is that we require a header line.
+Here is an example:
+@verbatim
+chr name coord a1 a2 <ind1>_a1a1 <ind1>_a1a2 <ind1>_a2a2 <ind2>_a1a1 ...
+@end verbatim
+where the ``<ind1>'''s have to be replaced by the name of the individuals in the given data set.
+
+Finally, the program @command{eqtlbma} also reads genotypes as allele dose, that is 0, 1, 2 or NA.
+Here is an example:
+@verbatim
+ind1 ind2 ind3 ...
+snp1 0 2 1 ...
+snp2 0 NA 0 ...
+...
+@end verbatim
+
+The VCF and IMPUTE-like formats contain information about SNP coordinates,
+but not the allele-dose format.
+Therefore, with the latter, we also need to use the option @option{--scoord}
+followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
+
+The option @option{--maf} allows to skip loading SNPs 
+if their minor allele frequency is below a given threshold, for instance 0.05.
+
+@section Phenotypes
+
+As for the option @option{--geno}, the option @option{-p, --pheno} requires a file as argument.
+This file has two columns separated by a space or a tabulation, and one line per subgroup.
+The first column is the identifier of the subgroup.
+The second column is the path to the file containing the genotypes for this subgroup.
+Here is an example:
+@verbatim
+Fibroblasts /data/phenotypes_Fibroblasts.txt.gz
+LCLs /data/phenotypes_LCLs.txt.gz
+T-cells /data/phenotypes_T-cells.txt.gz
+@end verbatim
+
+The program @command{eqtlbma} uses the term ``feature'' as the generic term for
+the entities for which we have phenotypic measurements.
+They can be exons, transcripts, genes, proteins, metabolites, etc, 
+but we stick to genes in this manual.
+(Note also that the program implements a model with a specific prior 
+meaningful for genes but which may not be appropriate for some other features.)
+
+The actual files containing the phenotypes have the following format:
+@verbatim
+ind1 ind2 ind3 ...
+gene1 2.0495 1.0947 1.9924 ...
+gene2 0.1928 -0.873 0.5284 ...
+...
+@end verbatim
+
+As the files with phenotypes don't contain the gene coordinates, we also need to use the option
+@option{--fcoord} to specify gene coordinates in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
+
+Note that it is not a problem for the program if each phenotype file doesn't contain the same genes.
+However, the individual names have to be of the same format as those specified in the genotype files.
+Also, the order of the columns doesn't matter in any file.
+
+The option @option{--qnorm} allows the program to transform the phenotypes
+into a standard Normal distribution.
+An FAQ entry indicates how to do this beforehand in R.
+
+@section @emph{Cis} region
+
+The @command{eqtlbma} program focuses on detecting associations between SNPs and genes,
+restricting itself to SNPs in a @emph{cis} candidate region of each gene.
+The option @option{--anchor} allows to specify the boundary(ies) of this region,
+with ``FSS'' for ``feature start site'', ``FES'' for ``feature end site'' and
+``FSS+FES'' for both.
+The option @option{--cis} precises the length of half of the @emph{cis} region, in base pairs.
+
+As an example, @option{--anchor FSS --cis 100000} means that, for each gene, 
+we will test all SNPs falling in the interval [-100kb,+100kb] centered on the
+the start coordinate of the given gene as determined from the BED file given to option @option{--fcoord}.
+
+@section Analysis steps and output files
+
+The option @option{-o,--out} requires a character string and will use it 
+as a prefix to name the output files.
+Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
+
+The program @command{eqtlbma} can perform several kinds of analysis.
+The option @option{--step} can be used to chose one or all of them.
+Step 1 only tests for association in each subgroup separately.
+Step 2 does the same and also performs permutations at the gene level.
+Step 3 tests for association in each subgroup separately and also in all subgroups jointly.
+Step 4 does the same and perform permutations but only for the joint analysis.
+Step 5 does the same and perform permutations for both separate and joint analyses.
+
+If the option @option{--outraw} is not specified, the raw Bayes Factors won't be saved.
+This can be useful in some cases: for instance, when the number of subgroups is large (>15-20).
+However, the hierarchical model requires all the raw BFs.
+
+When using steps 3, 4 or 5, we need to specify the options @option{--gridL} and @option{--gridS},
+along with two files containing the grids over which the Bayes Factors are averaged.
+A grid has two columns, 
+the first contains values of @math{\phi^2} (prior variance of the standardized effects @math{b_s}'s in each subgroup) 
+and the second values of @math{\omega^2} (prior variance of the standardized effect @math{\bar{b}} averaged over all subgroups).
+
+The option @option{--gridL} specifies a ``large'' grid.
+It is typically used for meta-analysis (see this preprint of Wen & Stephens on @url{http://arxiv.org/abs/1111.1210,arXiv}),
+or for the BMAlite analysis (see the preprint of Flutre @emph{et al} on @url{http://arxiv.org/abs/1212.4786,arXiv}).
+The option @option{--gridS} specifies a ``small'' grid used with configurations (see Flutre @emph{et al}).
+
+The option @option{--bfs} allows to specify which Bayes Factors we want to compute.
+The acronym ``abf'' is used to mean ``approximated Bayes factor'' because the Bayes Factor
+can't be calculated analytically and therefore has to be approximated using Laplace's method.
+See Wen & Stephens for more details.
+
+Specifying @option{--bfs gen} computes the ``general'' BF 
+corresponding to the consistent configuration using the large grid.
+Fixed-effect and maximum-heterogeneity BFs are also calculated (see Wen & Stephens).
+
+Specifying @option{--bfs sin} also computes the BF for each singleton, 
+that is for configurations (100), (010) and (001) if there are 3 subgroups.
+Also, the BF called BMAlite in Flutre @emph{et al} (corresponding to the average of BFgen and all BFsin's) is also reported.
+
+Finally, specifying @option{--bfs all} computes the BF for each configuration.
+This can be too costly when the number of subgroups exceeds 15 or 20.
+
+The option @option{--mvlr} implements the multivariate model in which the errors
+in the linear regressions are correlated (see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}).
+This is especially important when all subgroups share the same set of individuals.
+When using this option, the option @option{--fitsig} is set by default at 0.
+
+The option @option{--nperm} allows to specify how many permutations will be performed.
+We recommend 10000.
+In practice, we permute the individual labels.
+As individuals can be present in several subgroups, we recommend to use @option{--permsep 1}
+to preserve such correlation structure when doing a subgroup-by-subgroup analysis.
+You can also specify the initialization of the random number generator with the option @option{--seed}
+in order to be able to replicate exactly the results.
+
+To speed-up the permutations, we also recommend to use the option @option{--trick 1}.
+Indeed, when it is clear that there is no association between the given gene-SNP pair,
+it is not necessary to perform 10000 permutations, a much smaller number is enough,
+and this option implements this adaptively for each gene-SNP pair.
+It requires another random number generator, which also uses @option{--seed}.
+The output file will contain the total number of permutations performed.
+
+If we want to compare the two approaches (separate or joint analysis), we may want
+to use the exact same permutations for both.
+Yet we may also want to use the ``trick''.
+Specifying @option{--trick 2} allows to do just that and is therefore recommended.
+
+Finally, the option @option{--pbf} specifies which BF is used as a test statistic for steps 4 and 5.
+The BF called ``BMA'' in Flutre @emph{et al} corresponds to @option{--pbf all},
+and the BF called ``BMAlite'' corresponds to @option{--pbf gen-sin}.
+
+@c=============================================================================
+
+@node Running the program
+@chapter Running the program
+
+@cindex analysis
+
+For a quick and simple analysis, the command line can look like this:
+@verbatim
+eqtlbma \
+--geno file_with_paths_to_genotype_files.txt \
+--scoord file_with_SNP_coordinates.bed.gz \
+--pheno file_with_paths_to_phenotype_files.txt \
+--fcoord file_with_gene_coordinates.bed.gz \
+--out output_eqtlbma \
+--step 3 \
+--gridL file_with_large_grid.txt \
+--gridS file_with_small_grid.txt \
+--bfs all \
+@end verbatim
+
+When dealing with many genes (e.g. 20,000) and SNPs (e.g. 5 millions),
+we recommend to split the analysis in batches and launch them in parallel.
+To simplify this, i.e. to avoid the burden of creating new input files,
+we can use the option @option{--ftr}.
+
+Let's say that we want 100 batches, we only need to split all the genes into 100 lists.
+Starting from the BED files given to @option{--fcoord}, we can do this with the following command 
+(of course you may have to adapt this a bit if it doesn't work at first):
+@verbatim
+nbBatches="100"; mkdir lists_genes; cd lists_genes; \
+zcat ../gene_coords.bed.gz | cut -f4 | split \
+-l $(echo "scale=0; $(zcat ../gene_coords.bed.gz | wc -l)/${nbBatches}" | bc -l) \
+--suffix-length=3 --numeric-suffixes=1 --additional-suffix=.txt \
+--filter='gzip > $FILE.gz' - list_genes_; cd ..
+@end verbatim
+
+Then, we can easily launch all batches in parallel, 
+for instance with @option{--ftr lists_genes/list_genes_001.txt.gz} for the first batch.
+
+A full command line may look like this:
+@verbatim
+eqtlbma \
+--geno file_with_paths_to_genotype_files.txt \
+--scoord file_with_SNP_coordinates.bed.gz \
+--pheno file_with_paths_to_phenotype_files.txt \
+--fcoord file_with_gene_coordinates.bed.gz \
+--out output_eqtlbma_001 \
+--step 5 \
+--outraw \
+--qnorm \
+--maf 0.05 \
+--gridL file_with_large_grid.txt \
+--gridS file_with_small_grid.txt \
+--bfs all \
+--mvlr \
+--fitnull \
+--nperm 10000 \
+--trick 2 \
+--pbf all \
+--ftr lists_genes/list_genes_001.txt.gz
+@end verbatim
+
+Have a look at the script @command{launch_eqtlbma_parallel.bash} 
+in the directory @command{scripts/} of the package.
+
+Note that you can also use the option @option{--snp} if you want to analyse
+only a subset of all SNPs.
+
+@c=============================================================================
+
+@node Reading the outputs
+@chapter Reading the outputs
+
+@cindex outputs
+
+The program @command{eqtlbma} creates several output files, all starting with 
+the character string given to option @option{--out}, e.g. ``out_eqtlbma''
+(remember to include the batch number when you parallelize).
+All output files contain a header line, which should make it easy to understand
+as well as load into R.
+
+If @option{--mvlr} is not set, one file is created per subgroup with some summary statistics.
+They have the suffix ``_sumstats_<subgroup>.txt.gz''.
+These summary statistics can be used to draw forest plots.
+For steps 2 and 5, there will also be one file per subgroup with the results of the permutations,
+with suffix ``_sepPermPvals.txt.gz''.
+
+One file contains all the BFs averaged over the grid, with suffix ``_l10abfs_avg-grids.txt.gz''.
+If option @option{--outraw} was given, there will also be one file with all the raw BFs,
+i.e. one per grid value, with suffix ``_l10abfs_raw.txt.gz''.
+Such files are necessary to run the hierarchical model (see below).
+For steps 4 and 5, there will also be a file with the results of the permutations,
+with suffix ``_jointPermPvals.txt.gz''.
+
+@c=============================================================================
+
+@node Running the hierarchical model
+@chapter Running the hierarchical model
+
+@cindex hierarchical model
+
+not yet available, contact Xiaoquan Wen.
+
+@c=============================================================================
+
+@node Frequently asked questions
+@chapter Frequently asked questions
+
+@cindex FAQ
+
+@itemize
+@item
+How do I cite this package?
+
+For the moment, you can cite the preprint available on @url{http://arxiv.org/abs/1212.4786, arXiv}: ``A statistical framework for joint eQTL analysis in multiple tissues'' by T.Flutre, X.Wen, J.Pritchard and M.Stephens (arXiv:1212.4786).
+
+@item
+How do I make the file(s) for the grid(s)?
+
+Using R, you can use the following function:
+
+@verbatim
+
+getGrid <- function(grid.type="general", no.het=FALSE){
+  oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
+  oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
+  if(grid.type != "general"){
+    if(no.het){
+      oma2.over.oma2.plus.phi2 <- c(1)
+    } else
+      oma2.over.oma2.plus.phi2 <- c(3/4, 1)
+  }
+  grid <- matrix(NA, nrow=length(oma2.plus.phi2) *
+                 length(oma2.over.oma2.plus.phi2), ncol=2)
+  colnames(grid) <- c("phi2", "oma2")
+  i <- 1
+  for(aes in oma2.plus.phi2){
+    for(hom in oma2.over.oma2.plus.phi2){
+      grid[i,"phi2"] <- aes * (1 - hom)
+      grid[i,"oma2"] <- aes * hom
+      i <- i + 1
+    }
+  }
+  return(grid)
+}
+
+@end verbatim
+
+@item
+How do I transform my phenotypes beforehand into a standard Normal?
+
+Using R, you can use the following command, assuming that @command{matrix.original} has genes in rows and samples in columns:
+
+@verbatim
+
+matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
+  qqnorm(exp.per.gene, plot.it=FALSE)$x
+}))
+
+@end verbatim
+
+@item
+Is this packaged tested?
+
+We implemented some R code in order to perform functional tests.
+Launching them is automatized by @option{make --check}.
+
+@item
+How can I contribute?
+
+For the moment, you can send us emails.
+In the future, the best solution would be to create a repository on @url{http://github.com/,Github}.
+
+@end itemize
+
+
+@node GNU Free Documentation License
+@appendix GNU Free Documentation License
+
+@include fdl.texi
+
+
+@node Index
+@unnumbered Index
+
+@printindex cp
+
+@bye
