@@ -52,6 +52,10 @@ using namespace std;
 
 #include "utils.h"
 
+#ifndef VERSION
+#define VERSION "1.0"
+#endif
+
 #ifdef LIB_MVLR
 #include "MVLR.h"
 #endif
@@ -180,7 +184,7 @@ void help (char ** argv)
  */
 void version (char ** argv)
 {
-  cout << argv[0] << " " << __DATE__ << " " << __TIME__ << endl
+  cout << argv[0] << " " << VERSION << endl
        << endl
        << "Copyright (C) 2012-2013 Timothee Flutre and Xiaoquan Wen." << endl
        << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>" << endl
