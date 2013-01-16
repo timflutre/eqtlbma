@@ -24,7 +24,7 @@ the INSTALL file in this distribution for more detailed instructions.
 For the impatients:
     ./configure
     make
-	make check
+    make check
     sudo make install
 
 

@@ -436,7 +436,7 @@ with suffix ``_jointPermPvals.txt.gz''.
 
 @cindex hierarchical model
 
-not yet available, contact Xiaoquan Wen.
+Not yet available, contact @url{http://www.sph.umich.edu/iscr/faculty/profile.cfm?uniqname=xwen,Xiaoquan Wen}.
 
 @c=============================================================================
 
@@ -505,8 +505,8 @@ Launching them is automatized by @option{make --check}.
 @item
 How can I contribute?
 
-For the moment, you can send us emails.
-In the future, the best solution would be to create a repository on @url{http://github.com/,Github}.
+The code of the package is freely available on @url{http://github.com/timflutre/eqtlbma,Github}, 
+so you can fork it and let us know of any pull request.
 
 @end itemize
 
