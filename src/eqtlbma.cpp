@@ -2759,7 +2759,8 @@ loadPhenos (
     
     closeFile (mPhenoPaths.find(vSubgroups[s])->second, phenoStream);
     if (verbose > 0)
-      cout << "s" << (s+1) << " (" << vSubgroups[s] << "): " << (nbLines-1)
+      cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
+	   << mPhenoPaths.find(vSubgroups[s])->second << "): " << (nbLines-1)
 	   << " features (to keep: " << nbFtrsToKeepPerSubgroup << ")"
 	   << endl << flush;
   }
@@ -3131,7 +3132,8 @@ loadGenosAndSnpInfo (
     
     closeFile (mGenoPaths.find(vSubgroups[s])->second , genoStream);
     if (verbose > 0)
-      cout << "s" << (s+1) << " (" << vSubgroups[s] << "): " << (nbLines-1)
+      cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
+	   << mGenoPaths.find(vSubgroups[s])->second << "): " << (nbLines-1)
 	   << " SNPs (to keep: " << nbSnpsToKeepPerSubgroup
 	   << ", loaded in " << fixed << setprecision(2)
 	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
@@ -3531,7 +3533,8 @@ loadCovariates (
 			 vvSampleIdxPhenos, mCovarPaths, vSbgrp2Covars);
     if (verbose > 0)
       for (size_t s = 0; s < vSbgrp2Covars.size(); ++s)
-	cout << "s" << (s+1) << " (" << vSubgroups[s] << "): "
+	cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
+	     << mCovarPaths.find(vSubgroups[s])->second << "): "
 	     << vSbgrp2Covars[s].size() << " covariates" << endl;
   }
 }
@@ -3741,12 +3744,12 @@ makePerms (
   {
     cout << "get feature-level P-values by permuting phenotypes ..." << endl
 	 << "permutation"<< (nbPerms > 1 ? "s=" : "=") << nbPerms
-	 << ", seed=" << seed
-	 << ", trick=" << trick;
+	 << " seed=" << seed
+	 << " trick=" << trick;
     if (whichStep == 2 || whichStep == 5)
-      cout << ", permSep=" << whichPermSep;
+      cout << " permSep=" << whichPermSep;
     if (whichStep == 4 || whichStep == 5)
-      cout << ", permBf=" << whichPermBf;
+      cout << " permBf=" << whichPermBf;
     cout << endl << flush;
   }
   
@@ -3865,7 +3868,9 @@ writeResSepPermPval (
   const int & verbose)
 {
   if (verbose > 0)
-    cout << "write results of feature-level P-values in each subgroup separately ..."
+    cout << "write results of feature-level P-values"
+	 << " in each subgroup separately"
+	 << " (permsep=2) ..."
 	 << endl << flush;
   
   for (size_t s = 0; s < vSubgroups.size(); ++s)
@@ -3918,7 +3923,9 @@ writeResSepPermPval (
   const int & verbose)
 {
   if (verbose > 0)
-    cout << "write results of feature-level P-values, each subgroup ..."
+    cout << "write results of feature-level P-values"
+	 << " in each subgroup separately"
+	 << " (permsep=1) ..."
 	 << endl << flush;
   
   stringstream ssOutFile, ssTxt;
@@ -4406,10 +4413,11 @@ int main (int argc, char ** argv)
   {
     time (&startRawTime);
     cout << "START " << argv[0] << " (" << time2string (startRawTime) << ")"
-	 << endl
-	 << "compiled -> " << __DATE__ << " " << __TIME__
-	 << endl << flush;
+	 << endl << "version " << VERSION << " compiled " << __DATE__ << " "
+	 << __TIME__ << endl;
     printCmdLine (cout, argc, argv);
+    cout << "cwd: " << getCurrentDirectory() << endl;
+    cout << flush;
   }
   
   run (genoPathsFile, snpCoordFile, phenoPathsFile, ftrCoordsFile, anchor,
