@@ -1,0 +1,16 @@
+*.[oa]
+*~
+Makefile
+Makefile.in
+.deps
+*.log
+*.trs
+aclocal.m4
+autom4te.cache/
+config.status
+configure
+doc/manual_eqtlbma.info
+doc/stamp-vti
+doc/version.texi
+eqtlbma-*.tar.gz
+src/eqtlbma
