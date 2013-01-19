@@ -14,3 +14,4 @@ doc/stamp-vti
 doc/version.texi
 eqtlbma-*.tar.gz
 src/eqtlbma
+.Rhistory

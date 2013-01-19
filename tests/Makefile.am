@@ -1,6 +1,8 @@
-#MAINTAINERCLEANFILES = Makefile.in launch_functional_tests.in
-TESTS = launch_functional_tests.bash
-EXTRA_DIST = launch_functional_tests.bash functional_tests.R
+TESTS = test_basic.bash \
+        test_genes-absent-in-some-subgroups.bash
+EXTRA_DIST = functional_tests.R \
+             test_basic.bash \
+             test_genes-absent-in-some-subgroups.bash
 AM_TESTS_ENVIRONMENT = \
 	eqtlbma_abspath='$(abs_top_builddir)'/src/eqtlbma; \
 	export eqtlbma_abspath; \

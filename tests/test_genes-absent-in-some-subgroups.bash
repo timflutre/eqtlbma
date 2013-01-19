@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch functional tests for eqtlbma, via `make check'
+# Aim: launch functional test with genes absent in some subgroups
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`$0' launches functional tests for eqtlbma.\n"
+    msg="\`$0' launches functional test with genes absent in some subgroups.\n"
     msg+="\n"
     msg+="Usage: $0 [OPTIONS] ...\n"
     msg+="\n"
@@ -82,15 +82,19 @@ function simul_data_and_calc_exp_res () {
 	echo "simulate data and calculate expected results ..."
     fi
     R --no-restore --no-save --slave --vanilla \
-	--file=${pathToRscript} --args $(pwd) $(expr $verbose - 1)
+	--file=${pathToRscript} --args --verbose $(expr $verbose - 1) --dir $(pwd) \
+	--rgs
 }
 
 function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz -p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 -o obs_eqtlbma --step 1 -v $(expr $verbose - 1) #--nperm 500 --seed 1859 --trick 2
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz -p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 -o obs_eqtlbma --outraw --step 3 --gridL grid_phi2_oma2_general.txt.gz --gridS grid_phi2_oma2_with-configs.txt.gz --bfs all -v $(expr $verbose - 1) --nperm 500 --seed 1859 --trick 2 --pbf all
+    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz \
+	-p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 \
+	-o obs_eqtlbma --outraw --step 3 --gridL grid_phi2_oma2_general.txt.gz \
+	--gridS grid_phi2_oma2_with-configs.txt.gz --bfs all \
+	-v $(expr $verbose - 1)
 }
 
 function comp_obs_vs_exp () {

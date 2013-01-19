@@ -1,6 +1,6 @@
 ## `functional_tests.R' simulate a typical eQTL data set in multiple
 ## tissues and analyze it with R in order to test `eqtlbma'.
-## Copyright (C) 2012 Timothee Flutre
+## Copyright (C) 2012-2013 Timothee Flutre
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -15,20 +15,30 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#options(warn=2, error=recover)
+
 rm(list=ls())
 sink(file=stdout(), type="message")
 
 parseArgs <- function(){
-  params <- list(dir.name=NULL,
-                 verbose=1)
+  params <- list(verbose=1,
+                 dir.name=NULL,
+                 rmvGenesFromSbgrps=FALSE)
   
   args <- commandArgs(trailingOnly=TRUE)
   ## print(args)
   stopifnot(length(args) != 0)
-  params$dir.name <- args[1]
-  if(length(args) == 2)
-    params$verbose <- as.numeric(args[2])
-  ## print(params)
+  
+  for(i in seq(1, length(args), 2)){
+    if(args[i] == "-v" || args[i] == "--verbose")
+      params$verbose <- as.numeric(args[i+1])
+    else if(args[i] == "--dir")
+      params$dir.name <- args[i+1]
+    else if(args[i] == "--rgs")
+      params$rmvGenesFromSbgrps <- TRUE
+  }
+  if(params$verbose > 1)
+    print(params)
   
   return(params)
 }
@@ -95,7 +105,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
   }
 }
 
-getSimulatedData <- function(verbose=0){
+getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
 
@@ -233,6 +243,17 @@ getSimulatedData <- function(verbose=0){
     }
   }
   
+  ## rmv gene9 in s3
+  if(rmvGenesFromSbgrps){
+    phenos[["s3"]] <- phenos[["s3"]][-9,]
+    tmp <- truth
+    tmp[tmp$gene == "gene9", "config"] <-
+      paste(do.call(c, strsplit(tmp[tmp$gene == "gene9", "config"], ""))[-3],
+            collapse="")
+    tmp[tmp$gene == "gene9", c("mu3", "b3", "sigma3")] <- NA
+    truth <- tmp
+  }
+  
   return(list(gene.coords=gene.coords,
               snp.coords=snp.coords,
               geno.counts=geno.counts,
@@ -259,19 +280,19 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
     write.table(x=tmp, file="list_genotypes.txt", quote=FALSE,
                 row.names=FALSE, col.names=FALSE)
   } else if(geno.format == "vcf"){
-    
+    message("ERROR: saving genotypes in VCF not yet implemented")
   } else if(geno.format == "impute"){
-    
+    message("ERROR: saving genotypes in IMPUTE not yet implemented")
   }
   
   for(s in 1:length(data$phenos))
     write.table(x=data$phenos[[s]],
                 file=gzfile(paste0("phenotypes_",names(data$phenos)[s],".txt.gz")),
                 quote=FALSE)
-    tmp <- data.frame(subgroup=names(data$phenos),
-                      file=paste0("phenotypes_",names(data$phenos),".txt.gz"))
-    write.table(x=tmp, file="list_phenotypes.txt", quote=FALSE,
-                row.names=FALSE, col.names=FALSE)
+  tmp <- data.frame(subgroup=names(data$phenos),
+                    file=paste0("phenotypes_",names(data$phenos),".txt.gz"))
+  write.table(x=tmp, file="list_phenotypes.txt", quote=FALSE,
+              row.names=FALSE, col.names=FALSE)
   
   write.table(x=data$truth, file=gzfile("truth.txt.gz"),
               quote=FALSE, row.names=FALSE)
@@ -293,19 +314,23 @@ calcSstatsOnSimulatedData <- function(data=NULL){
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
       i <- i + 1
+      gene <- data$gene.coords$id[g]
       for(s in 1:length(data$phenos)){
-        sstats[[s]]$ftr[i] <- data$gene.coords$id[g]
+        sstats[[s]]$ftr[i] <- gene
         sstats[[s]]$snp[i] <- data$snp.coords$id[p]
         sstats[[s]]$maf[i] <- sum(as.numeric(data$geno.counts[p,])) /
           (2 * length(data$phenos[[s]][g,]))
-        sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
-        tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
-                          as.numeric(data$geno.counts[p,])))
-        sstats[[s]]$pve[i] <- tmp$r.squared
-        sstats[[s]]$sigmahat[i] <- tmp$sigma
-        sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
-        sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
-        sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
+        if(gene %in% rownames(data$phenos[[s]])){
+          sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
+          tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
+                            as.numeric(data$geno.counts[p,])))
+          sstats[[s]]$pve[i] <- tmp$r.squared
+          sstats[[s]]$sigmahat[i] <- tmp$sigma
+          sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
+          sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
+          sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
+        } else # case where gene is absent in subgroup
+          sstats[[s]]$n[i] <- 0
       }
     }
   }
@@ -317,21 +342,24 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
   std.sstats.corr <- do.call(rbind, lapply(sstats, function(x){
     N <- x[x$ftr == data$gene.coords$id[g] &
            x$snp == data$snp.coords$id[p],
-           4]
-    sigmahat <- x[x$ftr == data$gene.coords$id[g] &
-                  x$snp == data$snp.coords$id[p],
-                  6]
-    betahat <- x[x$ftr == data$gene.coords$id[g] &
-                 x$snp == data$snp.coords$id[p],
-                 7]
-    sebetahat <- x[x$ftr == data$gene.coords$id[g] &
+           "n"]
+    if(N == 0){
+      c(NA, NA, NA)
+    } else{
+      sigmahat <- x[x$ftr == data$gene.coords$id[g] &
+                    x$snp == data$snp.coords$id[p],
+                    6]
+      betahat <- x[x$ftr == data$gene.coords$id[g] &
                    x$snp == data$snp.coords$id[p],
-                   8]
-    bhat <- betahat / sigmahat
-    sebhat <- sebetahat / sigmahat
-    t <- qnorm(pt(-abs(bhat/sebhat), N-2, log=TRUE), log=TRUE)
-    if(correct){
-      if(abs(t) > 10^(-8)){
+                   7]
+      sebetahat <- x[x$ftr == data$gene.coords$id[g] &
+                     x$snp == data$snp.coords$id[p],
+                     8]
+      bhat <- betahat / sigmahat
+      sebhat <- sebetahat / sigmahat
+      t <- qnorm(pt(-abs(bhat/sebhat), N-2, log=TRUE), log=TRUE)
+      if(correct){
+        if(abs(t) > 10^(-8)){
           sigmahat <- abs(betahat) / (abs(t) * sebhat)
           bhat <- betahat / sigmahat
           sebhat <- bhat / t
@@ -339,8 +367,9 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
           bhat <- 0
           sebhat <- Inf
         }
+      }
+      c(bhat, sebhat, t)
     }
-    c(bhat, sebhat, t)
   }))
   colnames(std.sstats.corr) <- c("bhat", "sebhat", "t")
   return(std.sstats.corr)
@@ -353,8 +382,10 @@ calcL10Abf <- function(sstats, phi2, oma2){
   bbarhat.num <- 0
   bbarhat.denom <- 0
   varbbarhat <- 0
-  l10abfs.single <- rep(NA, nrow(sstats))
-  for(i in 1:length(l10abfs.single)){
+  l10abfs.single <- c()
+  for(i in 1:nrow(sstats)){ # for each subgroup
+    if(sum(is.na(sstats[i,])) == length(sstats[i,]))
+      next
     bhat <- sstats[i,"bhat"]
     varbhat <- sstats[i,"sebhat"]^2
     t <- sstats[i,"t"]
@@ -362,26 +393,29 @@ calcL10Abf <- function(sstats, phi2, oma2){
       bbarhat.num <- bbarhat.num + bhat / (varbhat + phi2)
       bbarhat.denom <- bbarhat.denom + 1 / (varbhat + phi2)
       varbbarhat <- varbbarhat + 1 / (varbhat + phi2)
-      l10abfs.single[i] <- 0.5 * log10(varbhat) -
+      tmp <- 0.5 * log10(varbhat) -
         0.5 * log10(varbhat + phi2) +
           (0.5 * t^2 * phi2 / (varbhat + phi2)) / log(10)
     } else
-      l10abfs.single[i] <- 0
+      tmp <- 0
+    l10abfs.single <- c(l10abfs.single, tmp)
   }
-  
-  bbarhat <- ifelse(bbarhat.denom != 0, bbarhat.num / bbarhat.denom, 0)
-  varbbarhat <- ifelse(varbbarhat != 0, 1 / varbbarhat, Inf)
-  if(bbarhat != 0 & ! is.infinite(varbbarhat)){
-    T2 <- bbarhat^2 / varbbarhat
-    l10abf.bbar <- ifelse(T2 != 0,
-                          0.5 * log10(varbbarhat) - 0.5 * log10(varbbarhat + oma2) +
-                          (0.5 * T2 * oma2 / (varbbarhat + oma2)) / log(10),
-                          0)
-    l10abf <- l10abf.bbar
-    for(i in 1:length(l10abfs.single))
-      l10abf <- l10abf + l10abfs.single[i]
-  } else
-    l10abf <- 0
+
+  if(length(l10abfs.single) != 0){
+    bbarhat <- ifelse(bbarhat.denom != 0, bbarhat.num / bbarhat.denom, 0)
+    varbbarhat <- ifelse(varbbarhat != 0, 1 / varbbarhat, Inf)
+    if(bbarhat != 0 & ! is.infinite(varbbarhat)){
+      T2 <- bbarhat^2 / varbbarhat
+      l10abf.bbar <- ifelse(T2 != 0,
+                            0.5 * log10(varbbarhat) - 0.5 * log10(varbbarhat + oma2) +
+                            (0.5 * T2 * oma2 / (varbbarhat + oma2)) / log(10),
+                            0)
+      l10abf <- l10abf.bbar
+      for(i in 1:length(l10abfs.single))
+        l10abf <- l10abf + l10abfs.single[i]
+    } else
+      l10abf <- 0
+  }    
   
   return(as.numeric(l10abf))
 }
@@ -404,18 +438,37 @@ getConfigNames <- function(configs){
   return(config.names)
 }
 
+## std.sstats.corr: matrix with rows s1,s2,s3 and cols bhat,sebhat,t
 calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
   abfs <- matrix(data=NA, nrow=nrow(configs)-1, ncol=nrow(gridS))
-  ## rownames(abfs) <- getConfigNames(configs)
+  ## rownames(abfs) <- getConfigNames(configs) # -> not the good order...
   rownames(abfs) <- c("1", "2", "3", "1-2", "1-3", "2-3", "1-2-3")
-  for(m in rownames(abfs)){
-    tmp <- std.sstats.corr[as.numeric(do.call(c, strsplit(m, "-"))),]
+  isAbsentInSbgrp <- rep(FALSE, 3)
+  for(config in rownames(abfs)){
+    tmp <- std.sstats.corr[as.numeric(do.call(c, strsplit(config, "-"))),]
+    if(length(grep("-", config)) == 0 && sum(is.na(tmp)) == length(tmp))
+      isAbsentInSbgrp[as.numeric(config)] <- TRUE
     tmp <- matrix(tmp, nrow=ifelse(is.vector(tmp), 1, nrow(tmp)),
                   ncol=ncol(std.sstats.corr))
     colnames(tmp) <- colnames(std.sstats.corr)
     for(i in 1:nrow(gridS))
-      abfs[m,i] <- calcL10Abf(tmp, gridS[i,"phi2"], gridS[i,"oma2"])
+      abfs[config,i] <- calcL10Abf(tmp, gridS[i,"phi2"], gridS[i,"oma2"])
   }
+  
+  ## handle genes absent in some subgroups
+  if(sum(isAbsentInSbgrp) != 0){
+    for(config in rownames(abfs)){
+      if(length(grep("-", config)) != 0){
+        sbgrps <- strsplit(config, "-")[[1]]
+        absent.sbgrps <- sapply(sbgrps, function(s){isAbsentInSbgrp[as.numeric(s)]})
+        if(sum(absent.sbgrps) != 0){
+          config.present <- paste(sbgrps[! absent.sbgrps], collapse="-")
+          abfs[config,] <- abfs[config.present,]
+        }
+      }
+    }
+  }
+  
   return(abfs)
 }
 
@@ -466,21 +519,53 @@ log10WeightedSum <- function(values=NULL, weights=NULL){
   if(is.null(weights))
     weights <- rep(1/length(values), length(values))
   max <- max(values)
-  max + log10(sum(weights * 10^(values - max)))
+  return(max + log10(sum(weights * 10^(values - max))))
+}
+
+calcAvgAbfsSinAndGenSin <- function(l10abfs.avg, i){
+  tmp <- c()
+  weights <- c()
+  
+  for(config in c("l10abf.1", "l10abf.2", "l10abf.3")){
+    if(! is.na(l10abfs.avg[i, config])){
+      tmp <- c(tmp, l10abfs.avg[i, config])
+      weights <- c(weights, (1/2)*(1/choose(3,1)))
+    }
+  }
+  l10abfs.avg$l10abf.sin[i] <- log10WeightedSum(tmp)
+  
+  tmp <- c(tmp, l10abfs.avg$l10abf.gen[i])
+  weights <- c(weights, (1/2))
+  l10abfs.avg$l10abf.gen.sin[i] <- log10WeightedSum(tmp, weights)
+  
+  return(l10abfs.avg)
+}
+
+calcAvgAbfAll <- function(l10abfs.avg, i, configs){
+  tmp <- c()
+  weights <- c()
+  for(config in paste0("l10abf.", configs)){
+    k <- length(strsplit(config, "-")[[1]])
+    if(! is.na(l10abfs.avg[i, config])){
+      tmp <- c(tmp, l10abfs.avg[i, config])
+      weights <- c(weights, (1/3) * (1/choose(3,k)))
+    }
+  }
+  l10abfs.avg$l10abf.all[i] <- log10WeightedSum(tmp, weights)
+  return(l10abfs.avg)
 }
 
 calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
   stopifnot(! is.null(data), ! is.null(l10abfs.raw))
-  l10abfs.avg <- data.frame(ftr=rep(NA, data$params$nb.pairs),
-                            snp=NA, nb.subgroups=length(data$phenos),
-                            nb.samples=sum(sapply(data$phenos, ncol)))
+  l10abfs.avg <- data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA,
+                            nb.subgroups=NA, nb.samples=NA)
   for(i in c("l10abf.gen", "l10abf.gen.fix", "l10abf.gen.maxh",
              "l10abf.sin", "l10abf.gen.sin", "l10abf.all")){
     l10abfs.avg <- cbind(l10abfs.avg, NA)
     colnames(l10abfs.avg)[ncol(l10abfs.avg)] <- i
   }
-  config.names <- l10abfs.raw$config[4:10]
-  for(i in paste0("l10abf.",config.names)){
+  configs <- unique(l10abfs.raw$config)[-c(1:3)]
+  for(i in paste0("l10abf.",configs)){
     l10abfs.avg <- cbind(l10abfs.avg, NA)
     colnames(l10abfs.avg)[ncol(l10abfs.avg)] <- i
   }
@@ -494,6 +579,8 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
         next # SNP not in cis
       l10abfs.avg$ftr[i] <- data$gene.coords$id[g]
       l10abfs.avg$snp[i] <- data$snp.coords$id[p]
+      l10abfs.avg$nb.subgroups[i] <- 0
+      l10abfs.avg$nb.samples[i] <- 0
       
       tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
                          l10abfs.raw$snp == l10abfs.avg$snp[i] &
@@ -511,24 +598,22 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
                          c(4:ncol(l10abfs.raw))]
       l10abfs.avg$l10abf.gen.maxh[i] <- log10WeightedSum(tmp)
       
-      for(j in config.names){
+      for(config in configs){
         tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
                            l10abfs.raw$snp == l10abfs.avg$snp[i] &
-                           l10abfs.raw$config == j,
+                           l10abfs.raw$config == config,
                            c(4:13)]
-        l10abfs.avg[i, paste0("l10abf.",j)] <- log10WeightedSum(tmp)
+        if(length(grep("-", config)) == 0 && ! is.na(tmp[1])){
+          l10abfs.avg$nb.subgroups[i] <- l10abfs.avg$nb.subgroups[i] + 1
+          l10abfs.avg$nb.samples[i] <- l10abfs.avg$nb.samples[i] +
+            ncol(data$phenos[[as.numeric(config)]])
+        }
+        l10abfs.avg[i, paste0("l10abf.",config)] <- log10WeightedSum(tmp)
       }
       
-      tmp <- l10abfs.avg[i, c("l10abf.1","l10abf.2","l10abf.3")]
-      l10abfs.avg$l10abf.sin[i] <- log10WeightedSum(tmp)
+      l10abfs.avg <- calcAvgAbfsSinAndGenSin(l10abfs.avg, i)
       
-      tmp <- l10abfs.avg[i, c("l10abf.1","l10abf.2","l10abf.3","l10abf.gen")]
-      weights <- c(rep((1/2)*(1/choose(3,1)), 3), 1/2)
-      l10abfs.avg$l10abf.gen.sin[i] <- log10WeightedSum(tmp, weights)
-      
-      tmp <- l10abfs.avg[i,paste0("l10abf.",config.names)]
-      weights <- (1/3) * c(rep(1/choose(3,1),3), rep(1/choose(3,2),3), 1/choose(3,3))
-      l10abfs.avg[i, "l10abf.all"] <- log10WeightedSum(tmp, weights)
+      l10abfs.avg <- calcAvgAbfAll(l10abfs.avg, i, configs)
       
       i <- i + 1
     }
@@ -559,11 +644,12 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     message("write results (expected) ...")
   
   for(s in names(res$sstats)){
-    tmp <- cbind(res$sstats[[s]][,1:2],
-                 sprintf(fmt="%.07e", res$sstats[[s]][,3]),
-                 res$sstats[[s]][,4])
+    row.ids <- which(res$sstats[[s]]$n != 0) # don't save absent genes
+    tmp <- cbind(res$sstats[[s]][row.ids,1:2],
+                 sprintf(fmt="%.07e", res$sstats[[s]][row.ids,3]),
+                 res$sstats[[s]][row.ids,4])
     for(j in 5:ncol(res$sstats[[s]]))
-      tmp <- cbind(tmp, sprintf(fmt="%.07e", res$sstats[[s]][,j]))
+      tmp <- cbind(tmp, sprintf(fmt="%.07e", res$sstats[[s]][row.ids,j]))
     colnames(tmp) <- colnames(res$sstats[[s]])
     write.table(x=tmp, file=gzfile(paste0("exp_eqtlbma_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep=" ", na="nan")
@@ -589,8 +675,8 @@ run <- function(){
   if(params$verbose > 0)
     message(paste0("START functional_tests.R (", date(), ")"))
   setwd(params$dir.name)
-  data <- getSimulatedData(params$verbose)
-  writeSimulatedData(data, geno.format="custom", params$verbose)
+  data <- getSimulatedData(params$rmvGenesFromSbgrps, params$verbose)
+  writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$verbose)
