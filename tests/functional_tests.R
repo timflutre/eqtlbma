@@ -440,11 +440,11 @@ getConfigNames <- function(configs){
 
 ## std.sstats.corr: matrix with rows s1,s2,s3 and cols bhat,sebhat,t
 calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
-  abfs <- matrix(data=NA, nrow=nrow(configs)-1, ncol=nrow(gridS))
-  ## rownames(abfs) <- getConfigNames(configs) # -> not the good order...
-  rownames(abfs) <- c("1", "2", "3", "1-2", "1-3", "2-3", "1-2-3")
+  l10abfs <- matrix(data=NA, nrow=nrow(configs)-1, ncol=nrow(gridS))
+  ## rownames(l10abfs) <- getConfigNames(configs) # -> not the good order...
+  rownames(l10abfs) <- c("1", "2", "3", "1-2", "1-3", "2-3", "1-2-3")
   isAbsentInSbgrp <- rep(FALSE, 3)
-  for(config in rownames(abfs)){
+  for(config in rownames(l10abfs)){
     tmp <- std.sstats.corr[as.numeric(do.call(c, strsplit(config, "-"))),]
     if(length(grep("-", config)) == 0 && sum(is.na(tmp)) == length(tmp))
       isAbsentInSbgrp[as.numeric(config)] <- TRUE
@@ -452,24 +452,25 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
                   ncol=ncol(std.sstats.corr))
     colnames(tmp) <- colnames(std.sstats.corr)
     for(i in 1:nrow(gridS))
-      abfs[config,i] <- calcL10Abf(tmp, gridS[i,"phi2"], gridS[i,"oma2"])
+      l10abfs[config,i] <- calcL10Abf(tmp, gridS[i,"phi2"], gridS[i,"oma2"])
   }
   
   ## handle genes absent in some subgroups
   if(sum(isAbsentInSbgrp) != 0){
-    for(config in rownames(abfs)){
+    for(config in rownames(l10abfs)){
       if(length(grep("-", config)) != 0){
         sbgrps <- strsplit(config, "-")[[1]]
         absent.sbgrps <- sapply(sbgrps, function(s){isAbsentInSbgrp[as.numeric(s)]})
         if(sum(absent.sbgrps) != 0){
           config.present <- paste(sbgrps[! absent.sbgrps], collapse="-")
-          abfs[config,] <- abfs[config.present,]
+          l10abfs[config,] <- l10abfs[config.present,]
         }
-      }
+      } else if(isAbsentInSbgrp[as.numeric(config)]) # absent singleton
+        l10abfs[config,] <- rep(1, ncol(gridS))
     }
   }
   
-  return(abfs)
+  return(l10abfs)
 }
 
 calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL){
@@ -603,7 +604,7 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
                            l10abfs.raw$snp == l10abfs.avg$snp[i] &
                            l10abfs.raw$config == config,
                            c(4:13)]
-        if(length(grep("-", config)) == 0 && ! is.na(tmp[1])){
+        if(length(grep("-", config)) == 0 && sum(tmp == 1.0) != length(tmp)){
           l10abfs.avg$nb.subgroups[i] <- l10abfs.avg$nb.subgroups[i] + 1
           l10abfs.avg$nb.samples[i] <- l10abfs.avg$nb.samples[i] +
             ncol(data$phenos[[as.numeric(config)]])

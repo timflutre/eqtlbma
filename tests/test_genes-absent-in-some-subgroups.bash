@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch functional test with genes absent in some subgroups
+# Aim: launch a functional test with genes absent in some subgroups
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`$0' launches functional test with genes absent in some subgroups.\n"
+    msg="\`$0' launches a functional test with genes absent in some subgroups.\n"
     msg+="\n"
     msg+="Usage: $0 [OPTIONS] ...\n"
     msg+="\n"
@@ -135,7 +135,7 @@ clean=true
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
-    printf "START %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
+    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     startTime=$(timer)
 fi
 
@@ -157,6 +157,6 @@ cd ${cwd}
 if $clean; then rm -rf ${testDir}; fi
 
 if [ $verbose -gt "0" ]; then
-    printf "END %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
+    printf "END ${0##*/} %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     printf " (%s)\n" $(timer startTime)
 fi

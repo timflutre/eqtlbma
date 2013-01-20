@@ -1325,6 +1325,7 @@ ResFtrSnp_calcAbfsSingletons (
   {
     ssConfig.str("");
     ssConfig << (s+1);
+    vL10Abfs.assign (iGridS.size(), 1);
     
     if (iResFtrSnp.vNs[s] > 2)
     {
@@ -1342,31 +1343,18 @@ ResFtrSnp_calcAbfsSingletons (
 	  vvStdSstatsSingletons.push_back (vector<double> (3, 0));
 	}
       }
-      
-      vL10Abfs.assign (iGridS.size(), 0);
       for (size_t gridIdx = 0; gridIdx < iGridS.size(); ++gridIdx)
 	vL10Abfs[gridIdx] = getAbfFromStdSumStats (vNs,
 						   vvStdSstatsSingletons,
 						   iGridS.phi2s[gridIdx],
 						   iGridS.oma2s[gridIdx]);
-      iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
-						    vL10Abfs));
-      iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
-						 log10_weighted_sum (
-						   &(vL10Abfs[0]),
-						   vL10Abfs.size())));
     }
-    else // iResFtrSnp.vNs[s] <= 2
-    {
-      iResFtrSnp.mUnweightedAbfs.insert (
-	make_pair (ssConfig.str(),
-		   vector<double> (
-		     iGridS.size(),
-		     numeric_limits<double>::quiet_NaN())));
-      iResFtrSnp.mWeightedAbfs.insert (
-	make_pair (ssConfig.str(),
-		   numeric_limits<double>::quiet_NaN()));
-    }
+    iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						  vL10Abfs));
+    iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
+					       log10_weighted_sum (
+						 &(vL10Abfs[0]),
+						 vL10Abfs.size())));
   }
 }
 
@@ -1479,29 +1467,21 @@ ResFtrSnp_calcAbfsAllConfigs (
 	  vvStdSstatsSubset.push_back (vector<double> (3, 0));
 	}
       }
+      vL10Abfs.assign (iGridS.size(), 1);
       if (accumulate (vNs.begin(), vNs.end(), 0) > 2)
       {
-	vL10Abfs.assign (iGridS.size(), 0);
 	for (size_t gridIdx = 0; gridIdx < iGridS.size(); ++gridIdx)
 	  vL10Abfs[gridIdx] = getAbfFromStdSumStats (vNs,
 						     vvStdSstatsSubset,
 						     iGridS.phi2s[gridIdx],
 						     iGridS.oma2s[gridIdx]);
-	iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
-						      vL10Abfs));
-	iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
-						   log10_weighted_sum (
-						     &(vL10Abfs[0]),
-						     vL10Abfs.size())));
       }
-      else
-      {
-	iResFtrSnp.mUnweightedAbfs.insert (
-	  make_pair(ssConfig.str(), vector<double> (
-		      iGridS.size(), numeric_limits<double>::quiet_NaN())));
-	iResFtrSnp.mWeightedAbfs.insert (
-	  make_pair(ssConfig.str(), numeric_limits<double>::quiet_NaN()));
-      }
+      iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						    vL10Abfs));
+      iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
+						 log10_weighted_sum (
+						   &(vL10Abfs[0]),
+						   vL10Abfs.size())));
       if (gsl_combination_next (comb) != GSL_SUCCESS)
 	break;
     }

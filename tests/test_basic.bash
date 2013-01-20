@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch functional tests for eqtlbma, via `make check'
+# Aim: launch a basic functional test for eqtlbma
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`$0' launches functional tests for eqtlbma.\n"
+    msg="\`$0' launches a basic functional test for eqtlbma.\n"
     msg+="\n"
     msg+="Usage: $0 [OPTIONS] ...\n"
     msg+="\n"
@@ -89,8 +89,11 @@ function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz -p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 -o obs_eqtlbma --step 1 -v $(expr $verbose - 1) #--nperm 500 --seed 1859 --trick 2
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz -p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 -o obs_eqtlbma --outraw --step 3 --gridL grid_phi2_oma2_general.txt.gz --gridS grid_phi2_oma2_with-configs.txt.gz --bfs all -v $(expr $verbose - 1) --nperm 500 --seed 1859 --trick 2 --pbf all
+    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz \
+	-p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 \
+	-o obs_eqtlbma --outraw --step 3 --gridL grid_phi2_oma2_general.txt.gz \
+	--gridS grid_phi2_oma2_with-configs.txt.gz --bfs all \
+	-v $(expr $verbose - 1)
 }
 
 function comp_obs_vs_exp () {
@@ -131,7 +134,7 @@ clean=true
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
-    printf "START %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
+    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     startTime=$(timer)
 fi
 
@@ -153,6 +156,6 @@ cd ${cwd}
 if $clean; then rm -rf ${testDir}; fi
 
 if [ $verbose -gt "0" ]; then
-    printf "END %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
+    printf "END ${0##*/} %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     printf " (%s)\n" $(timer startTime)
 fi
