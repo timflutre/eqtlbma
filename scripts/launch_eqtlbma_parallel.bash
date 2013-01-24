@@ -126,7 +126,7 @@ function parseArgs () {
 	    --nperm) nperm=$2; shift 2;;
 	    --trick) trick=$2; shift 2;;
 	    --pbf) pbf=$2; shift 2;;
-	    --permsep) permSep=$2; shift 2;;
+	    --permsep) permsep=$2; shift 2;;
 	    --maxbf) maxbf=true; shift;;
 	    --sbgrp) sbgrp=$2; shift 2;;
             --) shift; break;;
@@ -200,8 +200,9 @@ sbgrp=""
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
-    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     startTime=$(timer)
+    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
+    echo "cmd-line: $0 "$@
 fi
 
 # prepare the feature list + misc
