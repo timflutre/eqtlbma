@@ -80,14 +80,15 @@ function timer () {
     if [[ $# -eq 0 ]]; then
         echo $(date '+%s')
     else
-        local  stime=$1
-        etime=$(date '+%s')
-        if [[ -z "$stime" ]]; then stime=$etime; fi
-        dt=$((etime - stime))
-        ds=$((dt % 60))
-        dm=$(((dt / 60) % 60))
-        dh=$((dt / 3600))
-        printf '%d:%02d:%02d' $dh $dm $ds
+        local startRawTime=$1
+        endRawTime=$(date '+%s')
+        if [[ -z "$startRawTime" ]]; then startRawTime=$endRawTime; fi
+        elapsed=$((endRawTime - startRawTime)) # in sec
+	nbDays=$((elapsed / 86400))
+        nbHours=$(((elapsed / 3600) % 24))
+        nbMins=$(((elapsed / 60) % 60))
+        nbSecs=$((elapsed % 60))
+        printf "%01dd %01dh %01dm %01ds" $nbDays $nbHours $nbMins $nbSecs
     fi
 }
 
@@ -201,8 +202,10 @@ parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
     startTime=$(timer)
-    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
-    echo "cmd-line: $0 "$@
+    msg="START ${0##*/} $(date +"%Y-%m-%d") $(date +"%H:%M:%S")"
+    msg+="\ncmd-line: $0 "$@
+    echo -e $msg
+    uname -a
 fi
 
 # prepare the feature list + misc
@@ -275,6 +278,10 @@ cmd+=" -v ${verbose}"
 
 # run the program
 eval $cmd
+if [ $? != 0 ]; then
+    echo "ERROR: eqtlbma didn't finished successfully" >&2
+    exit 1
+fi
 
 # clean
 if [ ! -z "${linksFile}" ]; then
@@ -282,6 +289,7 @@ if [ ! -z "${linksFile}" ]; then
 fi
 
 if [ $verbose -gt "0" ]; then
-    printf "END ${0##*/} %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
-    printf " (%s)\n" $(timer startTime)
+    msg="END ${0##*/} $(date +"%Y-%m-%d") $(date +"%H:%M:%S")"
+    msg+=" ($(timer startTime))"
+    echo $msg
 fi

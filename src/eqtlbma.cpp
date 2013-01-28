@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <getopt.h>
+#include <libgen.h>
 
 #include <iostream>
 #include <iomanip>
@@ -414,63 +415,63 @@ parseArgs (
   }
   if (genoPathsFile.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option -g\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (genoPathsFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't file '%s'\n\n", genoPathsFile.c_str());
     help (argv);
     exit (1);
   }
   if (! snpCoordsFile.empty() && ! doesFileExist (snpCoordsFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't file '%s'\n\n", snpCoordsFile.c_str());
     help (argv);
     exit (1);
   }
   if (phenoPathsFile.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option -p\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (phenoPathsFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", phenoPathsFile.c_str());
     help (argv);
     exit (1);
   }
   if (ftrCoordsFile.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option --fcoord\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (ftrCoordsFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", ftrCoordsFile.c_str());
     help (argv);
     exit (1);
   }
   if (anchor.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: SNPs in trans not yet implemented, see --anchor and --cis\n\n");
     help (argv);
     exit (1);
   }
   if (outPrefix.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option -o\n\n");
     help (argv);
     exit (1);
@@ -485,7 +486,7 @@ parseArgs (
   if (whichStep != 1 && whichStep != 2 && whichStep != 3 && whichStep != 4
       && whichStep != 5)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: --step should be 1, 2, 3, 4 or 5\n\n");
     help (argv);
     exit (1);
@@ -493,14 +494,14 @@ parseArgs (
   if ((whichStep == 3 || whichStep == 4 || whichStep == 5)
       && largeGridFile.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option --gridL with --step 3, 4 or 5\n\n");
     help (argv);
     exit (1);
   }
   if (! largeGridFile.empty() && ! doesFileExist (largeGridFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", largeGridFile.c_str());
     help (argv);
     exit (1);
@@ -509,14 +510,14 @@ parseArgs (
       && (whichBfs.compare("sin") == 0 || whichBfs.compare("all") == 0)
       && smallGridFile.empty())
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: missing compulsory option --gridS with --step 3, 4 or 5 and --bfs sin or all\n\n");
     help (argv);
     exit (1);
   }
   if (! smallGridFile.empty() && ! doesFileExist (smallGridFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", smallGridFile.c_str());
     help (argv);
     exit (1);
@@ -524,7 +525,7 @@ parseArgs (
   if (whichBfs.compare("gen") != 0 && whichBfs.compare("sin") != 0
       && whichBfs.compare("all") != 0)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: --bf should be 'gen', 'sin' or 'all'\n\n");
     help (argv);
     exit (1);
@@ -533,14 +534,14 @@ parseArgs (
     fprintf (stderr, "WARNING: separate analysis won't be performed with --mvlr\n\n");
   if ((whichStep == 2 || whichStep == 4 || whichStep == 5) && nbPerms == 0)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: --step %i but nbPerms = 0, see --nperm\n\n", whichStep);
     help (argv);
     exit (1);
   }
   if (trick != 0 && trick != 1 && trick != 2)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: --trick should be 0, 1 or 2\n\n");
     help (argv);
     exit (1);
@@ -548,7 +549,7 @@ parseArgs (
   if ((whichStep == 2 || whichStep == 5) &&
       whichPermSep != 1 && whichPermSep != 2)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: --permsep should be 1 or 2\n\n");
     help (argv);
     exit (1);
@@ -556,7 +557,7 @@ parseArgs (
   if ((whichStep == 4 || whichStep == 5) && whichBfs.compare("gen") == 0
       && whichPermBf.compare("gen") != 0)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: if --bfs gen, then --pbf should be 'gen' too\n\n");
     help (argv);
     exit (1);
@@ -564,21 +565,21 @@ parseArgs (
   if ((whichStep == 4 || whichStep == 5) && whichBfs.compare("sin") == 0
       && whichPermBf.compare("all") == 0)
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: if --bfs sin, then --pbf should be 'gen', 'sin' or 'gen-sin'\n\n");
     help (argv);
     exit (1);
   }
   if (! ftrsToKeepFile.empty() && ! doesFileExist (ftrsToKeepFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", ftrsToKeepFile.c_str());
     help (argv);
     exit (1);
   }
   if (! snpsToKeepFile.empty() && ! doesFileExist (snpsToKeepFile))
   {
-    printCmdLine (cerr, argc, argv);
+    getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: can't find '%s'\n\n", snpsToKeepFile.c_str());
     help (argv);
     exit (1);
@@ -3856,7 +3857,7 @@ writeResSepPermPval (
   for (size_t s = 0; s < vSubgroups.size(); ++s)
   {
     stringstream ssOutFile, ssTxt;
-    ssOutFile << outPrefix << "_permPval_" << vSubgroups[s] << ".txt.gz";
+    ssOutFile << outPrefix << "_sepPermPvals_" << vSubgroups[s] << ".txt.gz";
     if (verbose > 0)
       cout << "file " << ssOutFile.str() << endl << flush;
     gzFile outStream;
@@ -4392,11 +4393,12 @@ int main (int argc, char ** argv)
   if (verbose > 0)
   {
     time (&startRawTime);
-    cout << "START " << argv[0] << " (" << time2string (startRawTime) << ")"
-	 << endl << "version " << VERSION << " compiled " << __DATE__ << " "
-	 << __TIME__ << endl;
-    printCmdLine (cout, argc, argv);
-    cout << "cwd: " << getCurrentDirectory() << endl;
+    cout << "START " << basename(argv[0])
+	 << " " << time2string (startRawTime) << endl
+	 << "version " << VERSION << " compiled " << __DATE__
+	 << " " << __TIME__ << endl
+	 << "cmd-line: " << getCmdLine (argc, argv) << endl
+	 << "cwd: " << getCurrentDirectory() << endl;
     cout << flush;
   }
   
@@ -4409,12 +4411,10 @@ int main (int argc, char ** argv)
   if (verbose > 0)
   {
     time (&endRawTime);
-    cout << "END " << argv[0] << " (" << time2string (endRawTime) << ")"
-	 << endl
-	 << "elapsed -> " << elapsedTime(startRawTime, endRawTime)
-	 << endl
-	 << "max.mem -> " << getMaxMemUsedByProcess2Str ()
-	 << endl;
+    cout << "END " << basename(argv[0])
+	 << " " << time2string (endRawTime) << endl
+	 << "elapsed -> " << elapsedTime(startRawTime, endRawTime) << endl
+	 << "max.mem -> " << getMaxMemUsedByProcess2Str () << endl;
   }
   
   return EXIT_SUCCESS;

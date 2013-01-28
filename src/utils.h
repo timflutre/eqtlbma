@@ -1,7 +1,7 @@
 /** \file utils.h
  *
  *  `utils.cpp' gathers functions useful for any program.
- *  Copyright (C) 2011-2012  T. Flutre
+ *  Copyright (C) 2011-2013 Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -28,9 +28,6 @@
 #include <string>
 #include <fstream>
 using namespace std;
-
-#include <gsl/gsl_sort.h>
-#include <gsl/gsl_cdf.h>
 
 #include "zlib.h"
 
@@ -130,6 +127,6 @@ double getMaxMemUsedByProcess (void);
 
 string getMaxMemUsedByProcess2Str (void);
 
-void printCmdLine (ostream & os, int argc, char ** argv);
+string getCmdLine (int argc, char ** argv);
 
 #endif

@@ -1,7 +1,7 @@
 /** \file utils.cpp
  *
  *  `utils.cpp' gathers functions useful for any program.
- *  Copyright (C) 2011-2012  T. Flutre
+ *  Copyright (C) 2011-2013 Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -31,6 +31,9 @@
 #include <algorithm>
 #include <iomanip>
 using namespace std;
+
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_cdf.h>
 
 #include "utils.h"
 
@@ -135,26 +138,27 @@ elapsedTime (
   const time_t & startRawTime,
   const time_t & endRawTime)
 {
-  char str[128];
   double elapsed = difftime (endRawTime, startRawTime); // in sec
-  snprintf (str, 127, "%01.0fd %01.0fh %01.0fm %01.0fs",
-	    floor(elapsed/(24*60*60)),
-	    floor(elapsed/(60*60)),
-	    floor(fmod(elapsed,60*60)/60.0),
-	    fmod(elapsed,60));
-  return string(str);
+  char buffer[100];
+  int n = snprintf (buffer, 127, "%01.0fd %01.0fh %01.0fm %01.0fs",
+		    floor (elapsed / (24*60*60)),
+		    floor (fmod (elapsed, 24*60*60) / (60*60)),
+		    floor (fmod (elapsed, 24*60*60*60*60) / 60.0),
+		    fmod (elapsed, 60));
+  return string(buffer);
 }
 
-/** \brief Return a string with the given date-time, without end-of-line.
+/** \brief Return a string with Y-M-D H:M:S without end-of-line.
  */
 string
 time2string (
   const time_t & inTime)
 {
-  char * ptr = ctime (&inTime);
-  char buffer[126];
-  strcpy (buffer, ptr);
-  buffer[strlen(buffer)-1] = 0;
+  struct tm * ptTm = localtime (&inTime);
+  char buffer[100];
+  int n = snprintf (buffer, 126, "%i-%02i-%02i %02i:%02i:%02i",
+		    1900 + ptTm->tm_year, ptTm->tm_mon + 1, ptTm->tm_mday,
+		    ptTm->tm_hour, ptTm->tm_min, ptTm->tm_sec);
   return string(buffer);
 }
 
@@ -987,14 +991,14 @@ string getMaxMemUsedByProcess2Str (void)
   return string(str);
 }
 
-void
-printCmdLine (
-  ostream & os,
+string
+getCmdLine (
   int argc,
   char ** argv)
 {
-  os << argv[0];
+  ostringstream oss;
+  oss << argv[0];
   for(int i = 1; i < argc; ++i)
-    os << " " << argv[i];
-  os << endl << flush;
+    oss << " " << argv[i];
+  return (oss.str());
 }
