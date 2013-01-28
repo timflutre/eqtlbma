@@ -3059,6 +3059,33 @@ loadGenosAndSnpInfoFromVcf (
   }
 }
 
+void 
+duplicateGenosPerSnpInAllSubgroups (
+  const vector<string> & vSubgroups,
+  map<string, Snp> & mSnps,
+  const int & verbose)
+{
+  if (verbose > 0)
+    cout << "duplicate genotypes for other subgroups (same file) ..."
+	 << flush << endl;
+  for (size_t s = 1; s < vSubgroups.size(); ++s)
+  {
+    clock_t timeBegin = clock();
+    for (map<string, Snp>::iterator it = mSnps.begin();
+	 it != mSnps.end(); ++it)
+    {
+      it->second.vvIsNa[s] = it->second.vvIsNa[0];
+      it->second.vvGenos[s] = it->second.vvGenos[0];
+      it->second.vMafs[s] = it->second.vMafs[0];
+    }
+    if (verbose > 0)
+      cout << "s" << (s+1) << " (" << vSubgroups[s] << "): "
+	   << mSnps.size() << " SNPs duplicated in " << fixed << setprecision(2)
+	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
+	   << " min" << endl << flush;
+  }
+}
+
 void
 loadGenosAndSnpInfo (
   const map<string, string> & mGenoPaths,
@@ -3077,9 +3104,17 @@ loadGenosAndSnpInfo (
   string line;
   size_t nbLines, nbSnpsToKeepPerSubgroup;
   
-  // load each file
+  // load each file (if different from the first)
+  bool sameFiles = false;
   for (size_t s = 0; s < vSubgroups.size(); ++s)
   {
+    if (s > 0 && mGenoPaths.find(vSubgroups[s])->second.compare(
+	  mGenoPaths.find(vSubgroups[0])->second) == 0)
+    {
+      sameFiles = true;
+      break; // avoid loading same file several times
+    }
+    
     clock_t timeBegin = clock();
     nbSnpsToKeepPerSubgroup = 0;
     nbLines = 0;
@@ -3121,6 +3156,9 @@ loadGenosAndSnpInfo (
 	   << " min)" << endl << flush;
   }
   
+  if (sameFiles && vSubgroups.size() > 1)
+    duplicateGenosPerSnpInAllSubgroups (vSubgroups, mSnps, verbose);
+  
   // sort the SNPs per chr
   for (map<string, vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
        it != mChr2VecPtSnps.end(); ++it)
@@ -3152,8 +3190,17 @@ loadGenos (
   size_t nbSamples, nbLines;
   double maf;
   
+  // load each file (if different from the first)
+  bool sameFiles = false;
   for (size_t s = 0; s < vSubgroups.size(); ++s)
   {
+    if (s > 0 && mGenoPaths.find(vSubgroups[s])->second.compare(
+	  mGenoPaths.find(vSubgroups[0])->second) == 0)
+    {
+      sameFiles = true;
+      break; // avoid loading same file several times
+    }
+    
     clock_t timeBegin = clock();
     nbLines = 0;
     openFile (mGenoPaths.find(vSubgroups[s])->second, genoStream, "rb");
@@ -3253,6 +3300,9 @@ loadGenos (
 	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
 	   << " min)" << endl << flush;
   }
+  
+  if (sameFiles && vSubgroups.size() > 1)
+    duplicateGenosPerSnpInAllSubgroups (vSubgroups, mSnps, verbose);
   
   if (mSnps.size() == 0)
   {

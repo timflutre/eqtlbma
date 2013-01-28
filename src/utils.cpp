@@ -139,12 +139,13 @@ elapsedTime (
   const time_t & endRawTime)
 {
   double elapsed = difftime (endRawTime, startRawTime); // in sec
+  float nbDays = floor (elapsed / 86400),
+    nbHours = floor (fmod ((elapsed / 3600), 24)),
+    nbMins = floor (fmod ((elapsed / 60), 60)),
+    nbSecs = floor (fmod (elapsed, 60));
   char buffer[100];
-  int n = snprintf (buffer, 127, "%01.0fd %01.0fh %01.0fm %01.0fs",
-		    floor (elapsed / (24*60*60)),
-		    floor (fmod (elapsed, 24*60*60) / (60*60)),
-		    floor (fmod (elapsed, 24*60*60*60*60) / 60.0),
-		    fmod (elapsed, 60));
+  int n = snprintf (buffer, 100, "%01.0fd %01.0fh %01.0fm %01.0fs",
+		    nbDays, nbHours, nbMins, nbSecs);
   return string(buffer);
 }
 
