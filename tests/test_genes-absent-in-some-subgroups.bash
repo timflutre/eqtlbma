@@ -9,9 +9,9 @@ set -o errexit -o pipefail
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`$0' launches a functional test with genes absent in some subgroups.\n"
+    msg="\`${0##*/}' launches a functional test with genes absent in some subgroups.\n"
     msg+="\n"
-    msg+="Usage: $0 [OPTIONS] ...\n"
+    msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
     msg+="Options:\n"
     msg+="  -h, --help\tdisplay the help and exit\n"
@@ -24,11 +24,11 @@ function help () {
 }
 
 function version () {
-    msg="$0 1.0\n"
-    msg+="\n"
-    msg+="Not copyrighted -- provided to the public domain\n"
+    msg="${0##*/} 1.0\n"
     msg+="\n"
     msg+="Written by Timothee Flutre.\n"
+    msg+="\n"
+    msg+="Not copyrighted -- provided to the public domain\n"
     echo -e "$msg"
 }
 
@@ -37,14 +37,15 @@ function timer () {
     if [[ $# -eq 0 ]]; then
         echo $(date '+%s')
     else
-        local  stime=$1
-        etime=$(date '+%s')
-        if [[ -z "$stime" ]]; then stime=$etime; fi
-        dt=$((etime - stime))
-        ds=$((dt % 60))
-        dm=$(((dt / 60) % 60))
-        dh=$((dt / 3600))
-        printf '%d:%02d:%02d' $dh $dm $ds
+        local startRawTime=$1
+        endRawTime=$(date '+%s')
+        if [[ -z "$startRawTime" ]]; then startRawTime=$endRawTime; fi
+        elapsed=$((endRawTime - startRawTime)) # in sec
+        nbDays=$((elapsed / 86400))
+        nbHours=$(((elapsed / 3600) % 24))
+        nbMins=$(((elapsed / 60) % 60))
+        nbSecs=$((elapsed % 60))
+        printf "%01dd %01dh %01dm %01ds" $nbDays $nbHours $nbMins $nbSecs
     fi
 }
 
@@ -92,8 +93,9 @@ function calc_obs_res () {
     fi
     $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz \
 	-p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 \
-	-o obs_eqtlbma --outraw --step 3 --gridL grid_phi2_oma2_general.txt.gz \
-	--gridS grid_phi2_oma2_with-configs.txt.gz --bfs all \
+	-o obs_eqtlbma --outss --outraw --step 3 --bfs all \
+	--gridL grid_phi2_oma2_general.txt.gz \
+	--gridS grid_phi2_oma2_with-configs.txt.gz \
 	-v $(expr $verbose - 1)
 }
 
@@ -135,8 +137,10 @@ clean=true
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
-    printf "START ${0##*/} %s %s\n" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
     startTime=$(timer)
+    msg="START ${0##*/} $(date +"%Y-%m-%d") $(date +"%H:%M:%S")"
+    msg+="\ncmd-line: $0 "$@
+    echo -e $msg
 fi
 
 cwd=$(pwd)
@@ -157,6 +161,7 @@ cd ${cwd}
 if $clean; then rm -rf ${testDir}; fi
 
 if [ $verbose -gt "0" ]; then
-    printf "END ${0##*/} %s %s" $(date +"%Y-%m-%d") $(date +"%H:%M:%S")
-    printf " (%s)\n" $(timer startTime)
+    msg="END ${0##*/} $(date +"%Y-%m-%d") $(date +"%H:%M:%S")"
+    msg+=" ($(timer startTime))"
+    echo $msg
 fi

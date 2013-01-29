@@ -119,6 +119,7 @@ The command-line hence looks like this:
 --fcoord file_with_gene_coordinates.bed.gz \@*
 --out output_eqtlbma \@*
 --step 5 \@*
+--outss \@*
 --outraw \@*
 --qnorm \@*
 --maf 0.05 \@*
@@ -274,6 +275,15 @@ Step 3 tests for association in each subgroup separately and also in all subgrou
 Step 4 does the same and perform permutations but only for the joint analysis.
 Step 5 does the same and perform permutations for both separate and joint analyses.
 
+At the beginning of each step, summary statistics are computed in each subgroup 
+(estimates of effect sizes, standard errors, p-values, etc).
+If the option @option{--outss} is not specified, the summary statistics won't be saved.
+This can be useful in some cases: for instance, when we want to run a set of jobs with @option{--permsep 1} 
+and another set of jobs with @option{--permsep 2}, both sets of jobs in the same directory.
+We would typically use option @option{--outss} with the first set of jobs but not with the second,
+otherwise both sets of jobs may overwrite each other's files.
+However, we need the summary stats per subgroup if we want to make meta-analysis-like forest plots.
+
 If the option @option{--outraw} is not specified, the raw Bayes Factors won't be saved.
 This can be useful in some cases: for instance, when the number of subgroups is large (>15-20).
 However, the hierarchical model requires all the raw BFs.
@@ -307,8 +317,10 @@ This can be too costly when the number of subgroups exceeds 15 or 20.
 
 The option @option{--mvlr} implements the multivariate model in which the errors
 in the linear regressions are correlated (see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}).
-This is especially important when all subgroups share the same set of individuals.
-When using this option, the option @option{--fitsig} is set by default at 0.
+This is especially important when all subgroups share the same set of individuals, 
+for instance when several tissues are sampled from the same set of individuals.
+When using @option{--mvlr}, the option @option{--fitsig} is set by default at 0.
+Also, with @option{--mvlr}, the summary statistics per subgroup are not exported anymore.
 
 The option @option{--nperm} allows to specify how many permutations will be performed.
 We recommend 10000.
@@ -349,6 +361,7 @@ eqtlbma \
 --pheno file_with_paths_to_phenotype_files.txt \
 --fcoord file_with_gene_coordinates.bed.gz \
 --out output_eqtlbma \
+--outss \
 --step 3 \
 --gridL file_with_large_grid.txt \
 --gridS file_with_small_grid.txt \
@@ -416,11 +429,12 @@ the character string given to option @option{--out}, e.g. ``out_eqtlbma''
 All output files contain a header line, which should make it easy to understand
 as well as load into R.
 
-If @option{--mvlr} is not set, one file is created per subgroup with some summary statistics.
+If @option{--outss} is set but @option{--mvlr} is not, one file is created per subgroup with some summary statistics.
 They have the suffix ``_sumstats_<subgroup>.txt.gz''.
 These summary statistics can be used to draw forest plots.
-For steps 2 and 5, there will also be one file per subgroup with the results of the permutations,
-with suffix ``_sepPermPvals.txt.gz''.
+For steps 2 and 5, there will also be file(s) with the results of the permutations.
+If @option{--permsep 1} was given, there will be one such file, with suffix ``_sepPermPvals.txt.gz''.
+If @option{--permsep 2} was given, there will be one file per subgroup, with suffix ``_sepPermPvals_<subgroup>.txt.gz''.
 
 One file contains all the BFs averaged over the grid, with suffix ``_l10abfs_avg-grids.txt.gz''.
 If option @option{--outraw} was given, there will also be one file with all the raw BFs,

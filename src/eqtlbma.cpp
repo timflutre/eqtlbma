@@ -107,6 +107,7 @@ void help (char ** argv)
        << "\t\t3: both separate and joint analysis, without permutation" << endl
        << "\t\t4: both separate and joint analysis, with permutation for joint only" << endl
        << "\t\t5: both separate and joint analysis, with permutation for both" << endl
+       << "      --outss\twrite the output file with all summary statistics" << endl
        << "      --outraw\twrite the output file with all raw ABFs" << endl
        << "\t\tby default, only the ABFs averaged over the grids are written" << endl
        << "\t\twriting all raw ABFs can be too much if the number of subgroups is large" << endl
@@ -209,6 +210,7 @@ parseArgs (
   string & anchor,
   size_t & lenCis,
   string & outPrefix,
+  bool & outSstats,
   bool & outRaw,
   int & whichStep,
   bool & needQnorm,
@@ -245,6 +247,7 @@ parseArgs (
 	{"anchor", required_argument, 0, 0},
 	{"cis", required_argument, 0, 0},
 	{"out", required_argument, 0, 'o'},
+	{"outss", no_argument, 0, 0},
 	{"outraw", no_argument, 0, 0},
 	{"step", required_argument, 0, 0},
 	{"qnorm", no_argument, 0, 0},
@@ -294,6 +297,11 @@ parseArgs (
       if (strcmp(long_options[option_index].name, "cis") == 0)
       {
 	lenCis = atol (optarg);
+	break;
+      }
+      if (strcmp(long_options[option_index].name, "outss") == 0)
+      {
+	outSstats = true;
 	break;
       }
       if (strcmp(long_options[option_index].name, "outraw") == 0)
@@ -4297,6 +4305,7 @@ writeResJointPermPval (
 void
 writeRes (
   const string & outPrefix,
+  const bool & outSstats,
   const bool & outRaw,
   const map<string, Ftr> & mFtrs,
   const map<string, Snp> & mSnps,
@@ -4314,8 +4323,9 @@ writeRes (
 {
   if (whichStep == 1 || whichStep == 2 ||
       (! mvlr && (whichStep == 3 || whichStep == 4 || whichStep == 5)))
-    writeResSstats (outPrefix, mFtrs, mSnps, vSubgroups, vSbgrp2Covars,
-		    verbose);
+    if (outSstats)
+      writeResSstats (outPrefix, mFtrs, mSnps, vSubgroups, vSbgrp2Covars,
+		      verbose);
   
   if (whichStep == 2 || (whichStep == 5 && ! mvlr))
   {
@@ -4347,6 +4357,7 @@ run (
   const string & anchor,
   const size_t & lenCis,
   const string & outPrefix,
+  const bool & outSstats,
   const bool & outRaw,
   const int & whichStep,
   const bool & needQnorm,
@@ -4413,9 +4424,9 @@ run (
 	       iGridL, iGridS, mvlr, propFitSigma, nbPerms, seed, trick,
 	       whichPermSep, whichPermBf, useMaxBfOverSnps, verbose);
   
-  writeRes (outPrefix, outRaw, mFtrs, mSnps, vSubgroups, vSbgrp2Covars,
-	    whichStep, iGridL, iGridS, whichBfs, whichPermSep, mvlr,
-	    seed, whichPermBf, verbose);
+  writeRes (outPrefix, outSstats, outRaw, mFtrs, mSnps, vSubgroups,
+	    vSbgrp2Covars, whichStep, iGridL, iGridS, whichBfs, whichPermSep,
+	    mvlr, seed, whichPermBf, verbose);
 }
 
 #ifdef EQTLBMA_MAIN
@@ -4425,7 +4436,7 @@ int main (int argc, char ** argv)
   int verbose = 1, whichStep = 0, trick = 0, whichPermSep = 1;
   size_t lenCis = 100000, nbPerms = 0, seed = string::npos;
   float minMaf = 0.0, propFitSigma = 0.0;
-  bool outRaw = false, needQnorm = false, mvlr = false,
+  bool outSstats = false, outRaw = false, needQnorm = false, mvlr = false,
     useMaxBfOverSnps = false;
   string genoPathsFile, snpCoordFile, phenoPathsFile, ftrCoordsFile,
     anchor = "FSS", outPrefix, covarPathsFile, largeGridFile, smallGridFile,
@@ -4433,11 +4444,11 @@ int main (int argc, char ** argv)
     sbgrpToKeep;
   
   parseArgs (argc, argv, genoPathsFile, snpCoordFile, phenoPathsFile,
-	     ftrCoordsFile, anchor, lenCis, outPrefix, outRaw, whichStep,
-	     needQnorm, minMaf, covarPathsFile, largeGridFile, smallGridFile,
-	     whichBfs, mvlr, propFitSigma, nbPerms, seed, trick, whichPermSep,
-	     whichPermBf, useMaxBfOverSnps, ftrsToKeepFile, snpsToKeepFile, 
-	     sbgrpToKeep, verbose);
+	     ftrCoordsFile, anchor, lenCis, outPrefix, outSstats, outRaw,
+	     whichStep, needQnorm, minMaf, covarPathsFile, largeGridFile,
+	     smallGridFile, whichBfs, mvlr, propFitSigma, nbPerms, seed, trick,
+	     whichPermSep, whichPermBf, useMaxBfOverSnps, ftrsToKeepFile,
+	     snpsToKeepFile, sbgrpToKeep, verbose);
   
   time_t startRawTime, endRawTime;
   if (verbose > 0)
@@ -4453,10 +4464,11 @@ int main (int argc, char ** argv)
   }
   
   run (genoPathsFile, snpCoordFile, phenoPathsFile, ftrCoordsFile, anchor,
-       lenCis, outPrefix, outRaw, whichStep, needQnorm, minMaf, covarPathsFile,
-       largeGridFile, smallGridFile, whichBfs, mvlr, propFitSigma, nbPerms, seed,
-       trick, whichPermSep, whichPermBf, useMaxBfOverSnps, ftrsToKeepFile,
-       snpsToKeepFile, sbgrpToKeep, verbose);
+       lenCis, outPrefix, outSstats, outRaw, whichStep, needQnorm, minMaf,
+       covarPathsFile, largeGridFile, smallGridFile, whichBfs, mvlr,
+       propFitSigma, nbPerms, seed, trick, whichPermSep, whichPermBf,
+       useMaxBfOverSnps, ftrsToKeepFile, snpsToKeepFile, sbgrpToKeep,
+       verbose);
   
   if (verbose > 0)
   {

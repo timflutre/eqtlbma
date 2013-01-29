@@ -39,6 +39,7 @@ function help () {
     msg+="\t\tdefault=out_eqtlbma\n"
     msg+="      --step\tstep of the analysis to perform (1/2/3/4/5)\n"
     msg+="\t\tdefault=1\n"
+    msg+="      --outss\twrite the output file with all summary statistics\n"
     msg+="      --outraw\twrite the output file with all raw ABFs\n"
     msg+="      --qnorm\tquantile-normalize the phenotypes\n"
     msg+="      --maf\tminimum minor allele frequency\n"
@@ -93,7 +94,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,linksFile:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,permsep:,pbf:,maxbf,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,linksFile:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,permsep:,pbf:,maxbf,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -115,6 +116,7 @@ function parseArgs () {
 	    --cis) cis=$2; shift 2;;
 	    --out) out=$2; shift 2;;
 	    --step) step=$2; shift 2;;
+	    --outss) outss=true; shift;;
 	    --outraw) outraw=true; shift;;
 	    --qnorm) qnorm=true; shift;;
 	    --maf) maf=$2; shift 2;;
@@ -183,6 +185,7 @@ anchor="FSS"
 cis=100000
 out="out_eqtlbma"
 step=1
+outss=false
 outraw=false
 qnorm=false
 maf=0
@@ -233,6 +236,9 @@ cmd+=" --anchor ${anchor}"
 cmd+=" --cis ${cis}"
 cmd+=" --out ${out}_${split}"
 cmd+=" --step ${step}"
+if $outss; then
+    cmd+=" --outss"
+fi
 if $outraw; then
     cmd+=" --outraw"
 fi
