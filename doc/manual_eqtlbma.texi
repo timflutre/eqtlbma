@@ -245,7 +245,7 @@ Also, the order of the columns doesn't matter in any file.
 
 The option @option{--qnorm} allows the program to transform the phenotypes
 into a standard Normal distribution.
-An FAQ entry indicates how to do this beforehand in R.
+An FAQ entry at the end of this document indicates how to do this beforehand in R.
 
 @section @emph{Cis} region
 
@@ -447,12 +447,13 @@ Not yet available, contact @url{http://www.sph.umich.edu/iscr/faculty/profile.cf
 
 @itemize
 @item
-How do I cite this package?
+@strong{How do I cite this package?}
 
 For the moment, you can cite the preprint available on @url{http://arxiv.org/abs/1212.4786, arXiv}: ``A statistical framework for joint eQTL analysis in multiple tissues'' by T.Flutre, X.Wen, J.Pritchard and M.Stephens (arXiv:1212.4786).
 
+
 @item
-How do I make the file(s) for the grid(s)?
+@strong{How do I make the file(s) for the grid(s)?}
 
 Using R, you can use the following function:
 
@@ -483,8 +484,22 @@ getGrid <- function(grid.type="general", no.het=FALSE){
 
 @end verbatim
 
+A typical code would look like this:
+
+@verbatim
+
+gridL <- getGrid(``general'')
+write.table(x=gridL, file=gzfile(``grid_phi2_oma2_general.txt.gz''),
+            quote=FALSE, row.names=FALSE, col.names=FALSE)
+gridS <- getGrid(``configs'')
+write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
+            quote=FALSE, row.names=FALSE, col.names=FALSE)
+
+@end verbatim
+
+
 @item
-How do I transform my phenotypes beforehand into a standard Normal?
+@strong{How do I transform my phenotypes beforehand into a standard Normal?}
 
 Using R, you can use the following command, assuming that @command{matrix.original} has genes in rows and samples in columns:
 
@@ -496,14 +511,16 @@ matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
 
 @end verbatim
 
+
 @item
-Is this packaged tested?
+@strong{Is this packaged tested?}
 
 We implemented some R code in order to perform functional tests.
-Launching them is automatized by @option{make --check}.
+Launching them is automatized via @option{make --check}.
+
 
 @item
-How can I contribute?
+@strong{How can I contribute?}
 
 The code of the package is freely available on @url{http://github.com/timflutre/eqtlbma,Github}, 
 so you can fork it and let us know of any pull request.
