@@ -130,11 +130,21 @@ split (
   return (tokens[idx]);
 }
 
+/** \brief Return the processor time in seconds consumed by the program
+ *  since 'startTime'.
+*/
+double
+getElapsedTime (
+  const clock_t & startTime)
+{
+  return ((clock () - startTime) / double(CLOCKS_PER_SEC));
+}
+
 /** \brief Return a string with the elapsed time in d, h, m and s.
  *  \note http://stackoverflow.com/a/2419597/597069
  */
 string
-elapsedTime (
+getElapsedTime (
   const time_t & startRawTime,
   const time_t & endRawTime)
 {
@@ -152,7 +162,7 @@ elapsedTime (
 /** \brief Return a string with Y-M-D H:M:S without end-of-line.
  */
 string
-time2string (
+getDateTime (
   const time_t & inTime)
 {
   struct tm * ptTm = localtime (&inTime);

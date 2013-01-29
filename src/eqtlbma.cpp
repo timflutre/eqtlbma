@@ -3078,7 +3078,7 @@ duplicateGenosPerSnpInAllSubgroups (
 	 << flush << endl;
   for (size_t s = 1; s < vSubgroups.size(); ++s)
   {
-    clock_t timeBegin = clock();
+    clock_t startTime = clock();
     for (map<string, Snp>::iterator it = mSnps.begin();
 	 it != mSnps.end(); ++it)
     {
@@ -3088,9 +3088,9 @@ duplicateGenosPerSnpInAllSubgroups (
     }
     if (verbose > 0)
       cout << "s" << (s+1) << " (" << vSubgroups[s] << "): "
-	   << mSnps.size() << " SNPs duplicated in " << fixed << setprecision(2)
-	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
-	   << " min" << endl << flush;
+	   << mSnps.size() << " SNPs duplicated in "
+	   << fixed << setprecision(2) << getElapsedTime (startTime) << " sec"
+	   << endl << flush;
   }
 }
 
@@ -3123,7 +3123,7 @@ loadGenosAndSnpInfo (
       break; // avoid loading same file several times
     }
     
-    clock_t timeBegin = clock();
+    clock_t startTime = clock();
     nbSnpsToKeepPerSubgroup = 0;
     nbLines = 0;
     openFile (mGenoPaths.find(vSubgroups[s])->second, genoStream, "rb");
@@ -3158,10 +3158,9 @@ loadGenosAndSnpInfo (
     if (verbose > 0)
       cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
 	   << mGenoPaths.find(vSubgroups[s])->second << "): " << (nbLines-1)
-	   << " SNPs (to keep: " << nbSnpsToKeepPerSubgroup
-	   << ", loaded in " << fixed << setprecision(2)
-	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
-	   << " min)" << endl << flush;
+	   << " SNPs (to keep: " << nbSnpsToKeepPerSubgroup << ", loaded in "
+	   << fixed << setprecision(2) << getElapsedTime (startTime) << " sec)"
+	   << endl << flush;
   }
   
   if (sameFiles && vSubgroups.size() > 1)
@@ -3209,7 +3208,7 @@ loadGenos (
       break; // avoid loading same file several times
     }
     
-    clock_t timeBegin = clock();
+    clock_t startTime = clock();
     nbLines = 0;
     openFile (mGenoPaths.find(vSubgroups[s])->second, genoStream, "rb");
     if (! getline (genoStream, line))
@@ -3304,9 +3303,9 @@ loadGenos (
     closeFile (mGenoPaths.find(vSubgroups[s])->second , genoStream);
     if (verbose > 0)
       cout << "s" << (s+1) << " (" << vSubgroups[s] << "): " << (nbLines-1)
-	   << " SNPs (loaded in " << fixed << setprecision(2)
-	   << (clock() - timeBegin) / (double(CLOCKS_PER_SEC)*60.0)
-	   << " min)" << endl << flush;
+	   << " SNPs (loaded in "
+	   << fixed << setprecision(2) << getElapsedTime (startTime) << " sec)"
+	   << endl << flush;
   }
   
   if (sameFiles && vSubgroups.size() > 1)
@@ -3609,7 +3608,7 @@ inferAssos (
     cout << endl << flush;
   }
   
-  clock_t timeBegin = clock();
+  clock_t startTime = clock();
   size_t nbAnalyzedPairs = 0;
   size_t countFtrs = 0;
   
@@ -3635,8 +3634,8 @@ inferAssos (
   if (verbose > 0)
   {
     if(verbose == 1)
-      cout << " (" << fixed << setprecision(2) << (clock() - timeBegin) /
-	(double(CLOCKS_PER_SEC)*60.0) << " min)" << endl << flush;
+      cout << " (" << fixed << setprecision(2) << getElapsedTime (startTime)
+	   << " sec)" << endl << flush;
     cout << "nb of analyzed feature-SNP pairs: " << nbAnalyzedPairs << endl;
   }
 }
@@ -3661,7 +3660,7 @@ makePermsSep (
 {
   if (whichPermSep == 1)
   {
-    clock_t timeBegin = clock();
+    clock_t startTime = clock();
     gsl_rng_set (rngPerm, seed);
     if (trick != 0)
       gsl_rng_set (rngTrick, seed);
@@ -3678,8 +3677,8 @@ makePermsSep (
 				    nbPerms, trick, rngPerm, rngTrick);
     }
     if (verbose == 1)
-      cout << " (" << fixed << setprecision(2)<< (clock() - timeBegin) /
-	(double(CLOCKS_PER_SEC)*60.0) << " min)" << endl << flush;
+      cout << " (" << fixed << setprecision(2)<< getElapsedTime (startTime)
+	   << " sec)" << endl << flush;
   }
   else
   {
@@ -3687,7 +3686,7 @@ makePermsSep (
     stringstream ss;
     for (size_t s = 0; s < nbSubgroups; ++s)
     {
-      clock_t timeBegin = clock();
+      clock_t startTime = clock();
       gsl_rng_set (rngPerm, seed);
       if (trick != 0)
 	gsl_rng_set (rngTrick, seed);
@@ -3706,8 +3705,8 @@ makePermsSep (
 				     nbPerms, trick, s, rngPerm, rngTrick);
       }
       if (verbose == 1)
-	cout << " (" << fixed << setprecision(2) << (clock() - timeBegin) /
-	  (double(CLOCKS_PER_SEC)*60.0) << " min)" << endl << flush;
+	cout << " (" << fixed << setprecision(2) << getElapsedTime (startTime)
+	     << " sec)" << endl << flush;
     }
   }
 }
@@ -3735,7 +3734,7 @@ makePermsJoint (
   const gsl_rng * rngTrick,
   const int & verbose)
 {
-  clock_t timeBegin = clock();
+  clock_t startTime = clock();
   gsl_rng_set (rngPerm, seed);
   if (trick != 0)
     gsl_rng_set (rngTrick, seed);
@@ -3753,8 +3752,8 @@ makePermsJoint (
 			  useMaxBfOverSnps, rngPerm, rngTrick);
   }
   if (verbose == 1)
-    cout << " (" << fixed << setprecision(2) << (clock() - timeBegin) /
-      (double(CLOCKS_PER_SEC)*60.0) << " min)" << endl << flush;
+    cout << " (" << fixed << setprecision(2) << getElapsedTime (startTime)
+	 << " sec)" << endl << flush;
 }
 
 /** \brief Make permutations for the separate and/or the joint analysis
@@ -4455,7 +4454,7 @@ int main (int argc, char ** argv)
   {
     time (&startRawTime);
     cout << "START " << basename(argv[0])
-	 << " " << time2string (startRawTime) << endl
+	 << " " << getDateTime (startRawTime) << endl
 	 << "version " << VERSION << " compiled " << __DATE__
 	 << " " << __TIME__ << endl
 	 << "cmd-line: " << getCmdLine (argc, argv) << endl
@@ -4474,8 +4473,8 @@ int main (int argc, char ** argv)
   {
     time (&endRawTime);
     cout << "END " << basename(argv[0])
-	 << " " << time2string (endRawTime) << endl
-	 << "elapsed -> " << elapsedTime(startRawTime, endRawTime) << endl
+	 << " " << getDateTime (endRawTime) << endl
+	 << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
 	 << "max.mem -> " << getMaxMemUsedByProcess2Str () << endl;
   }
   

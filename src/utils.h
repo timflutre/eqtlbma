@@ -42,9 +42,11 @@ vector<string> split (const string & s, const char * delim);
 
 string split (const string & s, const char * delim, const size_t & idx);
 
-string elapsedTime (const time_t & startRawTime, const time_t & endRawTime);
+double getElapsedTime (const clock_t & startTime);
 
-string time2string (const time_t & inTime);
+string getElapsedTime (const time_t & startRawTime, const time_t & endRawTime);
+
+string getDateTime (const time_t & inTime);
 
 void openFile (const string & pathToFile, ifstream & fileStream);
 
