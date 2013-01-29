@@ -2996,7 +2996,7 @@ loadGenosAndSnpInfoFromVcf (
       for (size_t i = 0; i < nbSamples; ++i)
       {
 	split (tokens[9+i], ":", tokens2); // if several subfields
-	if (tokens2[0].compare(".") == 0)
+	if (tokens2[0].find(".") != string::npos)
 	  iSnp.vvIsNa[s][i] = true;
 	else
 	{
