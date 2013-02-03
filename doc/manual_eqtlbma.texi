@@ -87,8 +87,9 @@ Currently two tools are available:
 Bayes Factors for the joint analysis using default hyperparameters, 
 as well as perform permutations;
 @item
-@command{hm_em} can fit a hierarchical model, provide Empirical Bayes estimates of hyperparameters 
-and thus use such estimates to re-compute Bayes Factors and provide posterior probabilities.
+@command{hm} can fit the hierarchical model with the EM algorithm,
+provide Empirical Bayes estimates of hyperparameters 
+and thus uses such estimates to re-compute Bayes Factors and provide posterior probabilities.
 @end itemize
 
 More details are available in a preprint on @url{http://arxiv.org/abs/1212.4786,,arXiv}.
@@ -450,7 +451,45 @@ with suffix ``_jointPermPvals.txt.gz''.
 
 @cindex hierarchical model
 
-Not yet available, contact @url{http://www.sph.umich.edu/iscr/faculty/profile.cfm?uniqname=xwen,Xiaoquan Wen}.
+The @command{hm} program can take four options.
+
+The option @option{-d} requires the input file (not compressed, no header line) with the Bayes Factors.
+The format is the following:
+
+@verbatim
+snpname_genename model_index  log10_bf_grid1 log10_bf_grid2 ...
+@end verbatim
+
+The option @option{-s} requires the number of models to considered.
+It corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
+
+The option @option{-g} requires the number of grids to consider.
+For instance, if you used a grid with 10 pairs (@math{\phi^2,\omega^2}), you need to specify @option{-g 10}.
+
+The option @option{-t} can be given the threshold increase to terminate the EM algorithm.
+That is, if the log10-likelihood increases less than this threshold, the iterations stop.
+The default value is set at 0.05.
+
+The @command{hm} program writes information on stderr and stdout.
+On stderr, it outputs at each EM iteration the current parameter values and log10-likelihood of the model.
+At the end of the run, it also outputs the profile likelihood 95% confidence interval and the point estimates of pi0,
+configuration probabilities and grid probabilities.
+On stdout, it writes one line per gene-SNP pair with the gene-level log10(BF) and posterior probability, 
+the snp-level log10(BF) and the log10(BF) for each configuration.
+
+Importantly, if you want to launch the @command{hm} program with the output files from the @command{eqtlbma} program, 
+you can use the script @command{launch_hm.bash}.
+It will automatically decompress the output file(s) with suffix ``_l10abfs_raw.txt.gz'' 
+(one per job if @command{eqtlbma} was run in parallel),
+filter them to only keep the log10(BFs) corresponding to the configurations,
+and concatenate them into a single file in the proper format.
+The stdout and stderr of @command{hm} will be available as gzip files with a common prefix.
+
+Launch @command{launch_hm.bash -h} to get the help.
+The command-line will typically look like this:
+@verbatim
+launch_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' --nbC 7 --nbG 10 --outp out_hm
+@end verbatim
 
 @c=============================================================================
 

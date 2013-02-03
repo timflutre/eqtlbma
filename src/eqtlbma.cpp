@@ -111,7 +111,7 @@ void help (char ** argv)
        << "      --outraw\twrite the output file with all raw ABFs" << endl
        << "\t\tby default, only the ABFs averaged over the grids are written" << endl
        << "\t\twriting all raw ABFs can be too much if the number of subgroups is large" << endl
-       << "      --qnorm\tquantile-normalize the phenotypes" << endl
+       << "      --qnorm\tquantile-normalize the phenotypes to a N(0,1)" << endl
        << "      --maf\tminimum minor allele frequency (default=0.0)" << endl
        << "      --covar\tfile with absolute paths to covariate files" << endl
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl

@@ -13,7 +13,7 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2b\tpath to the dir containing the binary 'eqtlbma'\n"
+    msg+="      --p2b\tpath to the binary 'eqtlbma'\n"
     msg+="      --ftrD\tdirectory with lists of features to analyze\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
 #    msg+="      --f2s\tfile with links features-cisSNPs\n"
@@ -41,7 +41,7 @@ function help () {
     msg+="\t\tdefault=1\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
     msg+="      --outraw\twrite the output file with all raw ABFs\n"
-    msg+="      --qnorm\tquantile-normalize the phenotypes\n"
+    msg+="      --qnorm\tquantile-normalize the phenotypes to a N(0,1)\n"
     msg+="      --maf\tminimum minor allele frequency\n"
     msg+="\t\tdefault=0\n"
     msg+="      --covar\tfile with absolute paths to covariate files\n"
@@ -64,6 +64,9 @@ function help () {
     msg+="\t\tdefault=all\n"
     msg+="      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations\n"
     msg+="      --sbgrp\tidentifier of the subgroup to analyze\n"
+    msg+="\n"
+    msg+="Examples:\n"
+    msg+="  ${0##*/} --p2b ~/bin/eqtlbma --ftrD ./lists_genes/\n"
     echo -e "$msg"
 }
 
@@ -137,32 +140,32 @@ function parseArgs () {
 	esac
     done
     if [ -z "${pathToBin}" ]; then
-	echo "ERROR: missing compulsory option --p2b"
+	echo -e "ERROR: missing compulsory option --p2b\n"
 	help
 	exit 1
     fi
-    if [ ! -f "${pathToBin}/eqtlbma" ]; then
-	echo "ERROR: can't find binary '${pathToBin}/eqtlbma'"
+    if [ ! -f "${pathToBin}" ]; then
+	echo -e "ERROR: can't find binary '${pathToBin}'\n"
 	help
 	exit 1
     fi
-    if [ ! -x "${pathToBin}/eqtlbma" ]; then
-	echo "ERROR: can't execute '${pathToBin}/eqtlbma'"
+    if [ ! -x "${pathToBin}" ]; then
+	echo -e "ERROR: can't execute '${pathToBin}'\n"
 	help
 	exit 1
     fi
     if [ -z "${ftrDir}" ]; then
-	echo "ERROR: missing compulsory option --ftrDir"
+	echo -e "ERROR: missing compulsory option --ftrDir\n"
 	help
 	exit 1
     fi
     if [ ! -d "${ftrDir}" ]; then
-	echo "ERROR: can't find feature directory '${ftrDir}'"
+	echo -e "ERROR: can't find feature directory '${ftrDir}'\n"
 	help
 	exit 1
     fi
     if [ ! -f "${seedFile}" ]; then
-	echo "ERROR: can't find seed file '${seedFile}'"
+	echo -e "ERROR: can't find seed file '${seedFile}'\n"
 	help
 	exit 1
     fi
@@ -225,7 +228,7 @@ if [ ! -z "${seedFile}" ]; then
 fi
 
 # build the command-line
-cmd="${pathToBin}/eqtlbma"
+cmd="${pathToBin}"
 cmd+=" -g ${geno}"
 if [ ! -z "${scoord}" ]; then
     cmd+=" --scoord ${scoord}"
