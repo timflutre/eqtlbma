@@ -1796,11 +1796,12 @@ ResFtrSnp_calcAbfsAllConfigsMvlr (
       vvGamma[0].assign (Y.size(), 0);
       size_t i = 0;
       for (size_t s = 0; s < vIsEqtlInConfig.size(); ++s)
+      {
 	if (vIsEqtlInConfig[s])
-	{
 	  vvGamma[0][i] = 1;
-	  ++i;
-	}
+	++i;
+      }
+      
 #ifdef LIB_MVLR
       MVLR iMvlr;
       iMvlr.set_sigma_option (propFitSigma);
