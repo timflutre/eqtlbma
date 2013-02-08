@@ -29,7 +29,7 @@ function help () {
 }
 
 function version () {
-    msg="${0##*/} 1.0\n"
+    msg="${0##*/} 1.1\n"
     msg+="\n"
     msg+="Written by Timothee Flutre.\n"
     msg+="\n"

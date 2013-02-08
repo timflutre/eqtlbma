@@ -1,0 +1,21 @@
+2013-02-08 v1.1
+===============
+
+New Features
+* add the 'hm' program implementing the EM algorithm to fit the hierarchical model
+* in 'eqtlbma', put l10(BF) of absent genes for singleton configuration at 1 instead of NA
+* in 'eqtlbma', add options --outss and --tricut
+* in 'eqtlbma', report on stdout the running times using CLOCKS_PER_SEC
+* for 'eqtlbma', add test for genes absent in some subgroups
+
+Performance improvements
+* in 'eqtlbma', avoid loading same genotype files for each subgroup
+
+Bug fixes
+* in 'eqtlbma', properly detect missing values when loading a VCF file
+
+
+2013-01-16 v1.0
+===============
+
+first public release
