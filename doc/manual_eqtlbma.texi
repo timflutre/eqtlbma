@@ -10,7 +10,7 @@
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
 
-Copyright @copyright{} 2012 Timothee Flutre and Xiaoquan Wen.
+Copyright @copyright{} 2012-2013 Timothee Flutre and Xiaoquan Wen.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -491,7 +491,12 @@ The stdout and stderr of @command{hm} will be available as gzip files with a com
 Launch @command{launch_hm.bash -h} to get the help.
 The command-line will typically look like this:
 @verbatim
-launch_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' --nbC 7 --nbG 10 --outp out_hm
+launch_hm.bash \
+--p2b ~/bin/hm \
+--inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
+--nbC 7 \
+--nbG 10 \
+--outp out_hm
 @end verbatim
 
 @c=============================================================================
@@ -555,7 +560,7 @@ write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
 
 
 @item
-@strong{How do I transform my phenotypes beforehand into a standard Normal?}
+@strong{How do I transform my phenotypes beforehand into the quantiles of a standard Normal?}
 
 Using R, you can use the following command, assuming that @command{matrix.original} has genes in rows and samples in columns:
 
@@ -564,6 +569,20 @@ Using R, you can use the following command, assuming that @command{matrix.origin
 matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
   qqnorm(exp.per.gene, plot.it=FALSE)$x
 }))
+colnames(matrix.qnormed) <- colnames(matrix.original)
+
+@end verbatim
+
+In the presence of ties, it's better to break them randomly:
+
+@verbatim
+
+matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
+  idx <- sample(length(exp.per.gene))
+  tmp <- qqnorm(exp.per.gene[idx], plot.it=FALSE)$x
+  tmp[sort(idx, index.return=TRUE)$ix]
+}))
+colnames(matrix.qnormed) <- colnames(matrix.original)
 
 @end verbatim
 
