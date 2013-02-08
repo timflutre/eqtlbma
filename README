@@ -32,6 +32,6 @@ More information about eQtlBma
 ==============================
 
 To generate the manual in the doc/ directory, type:
-	make pdf
+    make pdf
 
 See the NEWS file for recent changes to the package.
