@@ -337,6 +337,9 @@ it is not necessary to perform 10000 permutations, a much smaller number is enou
 and this option implements this adaptively for each gene-SNP pair.
 It requires another random number generator, which also uses @option{--seed}.
 The output file will contain the total number of permutations performed.
+The option @option{--tricut} allows to tune the speed gain of the trick:
+the smaller the faster (i.e. less permutations are performed when there is no association).
+We found that using @option{--tricut 10} is usually enough.
 
 If we want to compare the two approaches (separate or joint analysis), we may want
 to use the exact same permutations for both.

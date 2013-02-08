@@ -58,6 +58,8 @@ function help () {
     msg+="\t\tdefault=10000\n"
     msg+="      --trick\tapply trick to speed-up permutations\n"
     msg+="\t\tdefault=2\n"
+    msg+="      --tricut\tcutoff for the trick\n"
+    msg+="\t\tdefault=10\n"
     msg+="      --permsep\twhich permutation procedure for the separate analysis\n"
     msg+="\t\tdefault=1\n"
     msg+="      --pbf\twhich BF to use as the test statistic for the joint-analysis permutations\n"
@@ -97,7 +99,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,linksFile:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,permsep:,pbf:,maxbf,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,linksFile:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -131,6 +133,7 @@ function parseArgs () {
 	    --fitsig) fitsig=$2; shift 2;;
 	    --nperm) nperm=$2; shift 2;;
 	    --trick) trick=$2; shift 2;;
+	    --tricut) trickCutoff=$2; shift 2;;
 	    --pbf) pbf=$2; shift 2;;
 	    --permsep) permsep=$2; shift 2;;
 	    --maxbf) maxbf=true; shift;;
@@ -200,6 +203,7 @@ mvlr=false
 fitsig=0
 nperm=10000
 trick=2
+trickCutoff=10
 permsep=1
 pbf="all"
 maxbf=false
@@ -267,6 +271,7 @@ if [ "x${step}" != "x1" -a "x${step}" != "x3" ]; then
 	cmd+=" --seed ${seed}"
     fi
     cmd+=" --trick ${trick}"
+    cmd+=" --tricut ${trickCutoff}"
     cmd+=" --permsep ${permsep}"
     if [ "x${step}" == "x4" -o "x${step}" == "x5" ]; then
 	cmd+=" --pbf ${pbf}"
