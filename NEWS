@@ -1,7 +1,17 @@
+2013-00-00 v1.2
+===============
+
+New features
+* change the format of the covariate files to make them readable by MatrixEQTL
+
+Bug fixes
+* allow covariates only for a subset of the subgroups
+
+
 2013-02-08 v1.1
 ===============
 
-New Features
+New features
 * add the 'hm' program implementing the EM algorithm to fit the hierarchical model
 * in 'eqtlbma', put l10(BF) of absent genes for singleton configuration at 1 instead of NA
 * in 'eqtlbma', add options --outss and --tricut

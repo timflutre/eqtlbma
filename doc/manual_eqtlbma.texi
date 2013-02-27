@@ -194,9 +194,10 @@ chr name coord a1 a2 <ind1>_a1a1 <ind1>_a1a2 <ind1>_a2a2 <ind2>_a1a1 ...
 where the ``<ind1>'''s have to be replaced by the name of the individuals in the given data set.
 
 Finally, the program @command{eqtlbma} also reads genotypes as allele dose, that is 0, 1, 2 or NA.
+This format is also read by the R package MatrixEQTL.
 Here is an example:
 @verbatim
-ind1 ind2 ind3 ...
+id ind1 ind2 ind3 ...
 snp1 0 2 1 ...
 snp2 0 NA 0 ...
 ...
@@ -209,6 +210,21 @@ followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.
 
 The option @option{--maf} allows to skip loading SNPs 
 if their minor allele frequency is below a given threshold, for instance 0.05.
+
+The option @option{--covar} requires a file as argument.
+This file has two columns separated by a space or a tabulation, and one line per subgroup.
+The first column is the identifier of the subgroup.
+The second column is the path to the file containing the genotypes for this subgroup.
+
+Each covariate file has to be in the following format:
+@verbatim
+id ind1 ind2 ...
+covar1 0.32 0.11 ...
+covar2 -1.0 0.8 ...
+...
+@end verbatim
+Note that this format is also read by the R package MatrixEQTL.
+
 
 @section Phenotypes
 

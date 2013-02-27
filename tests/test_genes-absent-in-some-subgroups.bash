@@ -83,8 +83,8 @@ function simul_data_and_calc_exp_res () {
 	echo "simulate data and calculate expected results ..."
     fi
     R --no-restore --no-save --slave --vanilla \
-	--file=${pathToRscript} --args --verbose $(expr $verbose - 1) --dir $(pwd) \
-	--rgs
+	--file=${pathToRscript} --args --verbose $(expr $verbose - 1) \
+	--dir $(pwd) --rgs
 }
 
 function calc_obs_res () {

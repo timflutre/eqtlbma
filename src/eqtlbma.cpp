@@ -54,7 +54,7 @@ using namespace std;
 #include "utils.h"
 
 #ifndef VERSION
-#define VERSION "1.0"
+#define VERSION "0.0"
 #endif
 
 #ifdef LIB_MVLR
@@ -90,7 +90,8 @@ void help (char ** argv)
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
        << "\t\tcan be a single line (single subgroup)" << endl
        << "\t\tadd '#' at the beginning of a line to comment it" << endl
-       << "\t\tsubgroup file: row 1 for sample names, column 1 for feature names" << endl
+       << "\t\tsubgroup file: custom format, same as for MatrixEQTL" << endl
+       << "\t\t row 1 for sample names, column 1 for feature names" << endl
        << "\t\tsubgroups can have different features" << endl
        << "\t\tall features should be in the --fcoord file" << endl
        << "      --fcoord\tfile with the feature coordinates" << endl
@@ -2466,7 +2467,7 @@ loadSamplesAllPhenos (
     if (s == 0)
     {
       split (line, " \t", vSamples);
-      if (vSamples[0].compare("Id") == 0)
+      if (vSamples[0].compare("Id") == 0 || vSamples[0].compare("id") == 0)
 	vSamples.erase (vSamples.begin());
       vvSamples.push_back (vSamples);
     }
@@ -2474,7 +2475,7 @@ loadSamplesAllPhenos (
     {
       vector<string> tokens;
       split (line, " \t", tokens);
-      if (tokens[0].compare("Id") == 0)
+      if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
 	tokens.erase (tokens.begin());
       vvSamples.push_back (tokens);
       for (size_t i = 0; i < tokens.size(); ++i)
@@ -2558,7 +2559,11 @@ loadSamplesAllGenos (
       split (line, " \t", tokens);
       closeFile (mGenoPaths.find(vSubgroups[s])->second, fileStream);
       
-      if (tokens[0].compare("chr") == 0) // IMPUTE format
+      if (tokens[0].compare("chr") == 0
+	  && tokens[1].compare("name") == 0
+	  && tokens[2].compare("coord") == 0
+	  && tokens[3].compare("a1") == 0
+	  && tokens[4].compare("a2") == 0) // IMPUTE format
       {
 	if ((tokens.size() - 5) % 3 != 0)
 	{
@@ -2581,9 +2586,9 @@ loadSamplesAllGenos (
 	      == vSamples.end())
 	    vSamples.push_back (tokens2[i]);
       }
-      else // allele dosage
+      else // allele dosage, as MatrixEQTL
       {
-	if (tokens[0].compare("Id") == 0)
+	if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
 	  tokens.erase (tokens.begin());
 	vvSamples.push_back (tokens);
 	for (i = 0; i < tokens.size(); ++i)
@@ -2711,7 +2716,7 @@ loadPhenos (
     }
     ++nbLines;
     split (line, " \t", tokens);
-    if (tokens[0].compare("Id") == 0)
+    if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
       nbSamples = tokens.size() - 1;
     else
       nbSamples = tokens.size();
@@ -3459,13 +3464,74 @@ loadListCovarFiles (
   }
 }
 
+/** \brief Allow to load several covariate files per subgroup.
+ */
+void
+loadListCovarFiles (
+  const string & covarPathsFile,
+  const string & sbgrpToKeep,
+  const vector<string> & vSubgroups,
+  map<string, vector<string> > & mCovarPaths,
+  const int & verbose)
+{
+  string line;
+  gzFile stream;
+  vector<string> tokens;
+  size_t line_id = 0, nbLoadedCovarFiles = 0;
+  
+  openFile (covarPathsFile, stream, "rb");
+  if (verbose > 0)
+    cout <<"load file " << covarPathsFile << " ..." << endl;
+  
+  while (getline (stream, line))
+  {
+    line_id++;
+    split (line, " \t,", tokens);
+    if (tokens.size() != 2)
+    {
+      cerr << "ERROR: file " << covarPathsFile
+	   << " should have only two columns" << " at line " << line_id
+	   << endl;
+      exit (1);
+    }
+    if (tokens[0][0] == '#')
+      continue;
+    if (! sbgrpToKeep.empty() && sbgrpToKeep.compare(tokens[0]) != 0)
+      continue;
+    if (find (vSubgroups.begin(), vSubgroups.end(), tokens[0])
+	== vSubgroups.end())
+    {
+      cerr << "WARNING: skip covariates of subgroup " << tokens[0]
+	   << " as there is no corresponding genotype / phenotype files"
+	   << endl;
+      continue;
+    }
+    if (mCovarPaths.find(tokens[0]) == mCovarPaths.end())
+      mCovarPaths.insert (make_pair (tokens[0], vector<string> ()));
+    mCovarPaths[tokens[0]].push_back (tokens[1]);
+    ++nbLoadedCovarFiles;
+  }
+  
+  if (! gzeof (stream))
+  {
+    cerr << "ERROR: can't read successfully file "
+	 << covarPathsFile << " up to the end" << endl;
+    exit (1);
+  }
+  closeFile (covarPathsFile, stream);
+  
+  if (verbose > 0)
+    cout << "items loaded: " << nbLoadedCovarFiles << " files for "
+	 << mCovarPaths.size() << " subgroups" << endl;
+}
+
 void
 loadCovarsFromFiles (
   const vector<string> & vSubgroups,
   const vector<string> & vSamples,
   const vector<vector<size_t> > & vvSampleIdxGenos,
   const vector<vector<size_t> > & vvSampleIdxPhenos,
-  const map<string, string> & mCovarPaths,
+  const map<string, vector<string> > & mCovarPaths,
   vector<map<string, vector<double> > > & vSbgrp2Covars)
 {
   gzFile covarStream;
@@ -3473,123 +3539,99 @@ loadCovarsFromFiles (
   string line;
   size_t nbLines = 0;
   
+  // for each subgroup
   for (size_t s = 0; s < vSubgroups.size(); ++s)
   {
     map<string, vector<double> > mCovars;
     
+    // if this subgroup has at least one covariate
     if (mCovarPaths.find(vSubgroups[s]) != mCovarPaths.end())
     {
-      nbLines = 0;
-      openFile (mCovarPaths.find(vSubgroups[s])->second, covarStream, "rb");
+      vector<string> vPaths = mCovarPaths.find(vSubgroups[s])->second;
       
-      // parse the header line to get covar names and order
-      if (! getline (covarStream, line))
+      // for each covariate files of this subgroup
+      for (size_t c = 0; c < vPaths.size(); ++c)
       {
-	cerr << "ERROR: problem with the header of file "
-	     << mCovarPaths.find(vSubgroups[s])->second << endl;
-	exit (1);
-      }
-      if (line.empty())
-      {
-	cerr << "ERROR: file " << mCovarPaths.find(vSubgroups[s])->second
-	     << " is empty" << endl;
-	exit (1);
-      }
-      ++nbLines;
-      vector<string> vCovars;
-      split (line, " \t", vCovars);
-      if (vCovars[0].compare ("sample") == 0)
-	vCovars.erase (vCovars.begin());
-      else
-      {
-	cerr << "ERROR: file " << mCovarPaths.find(vSubgroups[s])->second
-	     << " should have a header line starting with 'sample'" << endl;
-	exit (1);
-      }
-      
-      // parse the rest of the file into a temporary container
-      map<string, vector<double> > mSample2Covars;
-      while (getline (covarStream, line))
-      {
-	++nbLines;
-	split (line, " \t", tokens);
-	if (tokens.size() != vCovars.size() + 1)
+	nbLines = 0;
+	openFile (vPaths[c], covarStream, "rb");
+	
+	// parse the header line to get sample names and order
+	if (! getline (covarStream, line))
 	{
-	  cerr << "ERROR: not enough columns on line " << nbLines
-	       << " of file " << mCovarPaths.find(vSubgroups[s])->second
-	       << " (" << tokens.size() << " != " << vCovars.size() + 1 << ")"
-	       << endl;
+	  cerr << "ERROR: problem with the header of file "
+	       << vPaths[c] << endl;
 	  exit (1);
 	}
-	if (find (vSamples.begin(), vSamples.end(), tokens[0])
-	    == vSamples.end())
+	if (line.empty())
 	{
-	  cerr << "WARNING: skip sample " << tokens[0]
-	       << " in line " << nbLines
-	       << " of file " << mCovarPaths.find(vSubgroups[s])->second
-	       << " because it is absent from all genotype and phenotype files"
-	       << endl;
-	  continue;
+	  cerr << "ERROR: file " << vPaths[c] << " is empty" << endl;
+	  exit (1);
 	}
-	mSample2Covars.insert (make_pair (
-				 tokens[0], vector<double> (
-				   vCovars.size(),
-				   numeric_limits<double>::quiet_NaN())));
-	for (size_t c = 0; c < vCovars.size(); ++c)
-	  mSample2Covars[tokens[0]][c] = atof (tokens[(c+1)].c_str());
-      }
-      if (! gzeof (covarStream))
-      {
-	cerr << "ERROR: can't read successfully file "
-	     << mCovarPaths.find(vSubgroups[s])->second
-	     << " up to the end" << endl;
-	exit (1);
-      }
-      closeFile (mCovarPaths.find(vSubgroups[s])->second, covarStream);
-      
-      // check that all samples with covar from the given subgroup also have
-      // a genotype and a phenotype
-      if (vvSampleIdxGenos.size() == 1)
-      {
+	++nbLines;
+	vector<string> vHeader;
+	split (line, " \t", vHeader);
+	
+	// get colIdx in covar file for each sample in vSamples
+	vector<size_t> vColIdx (vSamples.size(), string::npos);
+	vector<string>::iterator it;
 	for (size_t i = 0; i < vSamples.size(); ++i)
-	  if (vvSampleIdxGenos[s][i] != string::npos
-	      && vvSampleIdxPhenos[s][i] != string::npos
-	      && mSample2Covars.find(vSamples[i]) == mSample2Covars.end())
+	{
+	  it = find (vHeader.begin(), vHeader.end(), vSamples[i]);
+	  if (it != vHeader.end())
+	    vColIdx[i] = it - vHeader.begin();
+	  else if (vvSampleIdxGenos[s][i] != string::npos
+		   && vvSampleIdxPhenos[s][i] != string::npos)
 	  {
 	    cerr << "ERROR: sample " << vSamples[i] << " has genotype"
 		 << " and phenotype in subgroup " << (s+1)
 		 << " but no covariate" << endl;
 	    exit (1);
 	  }
-      }
-      else
-      {
-	for (size_t i = 0; i < vSamples.size(); ++i)
-	  if (vvSampleIdxGenos[s][i] != string::npos
-	      && vvSampleIdxPhenos[s][i] != string::npos
-	      && mSample2Covars.find(vSamples[i]) == mSample2Covars.end())
+	}
+	
+	// parse each line (i.e. covariate)
+	while (getline (covarStream, line))
+	{
+	  ++nbLines;
+	  split (line, " \t", tokens);
+	  
+	  // check nb of values
+	  if (tokens.size() != vHeader.size())
 	  {
-	    cerr << "ERROR: sample " << vSamples[i] << " has genotype"
-		 << " and phenotype in subgroup " << (s+1)
-		 << " but no covariate" << endl;
+	    cerr << "ERROR: not enough columns on line " << nbLines
+		 << " of file " << vPaths[c]
+		 << " (" << tokens.size() << " != "
+		 << vHeader.size() << ")"
+		 << endl;
 	    exit (1);
 	  }
-      }
+	  
+	  // record the values by filling mCovars
+	  vector<double> vValues (vSamples.size(),
+				  numeric_limits<double>::quiet_NaN());
+	  for (size_t i = 0; i < vSamples.size(); ++i)
+	  {
+	    size_t colIdx = vColIdx[i];
+	    if (colIdx != string::npos)
+	      vValues[i] = atof (tokens[colIdx].c_str());
+	  }
+	  mCovars.insert (make_pair (tokens[0], vValues));
+	} // end of "parse each line"
+	
+	if (! gzeof (covarStream))
+	{
+	  cerr << "ERROR: can't read successfully file "
+	       << vPaths[c] << " up to the end" << endl;
+	  exit (1);
+	}
+	
+	closeFile (vPaths[c], covarStream);
+      } // end of "for each covariate of this subgroup"
       
-      // fill the final containers with samples in the right order
-      for (size_t c = 0; c < vCovars.size(); ++c)
-      {
-	mCovars.insert (make_pair (vCovars[c], vector<double> (
-				     vSamples.size(),
-				     numeric_limits<double>::quiet_NaN())));
-	for (size_t i = 0; i < vSamples.size(); ++i)
-	  if (mSample2Covars.find(vSamples[i]) != mSample2Covars.end())
-	    mCovars[vCovars[c]][i] = mSample2Covars[vSamples[i]][c];
-      }
-    }
+    } // end of "if this subgroup has at least one covariate"
     
     vSbgrp2Covars.push_back (mCovars);
-  }
+  } // end of "for each subgroup"
 }
 
 void
@@ -3610,7 +3652,7 @@ loadCovariates (
   {
     if (verbose > 0)
       cout << "load covariates ..." << endl << flush;
-    map<string, string> mCovarPaths;
+    map<string, vector<string> > mCovarPaths;
     loadListCovarFiles (covarPathsFile, sbgrpToKeep, vSubgroups, mCovarPaths,
 			verbose);
     loadCovarsFromFiles (vSubgroups, vSamples, vvSampleIdxGenos,
@@ -3620,8 +3662,10 @@ loadCovariates (
       {
 	if(mCovarPaths.find(vSubgroups[s]) != mCovarPaths.end())
 	  cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
-	       << mCovarPaths.find(vSubgroups[s])->second << "): "
-	       << vSbgrp2Covars[s].size() << " covariates" << endl;
+	       << mCovarPaths.find(vSubgroups[s])->second.size() << " file"
+	       << (mCovarPaths.find(vSubgroups[s])->second.size() == 1 ? "" : "s")
+	       << "): " << vSbgrp2Covars[s].size() << " covariate"
+	       << (vSbgrp2Covars[s].size() == 1 ? "" : "s") << endl;
       }
   }
 }
@@ -3915,7 +3959,7 @@ writeResSstats (
     size_t lineId = 1;
     gzwriteLine (outStream, ssTxt.str(), ssOutFile.str(), lineId);
     
-    ssTxt.precision (7);
+    ssTxt.precision (6);
     ssTxt.setf (ios::scientific);
     for (map<string, Ftr>::const_iterator itF = mFtrs.begin();
 	 itF != mFtrs.end(); ++itF)
@@ -4095,7 +4139,7 @@ writeResAbfsRaw (
   gzwriteLine (outStream, ssTxt.str(), ssOutFile.str(), lineId);
   
   // write results
-  ssTxt.precision (7);
+  ssTxt.precision (6);
   ssTxt.setf (ios::scientific);
   for (map<string, Ftr>::const_iterator itF = mFtrs.begin();
        itF != mFtrs.end(); ++itF)
@@ -4245,7 +4289,7 @@ writeResAbfsAvgGrids (
   
   // write results
   size_t n;
-  ssTxt.precision (7);
+  ssTxt.precision (6);
   ssTxt.setf (ios::scientific);
   for (map<string, Ftr>::const_iterator itF = mFtrs.begin();
        itF != mFtrs.end(); ++itF)

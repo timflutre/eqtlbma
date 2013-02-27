@@ -23,7 +23,8 @@ sink(file=stdout(), type="message")
 parseArgs <- function(){
   params <- list(verbose=1,
                  dir.name=NULL,
-                 rmvGenesFromSbgrps=FALSE)
+                 rmvGenesFromSbgrps=FALSE,
+                 withCovars=FALSE)
   
   args <- commandArgs(trailingOnly=TRUE)
   ## print(args)
@@ -36,6 +37,8 @@ parseArgs <- function(){
       params$dir.name <- args[i+1]
     else if(args[i] == "--rgs")
       params$rmvGenesFromSbgrps <- TRUE
+    else if(args[i] == "--cvrt")
+      params$withCovars <- TRUE
   }
   if(params$verbose > 1)
     print(params)
@@ -105,7 +108,9 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
   }
 }
 
-getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
+getSimulatedData <- function(rmvGenesFromSbgrps=FALSE,
+                             withCovars=FALSE,
+                             verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
 
@@ -116,8 +121,9 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
   nb.inds <- 500
   inds <- data.frame(id=paste0("ind", 1:nb.inds),
                      name=paste0("individual ", 1:nb.inds),
-                     gender=sample(c("female", "male"), nb.inds, replace=TRUE),
                      stringsAsFactors=FALSE)
+  if(withCovars)
+    inds$sex <- sample(c(0, 1), nb.inds, replace=TRUE)
   
   nb.pairs <- 14
   params$nb.pairs <- nb.pairs
@@ -254,7 +260,8 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
     truth <- tmp
   }
   
-  return(list(gene.coords=gene.coords,
+  return(list(inds=inds,
+              gene.coords=gene.coords,
               snp.coords=snp.coords,
               geno.counts=geno.counts,
               phenos=phenos,
@@ -294,6 +301,15 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
   write.table(x=tmp, file="list_phenotypes.txt", quote=FALSE,
               row.names=FALSE, col.names=FALSE)
   
+  tmp <- rbind(c("id", data$inds$id),
+               c("sex", data$inds$sex))
+  write.table(x=tmp, file="covariates.txt", quote=FALSE,
+              row.names=FALSE, col.names=FALSE)
+  tmp <- data.frame(subgroup=names(data$phenos),
+                    file=rep("covariates.txt", length(data$phenos)))
+  write.table(x=tmp, file="list_covariates.txt", quote=FALSE,
+              row.names=FALSE, col.names=FALSE)
+  
   write.table(x=data$truth, file=gzfile("truth.txt.gz"),
               quote=FALSE, row.names=FALSE)
 }
@@ -302,9 +318,15 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
 calcSstatsOnSimulatedData <- function(data=NULL){
   stopifnot(! is.null(data))
   sstats <- lapply(data$phenos, function(x){
-    data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
-               pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
-               betapval.geno=NA, stringsAsFactors=FALSE)
+    tmp <- data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
+                      pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
+                      betapval.geno=NA, stringsAsFactors=FALSE)
+    if("sex" %in% names(data$inds)){
+      tmp$betahat.sex <- NA
+      tmp$sebetahat.sex <- NA
+      tmp$betapval.sex <- NA
+    }
+    tmp
   })
   i <- 0
   for(g in 1:nrow(data$gene.coords)){
@@ -322,13 +344,23 @@ calcSstatsOnSimulatedData <- function(data=NULL){
           (2 * length(data$phenos[[s]][g,]))
         if(gene %in% rownames(data$phenos[[s]])){
           sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
-          tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
-                            as.numeric(data$geno.counts[p,])))
+          if(! "sex" %in% names(data$inds)){
+            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
+                              as.numeric(data$geno.counts[p,])))
+          } else
+            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
+                              as.numeric(data$geno.counts[p,]) +
+                              as.numeric(data$inds$sex)))
           sstats[[s]]$pve[i] <- tmp$r.squared
           sstats[[s]]$sigmahat[i] <- tmp$sigma
           sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
           sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
           sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
+          if("sex" %in% names(data$inds)){
+            sstats[[s]]$betahat.sex[i] <- tmp$coefficients[3,"Estimate"]
+            sstats[[s]]$sebetahat.sex[i] <- tmp$coefficients[3,"Std. Error"]
+            sstats[[s]]$betapval.sex[i] <- tmp$coefficients[3,"Pr(>|t|)"]
+          }
         } else # case where gene is absent in subgroup
           sstats[[s]]$n[i] <- 0
       }
@@ -647,10 +679,10 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
   for(s in names(res$sstats)){
     row.ids <- which(res$sstats[[s]]$n != 0) # don't save absent genes
     tmp <- cbind(res$sstats[[s]][row.ids,1:2],
-                 sprintf(fmt="%.07e", res$sstats[[s]][row.ids,3]),
+                 sprintf(fmt="%.06e", res$sstats[[s]][row.ids,3]),
                  res$sstats[[s]][row.ids,4])
     for(j in 5:ncol(res$sstats[[s]]))
-      tmp <- cbind(tmp, sprintf(fmt="%.07e", res$sstats[[s]][row.ids,j]))
+      tmp <- cbind(tmp, sprintf(fmt="%.06e", res$sstats[[s]][row.ids,j]))
     colnames(tmp) <- colnames(res$sstats[[s]])
     write.table(x=tmp, file=gzfile(paste0("exp_eqtlbma_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep=" ", na="nan")
@@ -658,14 +690,14 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
   
   tmp <- res$l10abfs.raw[,1:3]
   for(j in 4:ncol(res$l10abfs.raw))
-    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.07e", res$l10abfs.raw[,j])))
+    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.raw[,j])))
   colnames(tmp) <- colnames(res$l10abfs.raw)
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_raw.txt.gz"),
               quote=FALSE, row.names=FALSE, sep=" ", na="nan")
   
   tmp <- res$l10abfs.avg[,1:4]
   for(j in 5:ncol(res$l10abfs.avg))
-    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.07e", res$l10abfs.avg[,j])))
+    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.avg[,j])))
   colnames(tmp) <- colnames(res$l10abfs.avg)
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_avg-grids.txt.gz"),
               quote=FALSE, row.names=FALSE, sep=" ", na="nan")
@@ -676,7 +708,9 @@ run <- function(){
   if(params$verbose > 0)
     message(paste0("START functional_tests.R (", date(), ")"))
   setwd(params$dir.name)
-  data <- getSimulatedData(params$rmvGenesFromSbgrps, params$verbose)
+  data <- getSimulatedData(params$rmvGenesFromSbgrps,
+                           params$withCovars,
+                           params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
