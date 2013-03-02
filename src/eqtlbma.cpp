@@ -3570,6 +3570,8 @@ loadCovarsFromFiles (
 	++nbLines;
 	vector<string> vHeader;
 	split (line, " \t", vHeader);
+	if (vHeader[0].compare("Id") == 0 || vHeader[0].compare("id") == 0)
+	  vHeader.erase (vHeader.begin());
 	
 	// get colIdx in covar file for each sample in vSamples
 	vector<size_t> vColIdx (vSamples.size(), string::npos);
@@ -3596,12 +3598,12 @@ loadCovarsFromFiles (
 	  split (line, " \t", tokens);
 	  
 	  // check nb of values
-	  if (tokens.size() != vHeader.size())
+	  if (tokens.size() != vHeader.size() + 1)
 	  {
 	    cerr << "ERROR: not enough columns on line " << nbLines
 		 << " of file " << vPaths[c]
 		 << " (" << tokens.size() << " != "
-		 << vHeader.size() << ")"
+		 << vHeader.size() + 1 << ")"
 		 << endl;
 	    exit (1);
 	  }
