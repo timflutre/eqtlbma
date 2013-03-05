@@ -3580,7 +3580,7 @@ loadCovarsFromFiles (
 	{
 	  it = find (vHeader.begin(), vHeader.end(), vSamples[i]);
 	  if (it != vHeader.end())
-	    vColIdx[i] = it - vHeader.begin();
+	    vColIdx[i] = (it - vHeader.begin()) + 1;
 	  else if (vvSampleIdxGenos[s][i] != string::npos
 		   && vvSampleIdxPhenos[s][i] != string::npos)
 	  {
