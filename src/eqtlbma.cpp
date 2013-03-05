@@ -1613,6 +1613,8 @@ ResFtrSnp_prepareDataForMvlr (
   Xc.assign (vSbgrp2Covars[0].size(), vector<double> ());
   for (size_t s = 0; s < iFtr.vvPhenos.size(); ++s)
   {
+    if (iFtr.vvPhenos[s].size() == 0)
+      continue;
     vector<double> tmpY;
     size_t idxPheno, idxGeno;
     for (size_t i = 0; i < vvSampleIdxPhenos[s].size(); ++i)
@@ -1660,6 +1662,8 @@ ResFtrSnp_prepareDataForMvlrPerm (
   Xc.assign (vSbgrp2Covars[0].size(), vector<double> ());
   for (size_t s = 0; s < iFtr.vvPhenos.size(); ++s)
   {
+    if (iFtr.vvPhenos[s].size() == 0)
+      continue;
     vector<double> tmpY;
     size_t idxPheno, idxGeno, p;
     for (size_t i = 0; i < vvSampleIdxPhenos[s].size(); ++i)
@@ -1891,6 +1895,33 @@ Ftr_init (
   iFtr.nbPermsSoFarJoint = 0;
   iFtr.maxL10TrueAbf = numeric_limits<double>::quiet_NaN();
   iFtr.avgL10TrueAbf = numeric_limits<double>::quiet_NaN();
+}
+
+void
+Ftr_show (
+  const Ftr & iFtr,
+  ostream & os)
+{
+  os << iFtr.name << " " << iFtr.chr << " " << iFtr.start << " " << iFtr.end << endl
+     << "subgroups=" << iFtr.vvPhenos.size() << endl;
+  for(size_t s = 0; s < iFtr.vvPhenos.size(); ++s)
+  {
+    os << "subgroup=" << (s+1) << " samples=" << iFtr.vvPhenos[s].size() << endl;
+  }
+}
+
+bool
+Ftr_isAbsentInSomeSubgroups (
+  const Ftr & iFtr)
+{
+  bool isAbsentInSomeSubgroups = false;
+  for (size_t s = 0; s < iFtr.vvPhenos.size(); ++s)
+    if (iFtr.vvPhenos[s].size() == 0)
+    {
+      isAbsentInSomeSubgroups = true;
+      break;
+    }
+  return isAbsentInSomeSubgroups;
 }
 
 // assume both features are on the same chromosome
@@ -3719,6 +3750,12 @@ inferAssos (
 	   << " SNPs in cis" << endl << flush;
     if (itF->second.vPtCisSnps.size() > 0)
     {
+      if (mvlr && Ftr_isAbsentInSomeSubgroups (itF->second))
+      {
+	cerr << "WARNING: skip feature " << itF->first
+	     << " because it is not expressed in all subgroups" << endl;
+	continue;
+      }
       Ftr_inferAssos (itF->second, vvSampleIdxPhenos, vvSampleIdxGenos,
 		      whichStep, needQnorm, vSbgrp2Covars, iGridL, iGridS,
 		      whichBfs, mvlr, propFitSigma, verbose-1);
