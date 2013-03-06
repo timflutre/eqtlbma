@@ -82,8 +82,8 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    R --no-restore --no-save --slave --vanilla \
-	--file=${pathToRscript} --args --verbose $(expr $verbose - 1) --dir $(pwd)
+    R --no-restore --no-save --slave --vanilla --file=${pathToRscript} \
+	--args --verbose 1 --dir $(pwd) >& stdout_simul_exp
 }
 
 function calc_obs_res () {
@@ -95,7 +95,7 @@ function calc_obs_res () {
 	-o obs_eqtlbma --outss --outraw --step 3 --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	-v $(expr $verbose - 1)
+	-v 1 >& stdout_eqtlbma
 }
 
 function comp_obs_vs_exp () {

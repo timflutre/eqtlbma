@@ -281,21 +281,28 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
   if(geno.format == "custom"){
     write.table(x=data$snp.coords, file=gzfile("snp_coords.bed.gz"),
                 quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
-    write.table(x=data$geno.counts, file=gzfile("genotypes.txt.gz"), quote=FALSE)
-    tmp <- data.frame(subgroup=names(data$phenos), file=rep("genotypes.txt.gz",
-                                                     length(data$phenos)))
+    tmp <- rbind(colnames(data$geno.counts), data$geno.counts)
+    tmp <- cbind(c("id", rownames(data$geno.counts)), tmp)
+    write.table(x=tmp, file=gzfile("genotypes.txt.gz"),
+                quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+    tmp <- data.frame(subgroup=names(data$phenos),
+                      file=rep("genotypes.txt.gz",
+                        length(data$phenos)))
     write.table(x=tmp, file="list_genotypes.txt", quote=FALSE,
                 row.names=FALSE, col.names=FALSE)
   } else if(geno.format == "vcf"){
-    message("ERROR: saving genotypes in VCF not yet implemented")
+    message("ERROR: saving genotypes in VCF is not yet implemented")
   } else if(geno.format == "impute"){
-    message("ERROR: saving genotypes in IMPUTE not yet implemented")
+    message("ERROR: saving genotypes in IMPUTE is not yet implemented")
   }
   
-  for(s in 1:length(data$phenos))
-    write.table(x=data$phenos[[s]],
-                file=gzfile(paste0("phenotypes_",names(data$phenos)[s],".txt.gz")),
-                quote=FALSE)
+  for(s in 1:length(data$phenos)){
+    tmp <- rbind(colnames(data$phenos[[s]]), data$phenos[[s]])
+    tmp <- cbind(c("id", rownames(data$phenos[[s]])), tmp)
+    write.table(x=tmp, file=gzfile(paste0("phenotypes_",names(data$phenos)[s],
+                         ".txt.gz")), quote=FALSE, sep="\t", row.names=FALSE,
+                col.names=FALSE)
+  }
   tmp <- data.frame(subgroup=names(data$phenos),
                     file=paste0("phenotypes_",names(data$phenos),".txt.gz"))
   write.table(x=tmp, file="list_phenotypes.txt", quote=FALSE,
@@ -303,7 +310,7 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
   
   tmp <- rbind(c("id", data$inds$id),
                c("sex", data$inds$sex))
-  write.table(x=tmp, file="covariates.txt", quote=FALSE,
+  write.table(x=tmp, file="covariates.txt", quote=FALSE, sep="\t",
               row.names=FALSE, col.names=FALSE)
   tmp <- data.frame(subgroup=names(data$phenos),
                     file=rep("covariates.txt", length(data$phenos)))
@@ -311,7 +318,7 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
               row.names=FALSE, col.names=FALSE)
   
   write.table(x=data$truth, file=gzfile("truth.txt.gz"),
-              quote=FALSE, row.names=FALSE)
+              quote=FALSE, sep="\t", row.names=FALSE)
 }
 
 ## Calculate the summary statistics in each tissue
