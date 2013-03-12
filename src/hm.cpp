@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- *  g++ -Wall -Wextra -g hm_methods.cpp hm.cpp -lgsl -lgslcblas -o hm
+ *  g++ -Wall -Wextra -g utils.cpp hm_methods.cpp hm.cpp -lz -lgsl -lgslcblas -o hm
  */
 
 #include "hm_classes.h"
@@ -27,6 +27,8 @@
 #include <math.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+
+#include "utils.h"
 
 
 void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
@@ -695,6 +697,9 @@ void eQTL_controller::print_result(){
 
 int main(int argc, char **argv){
   
+  time_t startRawTime, endRawTime;
+  time (&startRawTime);
+  
   // creating the grid
   
   //olist.push_back(0.1);
@@ -798,4 +803,8 @@ int main(int argc, char **argv){
   controller.compute_posterior();
   controller.print_result();
   controller.estimate_profile_ci();
+  
+  time (&endRawTime);
+  cerr << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
+       << "max.mem -> " << getMaxMemUsedByProcess2Str () << endl;
 }
