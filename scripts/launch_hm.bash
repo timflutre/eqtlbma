@@ -159,10 +159,8 @@ startTime2=$(timer)
 tmpFile="input_hm_"$$".txt"
 rm -f $tmpFile
 nbInFiles=0
-nbPairs=0
 for inFile in $inFiles; do
     let nbInFiles=nbInFiles+1
-    let nbPairs=nbPairs+$(zcat $inFile | sed 1d | grep -c -v "gen")
     if [ -z "${reConf}" ]; then
     	zcat $inFile \
     	    | awk -v g=${nbGrids} 'NR>1 {if(match($3,"gen")==0){printf "%s_%s %s", $2, $1, $3; for(i=4;i<=4+g-1;++i){printf " %s", $i}; printf "\n"}}' \
@@ -173,6 +171,7 @@ for inFile in $inFiles; do
     	    >> $tmpFile
     fi
 done
+nbPairs=$(wc -l < $tmpFile)
 if [ $verbose -gt "0" ]; then
     msg="nb of input files: ${nbInFiles}\n"
     msg+="nb of gene-SNP pairs: ${nbPairs}\n"
