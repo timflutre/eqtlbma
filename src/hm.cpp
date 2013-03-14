@@ -614,7 +614,7 @@ void eQTL_controller::em_update_config(){
 void eQTL_controller::update_params(){
  
   
-  //*pi0 = new_pi0;
+  *pi0 = new_pi0;
   if(config_size>1){
     for(size_t i=0;i<config_size;i++)
       config_prior[i] = new_config_prior[i];
