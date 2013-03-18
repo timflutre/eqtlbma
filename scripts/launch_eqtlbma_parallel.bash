@@ -18,7 +18,7 @@ function help () {
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="      --snpD\tdirectory with lists of SNPs to analyze\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
-    msg+="\t\teach SNP file should correspond to a feature file, in the same order"
+    msg+="\t\teach SNP file should correspond to a feature file, in the same order\n"
     msg+="      --seedF\tfile with seeds (as many as files in --ftrD)\n"
     msg+="\t\toptional, default=list_seeds.txt.gz (should be gzipped)\n"
     msg+="      --task\ttask identifier (not for SGE, for SLURM only)\n"
