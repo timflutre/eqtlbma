@@ -2,9 +2,13 @@
 ===============
 
 New features
+* allow to launch 'hm' on any subset of the configurations (via a script option)
 * change the format of the covariate files to make them readable by MatrixEQTL
+* skip features (genes) if no coordinates are provided
+* don't save summary statistics for other covariates by default
 
 Bug fixes
+* update pi0 in the hierarchical model (bug absent in paper's results)
 * allow covariates only for a subset of the subgroups
 
 
