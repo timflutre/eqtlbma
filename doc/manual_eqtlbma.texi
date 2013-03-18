@@ -256,10 +256,7 @@ gene2 0.1928 -0.873 0.5284 ...
 
 As the files with phenotypes don't contain the gene coordinates, we also need to use the option
 @option{--fcoord} to specify gene coordinates in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
-
-Note that it is not a problem for the program if each phenotype file doesn't contain the same genes.
-However, the individual names have to be of the same format as those specified in the genotype files.
-Also, the order of the columns doesn't matter in any file.
+Genes with no coordinates will be skipped (useful when launching the program in parallel, see below).
 
 The option @option{--qnorm} allows the program to transform the phenotypes
 into a standard Normal distribution.
@@ -277,6 +274,9 @@ The option @option{--cis} precises the length of half of the @emph{cis} region, 
 As an example, @option{--anchor FSS --cis 100000} means that, for each gene, 
 we will test all SNPs falling in the interval [-100kb,+100kb] centered on the
 the start coordinate of the given gene as determined from the BED file given to option @option{--fcoord}.
+
+Following the convention in @url{http://code.google.com/p/bedtools/,BEDTools}, 
+the definition of the @emph{cis} region uses @leq{} and @geq{} instead of < and >.
 
 @section Analysis steps and output files
 
@@ -300,6 +300,8 @@ and another set of jobs with @option{--permsep 2}, both sets of jobs in the same
 We would typically use option @option{--outss} with the first set of jobs but not with the second,
 otherwise both sets of jobs may overwrite each other's files.
 However, we need the summary stats per subgroup if we want to make meta-analysis-like forest plots.
+Also, when the option @option{--outcv} is set, the summary statistics of the other covariates,
+if any, are saved.
 
 If the option @option{--outraw} is not specified, the raw Bayes Factors won't be saved.
 This can be useful in some cases: for instance, when the number of subgroups is large (>15-20).
@@ -391,29 +393,26 @@ eqtlbma \
 When dealing with many genes (e.g. 20,000) and SNPs (e.g. 5 millions),
 we recommend to split the analysis in batches and launch them in parallel.
 To simplify this, i.e. to avoid the burden of creating new input files,
-we can use the option @option{--ftr}.
+we can have several BED files with different subsets of genes.
 
 Let's say that we want 100 batches, we only need to split all the genes into 100 lists.
-Starting from the BED files given to @option{--fcoord}, we can do this with the following command 
+Starting from the initial BED file, we can do this with the following command 
 (of course you may have to adapt this a bit if it doesn't work at first):
 @verbatim
 nbBatches="100"; mkdir lists_genes; cd lists_genes; \
-zcat ../gene_coords.bed.gz | cut -f4 | split \
+zcat ../gene_coords.bed.gz | cut -f1-4 | split \
 -l $(echo "scale=0; $(zcat ../gene_coords.bed.gz | wc -l)/${nbBatches}" | bc -l) \
---suffix-length=3 --numeric-suffixes=1 --additional-suffix=.txt \
+--suffix-length=3 --numeric-suffixes=1 --additional-suffix=.bed \
 --filter='gzip > $FILE.gz' - list_genes_; cd ..
 @end verbatim
 
-Then, we can easily launch all batches in parallel, 
-for instance with @option{--ftr lists_genes/list_genes_001.txt.gz} for the first batch.
-
-A full command line may look like this:
+Then, a full command line may look like this:
 @verbatim
 eqtlbma \
 --geno file_with_paths_to_genotype_files.txt \
 --scoord file_with_SNP_coordinates.bed.gz \
 --pheno file_with_paths_to_phenotype_files.txt \
---fcoord file_with_gene_coordinates.bed.gz \
+--fcoord lists_genes/list_genes_001.bed.gz \
 --out output_eqtlbma_001 \
 --step 5 \
 --outraw \
@@ -426,8 +425,7 @@ eqtlbma \
 --fitnull \
 --nperm 10000 \
 --trick 2 \
---pbf all \
---ftr lists_genes/list_genes_001.txt.gz
+--pbf all
 @end verbatim
 
 Have a look at the script @command{launch_eqtlbma_parallel.bash} 
@@ -435,6 +433,8 @@ in the directory @command{scripts/} of the package.
 
 Note that you can also use the option @option{--snp} if you want to analyse
 only a subset of all SNPs.
+For instance you can have a file with a list of cis SNPs for each BED file 
+containing gene coordinates.
 
 @c=============================================================================
 
@@ -452,6 +452,8 @@ as well as load into R.
 If @option{--outss} is set but @option{--mvlr} is not, one file is created per subgroup with some summary statistics.
 They have the suffix ``_sumstats_<subgroup>.txt.gz''.
 These summary statistics can be used to draw forest plots.
+If you provide the option @option{--outcv}, the summary statistics of 
+the other covariates, if any, will also be saved.
 For steps 2 and 5, there will also be file(s) with the results of the permutations.
 If @option{--permsep 1} was given, there will be one such file, with suffix ``_sepPermPvals.txt.gz''.
 If @option{--permsep 2} was given, there will be one file per subgroup, with suffix ``_sepPermPvals_<subgroup>.txt.gz''.

@@ -95,7 +95,7 @@ function calc_obs_res () {
 	-o obs_eqtlbma --outss --outraw --step 3 --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	--covar list_covariates.txt \
+	--covar list_covariates.txt --outcv \
 	-v 1 >& stdout_eqtlbma
 }
 

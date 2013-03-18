@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <set>
 #include <algorithm>
 #include <limits>
 #include <sstream>
@@ -110,6 +111,7 @@ void help (char ** argv)
        << "\t\t4: both separate and joint analysis, with permutation for joint only" << endl
        << "\t\t5: both separate and joint analysis, with permutation for both" << endl
        << "      --outss\twrite the output file with all summary statistics" << endl
+       << "      --outcv\twrite the results for the other covariates when --outss" << endl
        << "      --outraw\twrite the output file with all raw ABFs" << endl
        << "\t\tby default, only the ABFs averaged over the grids are written" << endl
        << "\t\twriting all raw ABFs can be too much if the number of subgroups is large" << endl
@@ -177,11 +179,8 @@ void help (char ** argv)
        << "\t\t'all': average over all configurations" << endl
        << "      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations" << endl
        << "\t\totherwise the average ABF over SNPs is used (more Bayesian)" << endl
-       << "  -f, --ftr\tfile with a list of features to analyze" << endl
-       << "\t\tone feature name per line" << endl
-       << "\t\tallows to easily parallelize a whole analyzis" << endl
        << "  -s, --snp\tfile with a list of SNPs to analyze" << endl
-       << "\t\tone SNP name per line" << endl
+       << "\t\tone SNP name per line, useful when launched in parallel" << endl
        << "      --sbgrp\tidentifier of the subgroup to analyze" << endl
        << "\t\tuseful for quick analysis and debugging" << endl
        << endl;
@@ -216,6 +215,7 @@ parseArgs (
   size_t & lenCis,
   string & outPrefix,
   bool & outSstats,
+  bool & outCovars,
   bool & outRaw,
   int & whichStep,
   bool & needQnorm,
@@ -233,7 +233,6 @@ parseArgs (
   int & whichPermSep,
   string & whichPermBf,
   bool & useMaxBfOverSnps,
-  string & ftrsToKeepFile,
   string & snpsToKeepFile,
   string & sbgrpToKeep,
   int & verbose)
@@ -254,6 +253,7 @@ parseArgs (
 	{"cis", required_argument, 0, 0},
 	{"out", required_argument, 0, 'o'},
 	{"outss", no_argument, 0, 0},
+	{"outcv", no_argument, 0, 0},
 	{"outraw", no_argument, 0, 0},
 	{"step", required_argument, 0, 0},
 	{"qnorm", no_argument, 0, 0},
@@ -271,7 +271,6 @@ parseArgs (
 	{"permsep", required_argument, 0, 0},
 	{"pbf", required_argument, 0, 0},
 	{"maxbf", no_argument, 0, 0},
-	{"ftr", required_argument, 0, 'f'},
 	{"snp", required_argument, 0, 's'},
 	{"sbgrp", required_argument, 0, 0},
 	{0, 0, 0, 0}
@@ -309,6 +308,11 @@ parseArgs (
       if (strcmp(long_options[option_index].name, "outss") == 0)
       {
 	outSstats = true;
+	break;
+      }
+      if (strcmp(long_options[option_index].name, "outcv") == 0)
+      {
+	outCovars = true;
 	break;
       }
       if (strcmp(long_options[option_index].name, "outraw") == 0)
@@ -418,9 +422,6 @@ parseArgs (
       break;
     case 'o':
       outPrefix = optarg;
-      break;
-    case 'f':
-      ftrsToKeepFile = optarg;
       break;
     case 's':
       snpsToKeepFile = optarg;
@@ -594,13 +595,6 @@ parseArgs (
   {
     getCmdLine (argc, argv);
     fprintf (stderr, "ERROR: if --bfs sin, then --pbf should be 'gen', 'sin' or 'gen-sin'\n\n");
-    help (argv);
-    exit (1);
-  }
-  if (! ftrsToKeepFile.empty() && ! doesFileExist (ftrsToKeepFile))
-  {
-    getCmdLine (argc, argv);
-    fprintf (stderr, "ERROR: can't find '%s'\n\n", ftrsToKeepFile.c_str());
     help (argv);
     exit (1);
   }
@@ -931,6 +925,18 @@ void
 Snp_init (
   Snp & iSnp,
   const string & name,
+  const string & chr,
+  const string & coord)
+{
+  iSnp.name = name;
+  iSnp.chr = chr;
+  iSnp.coord = atol (coord.c_str());
+}
+
+void
+Snp_init (
+  Snp & iSnp,
+  const string & name,
   const size_t & nbSubgroups)
 {
   iSnp.name = name;
@@ -1064,7 +1070,8 @@ ResFtrSnp_getSstatsOneSbgrp (
   const vector<vector<size_t> > & vvSampleIdxPhenos,
   const vector<vector<size_t> > & vvSampleIdxGenos,
   const bool & needQnorm,
-  const vector<map<string, vector<double> > > & vSbgrp2Covars)
+  const vector<map<string, vector<double> > > & vSbgrp2Covars,
+  const bool & outCovars)
 {
   vector<double> vY, vG;
   size_t idxPheno, idxGeno, j;
@@ -1106,12 +1113,15 @@ ResFtrSnp_getSstatsOneSbgrp (
 				 iResFtrSnp.vSigmahats[s],
 				 vvResPredictors);
     iResFtrSnp.vMapPredictors[s]["genotype"] = vvResPredictors[0];
-    j = 1;
-    for (map<string, vector<double> >::const_iterator it =
-	   vSbgrp2Covars[s].begin(); it != vSbgrp2Covars[s].end(); ++it)
+    if (outCovars)
     {
-      iResFtrSnp.vMapPredictors[s][it->first] = vvResPredictors[j];
+      j = 1;
+      for (map<string, vector<double> >::const_iterator it =
+	     vSbgrp2Covars[s].begin(); it != vSbgrp2Covars[s].end(); ++it)
+      {
+	iResFtrSnp.vMapPredictors[s][it->first] = vvResPredictors[j];
 	++j;
+      }
     }
   }
 }
@@ -1220,13 +1230,6 @@ ResFtrSnp_getSstatsPermOneSbgrp (
 				 iResFtrSnp.vSigmahats[s],
 				 vvResPredictors);
     iResFtrSnp.vMapPredictors[s]["genotype"] = vvResPredictors[0];
-    j = 1;
-    for (map<string, vector<double> >::const_iterator it =
-	   vSbgrp2Covars[s].begin(); it != vSbgrp2Covars[s].end(); ++it)
-    {
-      iResFtrSnp.vMapPredictors[s][it->first] = vvResPredictors[j];
-	++j;
-    }
   }
 }
 
@@ -1877,17 +1880,14 @@ void
 Ftr_init (
   Ftr & iFtr,
   const string & name,
-  const size_t & nbSubgroups)
+  const string & chr,
+  const string & start,
+  const string & end)
 {
   iFtr.name = name;
-  iFtr.chr.clear();
-  iFtr.start = string::npos;
-  iFtr.end = string::npos;
-  iFtr.vvPhenos.resize (nbSubgroups);
-  iFtr.vvIsNa.resize (nbSubgroups);
-  iFtr.vPermPvalsSep.assign (nbSubgroups, numeric_limits<double>::quiet_NaN());
-  iFtr.vNbPermsSoFar.assign (nbSubgroups, 0);
-  iFtr.vMinTruePvals.assign (nbSubgroups, numeric_limits<double>::quiet_NaN());
+  iFtr.chr = chr;
+  iFtr.start = atol (start.c_str()) + 1; // BED format is 0-based
+  iFtr.end = atol (end.c_str());
   iFtr.sepPermPval = numeric_limits<double>::quiet_NaN();
   iFtr.nbPermsSoFarSep = 0;
   iFtr.minTruePval = numeric_limits<double>::quiet_NaN();
@@ -1982,6 +1982,7 @@ Ftr_inferAssos (
   const int & whichStep,
   const bool & needQnorm,
   const vector<map<string, vector<double> > > & vSbgrp2Covars,
+  const bool & outCovars,
   const Grid & iGridL,
   const Grid & iGridS,
   const string & whichBfs,
@@ -2007,7 +2008,7 @@ Ftr_inferAssos (
 	  ResFtrSnp_getSstatsOneSbgrp (iResFtrSnp, iFtr,
 				       *(iFtr.vPtCisSnps[snpId]), s,
 				       vvSampleIdxPhenos, vvSampleIdxGenos,
-				       needQnorm, vSbgrp2Covars);
+				       needQnorm, vSbgrp2Covars, outCovars);
 	}
       }
       if (whichStep == 3 || whichStep == 4 || whichStep == 5)
@@ -2498,7 +2499,8 @@ loadSamplesAllPhenos (
     if (s == 0)
     {
       split (line, " \t", vSamples);
-      if (vSamples[0].compare("Id") == 0 || vSamples[0].compare("id") == 0)
+      if (vSamples[0].compare("Id") == 0 || vSamples[0].compare("id") == 0
+	  || vSamples[0].compare("ID") == 0)
 	vSamples.erase (vSamples.begin());
       vvSamples.push_back (vSamples);
     }
@@ -2506,7 +2508,8 @@ loadSamplesAllPhenos (
     {
       vector<string> tokens;
       split (line, " \t", tokens);
-      if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
+      if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
+	  || tokens[0].compare("ID") == 0)
 	tokens.erase (tokens.begin());
       vvSamples.push_back (tokens);
       for (size_t i = 0; i < tokens.size(); ++i)
@@ -2619,7 +2622,8 @@ loadSamplesAllGenos (
       }
       else // allele dosage, as MatrixEQTL
       {
-	if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
+	if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
+	    || tokens[0].compare("ID") == 0)
 	  tokens.erase (tokens.begin());
 	vvSamples.push_back (tokens);
 	for (i = 0; i < tokens.size(); ++i)
@@ -2719,109 +2723,6 @@ loadSamples (
 }
 
 void
-loadPhenos (
-  const map<string, string> & mPhenoPaths,
-  const vector<string> & vSubgroups,
-  const vector<string> & vFtrsToKeep,
-  map<string, Ftr> & mFtrs,
-  const int & verbose)
-{
-  if (verbose > 0)
-    cout << "load phenotypes ..." << endl << flush;
-  
-  gzFile phenoStream;
-  string line;
-  vector<string> tokens;
-  size_t nbSamples, nbLines, nbFtrsToKeepPerSubgroup;
-  
-  for (size_t s = 0; s < vSubgroups.size(); ++s)
-  {
-    nbFtrsToKeepPerSubgroup = 0;
-    nbLines = 0;
-    openFile (mPhenoPaths.find(vSubgroups[s])->second, phenoStream, "rb");
-    if (! getline (phenoStream, line))
-    {
-      cerr << "ERROR: problem with the header of file "
-	   << mPhenoPaths.find(vSubgroups[s])->second << endl;
-      exit (1);
-    }
-    ++nbLines;
-    split (line, " \t", tokens);
-    if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
-      nbSamples = tokens.size() - 1;
-    else
-      nbSamples = tokens.size();
-    
-    while (getline (phenoStream, line))
-    {
-      ++nbLines;
-      split (line, " \t", tokens);
-      if (tokens.size() != nbSamples + 1)
-      {
-	cerr << "ERROR: not enough columns on line " << nbLines
-	     << " of file " << mPhenoPaths.find(vSubgroups[s])->second
-	     << " (" << tokens.size() << " != " << nbSamples + 1 << ")"
-	     << endl;
-	exit (1);
-      }
-      if (! vFtrsToKeep.empty()
-	  && find (vFtrsToKeep.begin(), vFtrsToKeep.end(), tokens[0])
-	  == vFtrsToKeep.end())
-	continue;
-      ++nbFtrsToKeepPerSubgroup;
-      
-      if (mFtrs.find(tokens[0]) == mFtrs.end())
-      {
-	Ftr iFtr;
-	Ftr_init (iFtr, tokens[0], mPhenoPaths.size());
-	iFtr.vvPhenos[s].assign (nbSamples, numeric_limits<double>::quiet_NaN());
-	iFtr.vvIsNa[s].assign (nbSamples, true);
-	for (size_t i = 1; i < tokens.size(); ++i)
-	  if (tokens[i].compare("NA") != 0)
-	  {
-	    iFtr.vvPhenos[s][i-1] = atof (tokens[i].c_str());
-	    iFtr.vvIsNa[s][i-1] = false;
-	  }
-	mFtrs.insert (make_pair (tokens[0], iFtr));
-      }
-      else
-      {
-	mFtrs[tokens[0]].vvPhenos[s].assign (nbSamples, numeric_limits<double>::quiet_NaN());
-	mFtrs[tokens[0]].vvIsNa[s].assign (nbSamples, true);
-	for (size_t i = 1; i < tokens.size() ; ++i)
-	  if (tokens[i].compare("NA") != 0)
-	  {
-	    mFtrs[tokens[0]].vvPhenos[s][i-1] = atof (tokens[i].c_str());
-	    mFtrs[tokens[0]].vvIsNa[s][i-1] = false;
-	  }
-      }
-    }
-    if (! gzeof (phenoStream))
-    {
-      cerr << "ERROR: can't read successfully file "
-	   << mPhenoPaths.find(vSubgroups[s])->second
-	   << " up to the end" << endl;
-      exit (1);
-    }
-    
-    closeFile (mPhenoPaths.find(vSubgroups[s])->second, phenoStream);
-    if (verbose > 0)
-      cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
-	   << mPhenoPaths.find(vSubgroups[s])->second << "): " << (nbLines-1)
-	   << " features (to keep: " << nbFtrsToKeepPerSubgroup << ")"
-	   << endl << flush;
-  }
-  
-  if (mFtrs.size() == 0)
-  {
-    cerr << "ERROR: no feature to analyze" << endl;
-    exit (1);
-  }
-  if (verbose > 0)
-    cout << "total nb of features with phenotypes: " << mFtrs.size() << endl;
-}
-
-void
 loadFtrInfo (
   const string & ftrCoordsFile,
   map<string, Ftr> & mFtrs,
@@ -2839,16 +2740,15 @@ loadFtrInfo (
   while (getline (ftrCoordsStream, line))
   {
     split (line, " \t", tokens);
-    if (mFtrs.find(tokens[3]) == mFtrs.end())
-      continue;
-    mFtrs[tokens[3]].chr = tokens[0];
-    mFtrs[tokens[3]].start = atol (tokens[1].c_str()) + 1;
-    mFtrs[tokens[3]].end = atol (tokens[2].c_str());
-    
-    if (mChr2VecPtFtrs.find(tokens[0]) == mChr2VecPtFtrs.end())
-      mChr2VecPtFtrs.insert (make_pair (tokens[0],
+    if (mFtrs.find(tokens[3]) != mFtrs.end())
+      continue; // in case of redundancy
+    Ftr iFtr;
+    Ftr_init (iFtr, tokens[3], tokens[0], tokens[1], tokens[2]);
+    mFtrs.insert (make_pair (iFtr.name, iFtr));
+    if (mChr2VecPtFtrs.find(iFtr.chr) == mChr2VecPtFtrs.end())
+      mChr2VecPtFtrs.insert (make_pair (iFtr.chr,
 					vector<Ftr*> ()));
-    mChr2VecPtFtrs[tokens[0]].push_back (&(mFtrs[tokens[3]]));
+    mChr2VecPtFtrs[iFtr.chr].push_back (&(mFtrs[iFtr.name]));
   }
   if (! gzeof (ftrCoordsStream))
   {
@@ -2858,20 +2758,6 @@ loadFtrInfo (
     exit (1);
   }
   closeFile (ftrCoordsFile, ftrCoordsStream);
-  
-  // check that all features have coordinates
-  map<string, Ftr>::iterator it = mFtrs.begin();
-  while (it != mFtrs.end())
-  {
-    if (it->second.chr.empty())
-    {
-      cerr << "WARNING: skip feature " << it->second.name
-	   << " because it has no coordinate" << endl;
-      mFtrs.erase (it++);
-    }
-    else
-      ++it;
-  }
   
   // sort the features per chr
   for (map<string, vector<Ftr*> >::iterator it = mChr2VecPtFtrs.begin();
@@ -2884,7 +2770,168 @@ loadFtrInfo (
     exit (1);
   }
   if (verbose > 0)
+    cout << "total nb of features with coordinates: " << mFtrs.size() << endl;
+}
+
+/** \brief Load phenotypes from each subgroup file.
+ *  \note format: row 1 for sample names, column 1 for feature names
+ */
+void
+loadPhenos (
+  const map<string, string> & mPhenoPaths,
+  const vector<string> & vSubgroups,
+  map<string, Ftr> & mFtrs,
+  const int & verbose)
+{
+  if (verbose > 0)
+    cout << "load phenotypes ..." << endl << flush;
+  
+  gzFile phenoStream;
+  string line;
+  vector<string> tokens;
+  size_t nbSubgroups = vSubgroups.size(), nbSamples, nbLines,
+    nbFtrsToKeepPerSubgroup;
+  
+  for (size_t s = 0; s < nbSubgroups; ++s)
+  {
+    nbFtrsToKeepPerSubgroup = 0;
+    nbLines = 0;
+    openFile (mPhenoPaths.find(vSubgroups[s])->second, phenoStream, "rb");
+    if (! getline (phenoStream, line))
+    {
+      cerr << "ERROR: problem with the header of file "
+	   << mPhenoPaths.find(vSubgroups[s])->second << endl;
+      exit (1);
+    }
+    ++nbLines;
+    split (line, " \t", tokens);
+    if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
+	|| tokens[0].compare("ID") == 0)
+      nbSamples = tokens.size() - 1;
+    else
+      nbSamples = tokens.size();
+    
+    while (getline (phenoStream, line))
+    {
+      ++nbLines;
+      split (line, " \t", tokens);
+      if (tokens.size() != nbSamples + 1)
+      {
+	cerr << "ERROR: not enough columns on line " << nbLines
+	     << " of file " << mPhenoPaths.find(vSubgroups[s])->second
+	     << " (" << tokens.size() << " != " << nbSamples + 1 << ")"
+	     << endl;
+	exit (1);
+      }
+      if (mFtrs.find(tokens[0]) == mFtrs.end())
+	continue;  // skip if no coordinate
+      if (mFtrs[tokens[0]].vvPhenos.empty())
+      {
+	mFtrs[tokens[0]].vvPhenos.resize (nbSubgroups);
+	mFtrs[tokens[0]].vvIsNa.resize (nbSubgroups);
+	mFtrs[tokens[0]].vPermPvalsSep.assign (nbSubgroups,
+					       numeric_limits<double>::quiet_NaN());
+	mFtrs[tokens[0]].vNbPermsSoFar.assign (nbSubgroups, 0);
+	mFtrs[tokens[0]].vMinTruePvals.assign (nbSubgroups,
+					       numeric_limits<double>::quiet_NaN());
+      }
+      mFtrs[tokens[0]].vvPhenos[s].assign (nbSamples, numeric_limits<double>::quiet_NaN());
+      mFtrs[tokens[0]].vvIsNa[s].assign (nbSamples, true);
+      for (size_t i = 1; i < tokens.size() ; ++i)
+	if (tokens[i].compare("NA") != 0)
+	{
+	  mFtrs[tokens[0]].vvPhenos[s][i-1] = atof (tokens[i].c_str());
+	  mFtrs[tokens[0]].vvIsNa[s][i-1] = false;
+	}
+      ++nbFtrsToKeepPerSubgroup;
+    }
+    if (! gzeof (phenoStream))
+    {
+      cerr << "ERROR: can't read successfully file "
+	   << mPhenoPaths.find(vSubgroups[s])->second
+	   << " up to the end" << endl;
+      exit (1);
+    }
+    
+    closeFile (mPhenoPaths.find(vSubgroups[s])->second, phenoStream);
+    if (verbose > 0)
+      cout << "s" << (s+1) << " (" << vSubgroups[s] << ", "
+	   << mPhenoPaths.find(vSubgroups[s])->second << "): " << (nbLines-1)
+	   << " features (to keep: " << nbFtrsToKeepPerSubgroup << ")"
+	   << endl << flush;
+  }
+  
+  // check that all features have phenotypes
+  map<string, Ftr>::iterator it = mFtrs.begin();
+  while (it != mFtrs.end())
+  {
+    if (it->second.vvPhenos.empty())
+    {
+      cerr << "WARNING: skip feature " << it->second.name
+      	   << " because it has no phenotype" << endl;
+      mFtrs.erase (it++);
+    }
+    else
+      ++it;
+  }
+  
+  if (mFtrs.size() == 0)
+  {
+    cerr << "ERROR: no feature to analyze" << endl;
+    exit (1);
+  }
+  if (verbose > 0)
     cout << "total nb of features to analyze: " << mFtrs.size() << endl;
+}
+
+set<string>
+loadSnpsToKeep (
+  const string & snpsToKeepFile,
+  const int & verbose)
+{
+  set<string> sSnpsToKeep;
+  
+  if (snpsToKeepFile.empty())
+    return sSnpsToKeep;
+  
+  string line;
+  gzFile stream;
+  vector<string> tokens;
+  size_t line_id = 0;
+  
+  openFile (snpsToKeepFile, stream, "rb");
+  if (verbose > 0)
+    cout <<"load file " << snpsToKeepFile << " ..." << endl;
+  
+  while (getline (stream, line))
+  {
+    line_id++;
+    split (line, " \t,", tokens);
+    if (tokens.size() != 1)
+    {
+      cerr << "ERROR: file " << snpsToKeepFile
+	   << " should have only one column"
+	   << " at line " << line_id << endl;
+      exit (1);
+    }
+    if (tokens[0][0] == '#')
+      continue;
+    if (sSnpsToKeep.find (tokens[0]) == sSnpsToKeep.end())
+      sSnpsToKeep.insert (tokens[0]);
+  }
+  
+  if (! gzeof (stream))
+  {
+    cerr << "ERROR: can't read successfully file "
+	 << snpsToKeepFile << " up to the end" << endl;
+    exit (1);
+  }
+  closeFile (snpsToKeepFile, stream);
+  
+  if (verbose > 0)
+    cout << "items loaded: " << sSnpsToKeep.size() << endl;
+  
+  return sSnpsToKeep;
 }
 
 void
@@ -2896,7 +2943,7 @@ loadGenosAndSnpInfoFromImpute (
   const float & minMaf,
   const vector<string> & vSubgroups,
   const size_t & s,
-  const vector<string> & vSnpsToKeep,
+  const set<string> & sSnpsToKeep,
   const map<string, vector<Ftr*> > & mChr2VecPtFtrs,
   size_t & nbSnpsToKeepPerSubgroup,
   map<string, Snp> & mSnps,
@@ -2923,9 +2970,8 @@ loadGenosAndSnpInfoFromImpute (
     }
     if (mChr2VecPtFtrs.find (tokens[0]) == mChr2VecPtFtrs.end())
       continue;
-    if (! vSnpsToKeep.empty()
-	&& find (vSnpsToKeep.begin(), vSnpsToKeep.end(), tokens[1])
-	== vSnpsToKeep.end())
+    if (! sSnpsToKeep.empty() && sSnpsToKeep.find (tokens[1])
+	== sSnpsToKeep.end())
       continue;
     
     maf = 0;
@@ -3005,7 +3051,7 @@ loadGenosAndSnpInfoFromVcf (
   const float & minMaf,
   const vector<string> & vSubgroups,
   const size_t & s,
-  const vector<string> & vSnpsToKeep,
+  const set<string> & sSnpsToKeep,
   const map<string, vector<Ftr*> > & mChr2VecPtFtrs,
   size_t & nbSnpsToKeepPerSubgroup,
   map<string, Snp> & mSnps,
@@ -3046,9 +3092,8 @@ loadGenosAndSnpInfoFromVcf (
     }
     if (mChr2VecPtFtrs.find (tokens[0]) == mChr2VecPtFtrs.end())
       continue;
-    if (! vSnpsToKeep.empty()
-	&& find (vSnpsToKeep.begin(), vSnpsToKeep.end(), tokens[2])
-	== vSnpsToKeep.end())
+    if (! sSnpsToKeep.empty() && sSnpsToKeep.find (tokens[2])
+	== sSnpsToKeep.end())
       continue;
     
     maf = 0;
@@ -3157,7 +3202,7 @@ loadGenosAndSnpInfo (
   const map<string, string> & mGenoPaths,
   const float & minMaf,
   const vector<string> & vSubgroups,
-  const vector<string> & vSnpsToKeep,
+  const set<string> & sSnpsToKeep,
   const map<string, vector<Ftr*> > & mChr2VecPtFtrs,
   map<string, Snp> & mSnps,
   map<string, vector<Snp*> > & mChr2VecPtSnps,
@@ -3195,7 +3240,7 @@ loadGenosAndSnpInfo (
     
     if (line.find("##fileformat=VCF") != string::npos) // VCF format
       loadGenosAndSnpInfoFromVcf (genoStream, line, nbLines, mGenoPaths,
-				  minMaf, vSubgroups, s, vSnpsToKeep,
+				  minMaf, vSubgroups, s, sSnpsToKeep,
 				  mChr2VecPtFtrs, nbSnpsToKeepPerSubgroup,
 				  mSnps, mChr2VecPtSnps);
     else if(line.find("chr") != string::npos
@@ -3204,7 +3249,7 @@ loadGenosAndSnpInfo (
 	    && line.find("a1") != string::npos
 	    && line.find("a2") != string::npos) // IMPUTE format
       loadGenosAndSnpInfoFromImpute (genoStream, line, nbLines, mGenoPaths,
-				     minMaf, vSubgroups, s, vSnpsToKeep,
+				     minMaf, vSubgroups, s, sSnpsToKeep,
 				     mChr2VecPtFtrs, nbSnpsToKeepPerSubgroup,
 				     mSnps, mChr2VecPtSnps);
     else if (line.compare(0, 2, "id") == 0)
@@ -3250,6 +3295,64 @@ loadGenosAndSnpInfo (
     cout << "nb of SNPs: " << mSnps.size() << endl;
 }
 
+void
+loadSnpInfo (
+  const string & snpCoordsFile,
+  const set<string> & sSnpsToKeep,
+  map<string, Snp> & mSnps,
+  map<string, vector<Snp*> > & mChr2VecPtSnps,
+  const int & verbose)
+{
+  if (verbose > 0)
+    cout << "load SNP coordinates ..." << endl << flush;
+  clock_t startTime = clock();
+  
+  // parse the BED file
+  gzFile snpCoordsStream;
+  openFile (snpCoordsFile, snpCoordsStream, "rb");
+  string line;
+  vector<string> tokens;
+  while (getline (snpCoordsStream, line))
+  {
+    split (line, " \t", tokens);
+    if (! sSnpsToKeep.empty() && sSnpsToKeep.find (tokens[3])
+	== sSnpsToKeep.end())
+      continue;
+    if (mSnps.find(tokens[3]) != mSnps.end())
+      continue; // in case of redundancy
+    Snp iSnp;
+    Snp_init (iSnp, tokens[3], tokens[0], tokens[2]);
+    mSnps.insert (make_pair (iSnp.name, iSnp));
+    if (mChr2VecPtSnps.find(iSnp.chr) == mChr2VecPtSnps.end())
+      mChr2VecPtSnps.insert (make_pair (iSnp.chr,
+					vector<Snp*> ()));
+    mChr2VecPtSnps[iSnp.chr].push_back (&(mSnps[iSnp.name]));
+  }
+  if (! gzeof (snpCoordsStream))
+  {
+    cerr << "ERROR: can't read successfully file "
+	 << snpCoordsFile
+	 << " up to the end" << endl;
+    exit (1);
+  }
+  closeFile (snpCoordsFile, snpCoordsStream);
+  
+  // sort the SNPs per chr
+  for (map<string, vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
+       it != mChr2VecPtSnps.end(); ++it)
+    sort (it->second.begin(), it->second.end(), Snp_compByCoord);
+  
+  if (mSnps.size() == 0)
+  {
+    cerr << "ERROR: no SNP to analyze" << endl;
+    exit (1);
+  }
+  if (verbose > 0)
+    cout << "total nb of SNPs with coordinates: " << mSnps.size()
+	 << " (loaded in " << fixed << setprecision(2)
+	 << getElapsedTime (startTime) << " sec)" << endl;
+}
+
 /** \brief Load genotypes from each subgroup file.
  *  \note format: row 1 for sample names, column 1 for SNP names,
  *  genotypes as allele dose
@@ -3259,7 +3362,6 @@ loadGenos (
   const map<string, string> & mGenoPaths,
   const float & minMaf,
   const vector<string> & vSubgroups,
-  const vector<string> & vSnpsToKeep,
   map<string, Snp> & mSnps,
   const int & verbose)
 {
@@ -3269,12 +3371,13 @@ loadGenos (
   gzFile genoStream;
   string line;
   vector<string> tokens;
-  size_t nbSamples, nbLines, nbSnpsToKeepPerSubgroup;
+  size_t nbSubgroups = vSubgroups.size(), nbSamples, nbLines,
+    nbSnpsToKeepPerSubgroup;
   double maf;
   
   // load each file (if different from the first)
   bool sameFiles = false;
-  for (size_t s = 0; s < vSubgroups.size(); ++s)
+  for (size_t s = 0; s < nbSubgroups; ++s)
   {
     if (s > 0 && mGenoPaths.find(vSubgroups[s])->second.compare(
 	  mGenoPaths.find(vSubgroups[0])->second) == 0)
@@ -3295,7 +3398,8 @@ loadGenos (
     }
     ++nbLines;
     split (line, " \t", tokens);
-    if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0)
+    if (tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
+	|| tokens[0].compare("ID") == 0)
       nbSamples = tokens.size() - 1;
     else
       nbSamples = tokens.size();
@@ -3312,63 +3416,38 @@ loadGenos (
 	     << endl;
 	exit (1);
       }
-      if (! vSnpsToKeep.empty()
-	  && find (vSnpsToKeep.begin(), vSnpsToKeep.end(), tokens[0])
-	  == vSnpsToKeep.end())
-	continue;
       
-      maf = 0;
       if (mSnps.find(tokens[0]) == mSnps.end())
+	continue; // skip if no coordinate
+      maf = 0;
+      if (mSnps[tokens[0]].vvGenos.empty())
       {
-	Snp iSnp;
-	Snp_init (iSnp, tokens[0], mGenoPaths.size());
-	iSnp.vvIsNa[s].resize (nbSamples, false);
-	iSnp.vvGenos[s].resize (nbSamples,
-				numeric_limits<double>::quiet_NaN());
-	for (size_t i = 1; i < tokens.size(); ++i)
-	{
-	  if (tokens[i].compare("NA") == 0 || tokens[i].compare("-1") == 0)
-	    iSnp.vvIsNa[s][i-1] = true;
-	  else
-	  {
-	    iSnp.vvGenos[s][i-1] = atof (tokens[i].c_str());
-	    maf += iSnp.vvGenos[s][i-1];
-	  }
-	}
-	maf /= 2 * (nbSamples
-		    - count (iSnp.vvIsNa[s].begin(),
-			     iSnp.vvIsNa[s].end(),
-			     true));
-	if ((maf <= 0.5 && maf < minMaf) || (maf > 0.5 && 1-maf < minMaf))
-	  continue;
-	++nbSnpsToKeepPerSubgroup;
-	iSnp.vMafs[s] = maf <= 0.5 ? maf : (1 - maf);
-	mSnps.insert (make_pair (tokens[0], iSnp));
+	mSnps[tokens[0]].vMafs.resize (nbSubgroups,
+				       numeric_limits<double>::quiet_NaN());
+	mSnps[tokens[0]].vvGenos.resize (nbSubgroups);
+	mSnps[tokens[0]].vvIsNa.resize (nbSubgroups);
       }
-      else
+      mSnps[tokens[0]].vvGenos[s].assign (nbSamples,
+					  numeric_limits<double>::quiet_NaN());
+      mSnps[tokens[0]].vvIsNa[s].assign (nbSamples, false);
+      for (size_t i = 1; i < tokens.size() ; ++i)
       {
-	mSnps[tokens[0]].vvIsNa[s].resize (nbSamples, false);
-	mSnps[tokens[0]].vvGenos[s].resize (nbSamples,
-					    numeric_limits<double>::quiet_NaN());
-	for (size_t i = 1; i < tokens.size() ; ++i)
+	if (tokens[i].compare("NA") == 0)
+	  mSnps[tokens[0]].vvIsNa[s][i-1] = true;
+	else
 	{
-	  if (tokens[i].compare("NA") == 0)
-	    mSnps[tokens[0]].vvIsNa[s][i-1] = true;
-	  else
-	  {
-	    mSnps[tokens[0]].vvGenos[s][i-1] = atof (tokens[i].c_str());
-	    maf += mSnps[tokens[0]].vvGenos[s][i-1];
-	  }
+	  mSnps[tokens[0]].vvGenos[s][i-1] = atof (tokens[i].c_str());
+	  maf += mSnps[tokens[0]].vvGenos[s][i-1];
 	}
-	maf /= 2 * (nbSamples
-		    - count (mSnps[tokens[0]].vvIsNa[s].begin(),
-			     mSnps[tokens[0]].vvIsNa[s].end(),
-			     true));
-	if ((maf <= 0.5 && maf < minMaf) || (maf > 0.5 && 1-maf < minMaf))
-	  continue;
-	++nbSnpsToKeepPerSubgroup;
-	mSnps[tokens[0]].vMafs[s] = maf <= 0.5 ? maf : (1 - maf);
       }
+      maf /= 2 * (nbSamples
+		  - count (mSnps[tokens[0]].vvIsNa[s].begin(),
+			   mSnps[tokens[0]].vvIsNa[s].end(),
+			   true));
+      if ((maf <= 0.5 && maf < minMaf) || (maf > 0.5 && 1-maf < minMaf))
+	continue;
+      ++nbSnpsToKeepPerSubgroup;
+      mSnps[tokens[0]].vMafs[s] = maf <= 0.5 ? maf : (1 - maf);
     }
     if (! gzeof (genoStream))
     {
@@ -3390,70 +3469,19 @@ loadGenos (
   if (sameFiles && vSubgroups.size() > 1)
     duplicateGenosPerSnpInAllSubgroups (vSubgroups, mSnps, verbose);
   
-  if (mSnps.size() == 0)
-  {
-    cerr << "ERROR: no SNP to analyze" << endl;
-    exit (1);
-  }
-  if (verbose > 0)
-    cout << "total nb of SNPs with genotypes: " << mSnps.size() << endl;
-}
-
-void
-loadSnpInfo (
-  const string & snpCoordsFile,
-  map<string, Snp> & mSnps,
-  map<string, vector<Snp*> > & mChr2VecPtSnps,
-  const int & verbose)
-{
-  if (verbose > 0)
-    cout << "load SNP coordinates ..." << endl << flush;
-  
-  // parse the BED file
-  gzFile snpCoordsStream;
-  openFile (snpCoordsFile, snpCoordsStream, "rb");
-  string line;
-  vector<string> tokens;
-  while (getline (snpCoordsStream, line))
-  {
-    split (line, " \t", tokens);
-    if (mSnps.find(tokens[3]) == mSnps.end())
-      continue;
-    mSnps[tokens[3]].chr = tokens[0];
-    mSnps[tokens[3]].coord = atol (tokens[1].c_str()) + 1;
-    
-    if (mChr2VecPtSnps.find(tokens[0]) == mChr2VecPtSnps.end())
-      mChr2VecPtSnps.insert (make_pair (tokens[0],
-					vector<Snp*> ()));
-    mChr2VecPtSnps[tokens[0]].push_back (&(mSnps[tokens[3]]));
-  }
-  if (! gzeof (snpCoordsStream))
-  {
-    cerr << "ERROR: can't read successfully file "
-	 << snpCoordsFile
-	 << " up to the end" << endl;
-    exit (1);
-  }
-  closeFile (snpCoordsFile, snpCoordsStream);
-  
-  // check that all SNPs have coordinates
+  // check that all SNPs have genotypes
   map<string, Snp>::iterator it = mSnps.begin();
   while (it != mSnps.end())
   {
     if (it->second.chr.empty())
     {
       cerr << "WARNING: skip SNP " << it->second.name
-	   << " because it has no coordinate" << endl;
+	   << " because it has no genotype" << endl;
       mSnps.erase (it++);
     }
     else
       ++it;
   }
-  
-  // sort the SNPs per chr
-  for (map<string, vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
-       it != mChr2VecPtSnps.end(); ++it)
-    sort (it->second.begin(), it->second.end(), Snp_compByCoord);
   
   if (mSnps.size() == 0)
   {
@@ -3601,7 +3629,8 @@ loadCovarsFromFiles (
 	++nbLines;
 	vector<string> vHeader;
 	split (line, " \t", vHeader);
-	if (vHeader[0].compare("Id") == 0 || vHeader[0].compare("id") == 0)
+	if (vHeader[0].compare("Id") == 0 || vHeader[0].compare("id") == 0
+	    || vHeader[0].compare("ID") == 0)
 	  vHeader.erase (vHeader.begin());
 	
 	// get colIdx in covar file for each sample in vSamples
@@ -3717,6 +3746,7 @@ inferAssos (
   const int & whichStep,
   const bool & needQnorm,
   const vector<map<string, vector<double> > > & vSbgrp2Covars,
+  const bool & outCovars,
   const Grid & iGridL,
   const Grid & iGridS,
   const string & whichBfs,
@@ -3757,8 +3787,9 @@ inferAssos (
 	continue;
       }
       Ftr_inferAssos (itF->second, vvSampleIdxPhenos, vvSampleIdxGenos,
-		      whichStep, needQnorm, vSbgrp2Covars, iGridL, iGridS,
-		      whichBfs, mvlr, propFitSigma, verbose-1);
+		      whichStep, needQnorm, vSbgrp2Covars, outCovars,
+		      iGridL, iGridS, whichBfs, mvlr, propFitSigma,
+		      verbose-1);
       nbAnalyzedPairs += itF->second.vResFtrSnps.size();
     }
   }
@@ -3972,6 +4003,7 @@ writeResSstats (
   const map<string, Snp> & mSnps,
   const vector<string> & vSubgroups,
   const vector<map<string, vector<double> > > & vSbgrp2Covars,
+  const bool & outCovars,
   const int & verbose)
 {
   if (verbose > 0)
@@ -3989,11 +4021,12 @@ writeResSstats (
     
     ssTxt << "ftr snp maf n pve sigmahat"
 	  << " betahat.geno sebetahat.geno betapval.geno";
-    for (map<string, vector<double> >::const_iterator it =
-	   vSbgrp2Covars[s].begin(); it != vSbgrp2Covars[s].end(); ++it)
-      ssTxt << " betahat." << it->first
-	    << " sebetahat." << it->first
-	    << " betapval." << it->first;
+    if (outCovars)
+      for (map<string, vector<double> >::const_iterator it =
+	     vSbgrp2Covars[s].begin(); it != vSbgrp2Covars[s].end(); ++it)
+	ssTxt << " betahat." << it->first
+	      << " sebetahat." << it->first
+	      << " betapval." << it->first;
     ssTxt << endl;
     size_t lineId = 1;
     gzwriteLine (outStream, ssTxt.str(), ssOutFile.str(), lineId);
@@ -4019,15 +4052,16 @@ writeResSstats (
 		<< " " << (itP->vMapPredictors[s].find("genotype")->second)[0]
 		<< " " << (itP->vMapPredictors[s].find("genotype")->second)[1]
 		<< " " << (itP->vMapPredictors[s].find("genotype")->second)[2];
-	  for (map<string, vector<double> >::const_iterator itC =
-		 vSbgrp2Covars[s].begin(); itC != vSbgrp2Covars[s].end();
-	       ++itC)
-	    ssTxt << " " << (itP->vMapPredictors[s].find(itC->first)->
-			     second)[0]
-		  << " " << (itP->vMapPredictors[s].find(itC->first)->
-			     second)[1]
-		  << " " << (itP->vMapPredictors[s].find(itC->first)->
-			     second)[2];
+	  if (outCovars)
+	    for (map<string, vector<double> >::const_iterator itC =
+		   vSbgrp2Covars[s].begin(); itC != vSbgrp2Covars[s].end();
+		 ++itC)
+	      ssTxt << " " << (itP->vMapPredictors[s].find(itC->first)->
+			       second)[0]
+		    << " " << (itP->vMapPredictors[s].find(itC->first)->
+			       second)[1]
+		    << " " << (itP->vMapPredictors[s].find(itC->first)->
+			       second)[2];
 	  ssTxt << endl;
 	  gzwriteLine (outStream, ssTxt.str(), ssOutFile.str(), lineId);
 	}
@@ -4445,6 +4479,7 @@ void
 writeRes (
   const string & outPrefix,
   const bool & outSstats,
+  const bool & outCovars,
   const bool & outRaw,
   const map<string, Ftr> & mFtrs,
   const map<string, Snp> & mSnps,
@@ -4464,7 +4499,7 @@ writeRes (
       (! mvlr && (whichStep == 3 || whichStep == 4 || whichStep == 5)))
     if (outSstats)
       writeResSstats (outPrefix, mFtrs, mSnps, vSubgroups, vSbgrp2Covars,
-		      verbose);
+		      outCovars, verbose);
   
   if (whichStep == 2 || (whichStep == 5 && ! mvlr))
   {
@@ -4497,6 +4532,7 @@ run (
   const size_t & lenCis,
   const string & outPrefix,
   const bool & outSstats,
+  const bool & outCovars,
   const bool & outRaw,
   const int & whichStep,
   const bool & needQnorm,
@@ -4514,16 +4550,10 @@ run (
   const int & whichPermSep,
   const string & whichPermBf,
   const bool & useMaxBfOverSnps,
-  const string & ftrsToKeepFile,
   const string & snpsToKeepFile,
   const string & sbgrpToKeep,
   const int & verbose)
 {
-  vector<string> vFtrsToKeep = loadOneColumnFile (ftrsToKeepFile, verbose);
-  vector<string> vSnpsToKeep = loadOneColumnFile (snpsToKeepFile, verbose);
-  Grid iGridL (largeGridFile, true, verbose);
-  Grid iGridS (smallGridFile, false, verbose);
-  
   map<string, string> mGenoPaths, mPhenoPaths;
   vector<string> vSubgroups;
   loadListsGenoAndPhenoFiles (genoPathsFile, phenoPathsFile, sbgrpToKeep,
@@ -4533,7 +4563,7 @@ run (
   vector<string> vSamples;
   vector<vector<size_t> > vvSampleIdxGenos, vvSampleIdxPhenos;
   loadSamples (mGenoPaths, mPhenoPaths, vSubgroups, vSamples,
-	        vvSampleIdxGenos, vvSampleIdxPhenos, verbose);
+	       vvSampleIdxGenos, vvSampleIdxPhenos, verbose);
   
   vector<map<string, vector<double> > > vSbgrp2Covars;
   loadCovariates (covarPathsFile, sbgrpToKeep, vSubgroups, vSamples,
@@ -4542,30 +4572,34 @@ run (
   
   map<string, Ftr> mFtrs;
   map<string, vector<Ftr*> > mChr2VecPtFtrs;
-  loadPhenos (mPhenoPaths, vSubgroups, vFtrsToKeep, mFtrs, verbose);
   loadFtrInfo (ftrCoordsFile, mFtrs, mChr2VecPtFtrs, verbose);
+  loadPhenos (mPhenoPaths, vSubgroups, mFtrs, verbose);
   
   map<string, Snp> mSnps;
   map<string, vector<Snp*> > mChr2VecPtSnps;
+  set<string> sSnpsToKeep = loadSnpsToKeep (snpsToKeepFile, verbose);
   if (snpCoordFile.empty())
-    loadGenosAndSnpInfo (mGenoPaths, minMaf, vSubgroups, vSnpsToKeep,
+    loadGenosAndSnpInfo (mGenoPaths, minMaf, vSubgroups, sSnpsToKeep,
 			 mChr2VecPtFtrs, mSnps, mChr2VecPtSnps, verbose);
   else
   {
-    loadGenos (mGenoPaths, minMaf, vSubgroups, vSnpsToKeep, mSnps, verbose);
-    loadSnpInfo (snpCoordFile, mSnps, mChr2VecPtSnps, verbose);
+    loadSnpInfo (snpCoordFile, sSnpsToKeep, mSnps, mChr2VecPtSnps, verbose);
+    loadGenos (mGenoPaths, minMaf, vSubgroups, mSnps, verbose);
   }
   
+  Grid iGridL (largeGridFile, true, verbose);
+  Grid iGridS (smallGridFile, false, verbose);
+  
   inferAssos (mFtrs, mChr2VecPtSnps, vvSampleIdxPhenos, vvSampleIdxGenos,
-	      anchor, lenCis, whichStep, needQnorm, vSbgrp2Covars, iGridL,
-	      iGridS, whichBfs, mvlr, propFitSigma, verbose);
+	      anchor, lenCis, whichStep, needQnorm, vSbgrp2Covars, outCovars,
+	      iGridL, iGridS, whichBfs, mvlr, propFitSigma, verbose);
   if (whichStep == 2 || whichStep == 4 || whichStep == 5)
     makePerms (mFtrs, vvSampleIdxPhenos, whichStep, needQnorm, vSbgrp2Covars,
 	       iGridL, iGridS, mvlr, propFitSigma, nbPerms, seed, trick,
 	       trickCutoff, whichPermSep, whichPermBf, useMaxBfOverSnps,
 	       verbose);
   
-  writeRes (outPrefix, outSstats, outRaw, mFtrs, mSnps, vSubgroups,
+  writeRes (outPrefix, outSstats, outCovars, outRaw, mFtrs, mSnps, vSubgroups,
 	    vSbgrp2Covars, whichStep, iGridL, iGridS, whichBfs, whichPermSep,
 	    mvlr, seed, whichPermBf, verbose);
 }
@@ -4577,19 +4611,19 @@ int main (int argc, char ** argv)
   int verbose = 1, whichStep = 0, trick = 0, whichPermSep = 1;
   size_t lenCis = 100000, nbPerms = 0, seed = string::npos, trickCutoff = 10;
   float minMaf = 0.0, propFitSigma = 0.0;
-  bool outSstats = false, outRaw = false, needQnorm = false, mvlr = false,
-    useMaxBfOverSnps = false;
+  bool outSstats = false, outCovars = false, outRaw = false, needQnorm = false,
+    mvlr = false, useMaxBfOverSnps = false;
   string genoPathsFile, snpCoordFile, phenoPathsFile, ftrCoordsFile,
     anchor = "FSS", outPrefix, covarPathsFile, largeGridFile, smallGridFile,
-    whichBfs = "gen", whichPermBf = "gen", ftrsToKeepFile, snpsToKeepFile,
+    whichBfs = "gen", whichPermBf = "gen", snpsToKeepFile,
     sbgrpToKeep;
   
   parseArgs (argc, argv, genoPathsFile, snpCoordFile, phenoPathsFile,
-	     ftrCoordsFile, anchor, lenCis, outPrefix, outSstats, outRaw,
-	     whichStep, needQnorm, minMaf, covarPathsFile, largeGridFile,
-	     smallGridFile, whichBfs, mvlr, propFitSigma, nbPerms, seed, trick,
-	     trickCutoff, whichPermSep, whichPermBf, useMaxBfOverSnps,
-	     ftrsToKeepFile, snpsToKeepFile, sbgrpToKeep, verbose);
+	     ftrCoordsFile, anchor, lenCis, outPrefix, outSstats, outCovars,
+	     outRaw, whichStep, needQnorm, minMaf, covarPathsFile,
+	     largeGridFile, smallGridFile, whichBfs, mvlr, propFitSigma,
+	     nbPerms, seed, trick, trickCutoff, whichPermSep, whichPermBf,
+	     useMaxBfOverSnps, snpsToKeepFile, sbgrpToKeep, verbose);
   
   time_t startRawTime, endRawTime;
   if (verbose > 0)
@@ -4605,11 +4639,10 @@ int main (int argc, char ** argv)
   }
   
   run (genoPathsFile, snpCoordFile, phenoPathsFile, ftrCoordsFile, anchor,
-       lenCis, outPrefix, outSstats, outRaw, whichStep, needQnorm, minMaf,
-       covarPathsFile, largeGridFile, smallGridFile, whichBfs, mvlr,
+       lenCis, outPrefix, outSstats, outCovars, outRaw, whichStep, needQnorm,
+       minMaf, covarPathsFile, largeGridFile, smallGridFile, whichBfs, mvlr,
        propFitSigma, nbPerms, seed, trick, trickCutoff, whichPermSep,
-       whichPermBf, useMaxBfOverSnps, ftrsToKeepFile, snpsToKeepFile,
-       sbgrpToKeep,
+       whichPermBf, useMaxBfOverSnps, snpsToKeepFile, sbgrpToKeep,
        verbose);
   
   if (verbose > 0)

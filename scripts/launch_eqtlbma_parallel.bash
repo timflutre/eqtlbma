@@ -14,13 +14,13 @@ function help () {
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
     msg+="      --p2b\tpath to the binary 'eqtlbma'\n"
-    msg+="      --ftrD\tdirectory with lists of features to analyze\n"
+    msg+="      --ftrD\tdirectory with lists of features to analyze (BED files)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
-#    msg+="      --f2s\tfile with links features-cisSNPs\n"
-#    msg+="\t\toptional, used to avoid loading all SNPs\n"
-#    msg+="\t\tformat: <ftr><space/tab><snp|coord>\n"
+    msg+="      --snpD\tdirectory with lists of SNPs to analyze\n"
+    msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
+    msg+="\t\teach SNP file should correspond to a feature file, in the same order"
     msg+="      --seedF\tfile with seeds (as many as files in --ftrD)\n"
-    msg+="\t\toptional, default=list_seeds.txt.gz\n"
+    msg+="\t\toptional, default=list_seeds.txt.gz (should be gzipped)\n"
     msg+="      --task\ttask identifier (not for SGE, for SLURM only)\n"
     msg+="\n"
     msg+="Options from 'eqtlbma' (run 'eqtlbma -h | less' for more details):\n"
@@ -29,8 +29,6 @@ function help () {
     msg+="      --scoord\tfile with the SNP coordinates\n"
     msg+="      --pheno\tfile with absolute paths to phenotype files\n"
     msg+="\t\tdefault=list_phenotypes.txt\n"
-    msg+="      --fcoord\tfile with the feature coordinates\n"
-    msg+="\t\tdefault=gene_coords.bed.gz\n"
     msg+="      --anchor\tfeature boundary(ies) for the cis region\n"
     msg+="\t\tdefault=FSS\n"
     msg+="      --cis\tlength of half of the cis region (in bp)\n"
@@ -40,6 +38,7 @@ function help () {
     msg+="      --step\tstep of the analysis to perform (1/2/3/4/5)\n"
     msg+="\t\tdefault=1\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
+    msg+="      --outcv\twrite the results for the other covariates when --outss\n"
     msg+="      --outraw\twrite the output file with all raw ABFs\n"
     msg+="      --qnorm\tquantile-normalize the phenotypes to a N(0,1)\n"
     msg+="      --maf\tminimum minor allele frequency\n"
@@ -99,7 +98,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,linksFile:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,snpD:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outcv,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -110,7 +109,7 @@ function parseArgs () {
             -v|--verbose) verbose=$2; shift 2;;
 	    --p2b) pathToBin=$2; shift 2;;
 	    --ftrD) ftrDir=$2; shift 2;;
-	    --f2s) linksFile=$2; shift 2;;
+	    --snpD) snpDir=$2; shift 2;;
 	    --seedF) seedFile=$2; shift 2;;
 	    --task) task=$2; shift 2;;
 	    --geno) geno=$2; shift 2;;
@@ -122,6 +121,7 @@ function parseArgs () {
 	    --out) out=$2; shift 2;;
 	    --step) step=$2; shift 2;;
 	    --outss) outss=true; shift;;
+	    --outcv) outss=true; shift;;
 	    --outraw) outraw=true; shift;;
 	    --qnorm) qnorm=true; shift;;
 	    --maf) maf=$2; shift 2;;
@@ -180,18 +180,18 @@ function parseArgs () {
 verbose=1
 pathToBin=""
 ftrDir=""
-linksFile=""
+snpDir=""
 seedFile=""
 task=""
 geno="list_genotypes.txt"
 scoord=""
 pheno="list_phenotypes.txt"
-fcoord="gene_coords.bed.gz"
 anchor="FSS"
 cis=100000
 out="out_eqtlbma"
 step=1
 outss=false
+outcv=false
 outraw=false
 qnorm=false
 maf=0
@@ -219,13 +219,11 @@ if [ $verbose -gt "0" ]; then
 fi
 
 # prepare the feature list + misc
-ftr=$(ls ${ftrDir}/* | awk -v i=${task} 'NR==i{print;exit}');
-split=$(echo ${ftr} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
-if [ ! -z "${linksFile}" ]; then
-    zcat ${ftr} > list_ftrs_${split}_$$.txt
-    zcat  linksFile | grep -f list_ftrs_${split}_$$.txt | awk '{split($2,a,"|"); print a[1]}' | sort | uniq > list_snps_${split}_$$.txt
-    snp="list_snps_${split}_$$.txt"
-    rm -f list_ftrs_${split}_$$.txt
+fcoord=$(ls ${ftrDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+split=$(echo ${fcoord} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
+snp=""
+if [ ! -z "${snpDir}" ]; then
+    snp=$(ls ${snpDir}/* | awk -v i=${task} 'NR==i{print;exit}');
 fi
 if [ ! -z "${seedFile}" ]; then
     seed=$(zcat ${seedFile} | sed -n ${task}p)
@@ -245,6 +243,9 @@ cmd+=" --out ${out}_${split}"
 cmd+=" --step ${step}"
 if $outss; then
     cmd+=" --outss"
+fi
+if $outcv; then
+    cmd+=" --outcv"
 fi
 if $outraw; then
     cmd+=" --outraw"
@@ -280,8 +281,7 @@ if [ "x${step}" != "x1" -a "x${step}" != "x3" ]; then
 	fi
     fi
 fi
-cmd+=" --ftr ${ftr}"
-if [ ! -z "${linksFile}" ]; then
+if [ ! -z "${snpDir}" ]; then
     cmd+=" --snp ${snp}"
 fi
 if [ ! -z "${sbgrp}" ]; then
@@ -295,11 +295,6 @@ eval $cmd
 if [ $? != 0 ]; then
     echo "ERROR: eqtlbma didn't finished successfully" >&2
     exit 1
-fi
-
-# clean
-if [ ! -z "${linksFile}" ]; then
-    rm -f $snp
 fi
 
 if [ $verbose -gt "0" ]; then
