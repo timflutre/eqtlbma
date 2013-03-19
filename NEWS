@@ -8,6 +8,7 @@ New features
 * in 'eqtlbma', skip features (genes) if no coordinates are provided and remove option --ftr
 * in 'launch_eqtlbma_parallel.bash', add option --snpD
 * in 'eqtlbma', exit if an empty file of SNPs to keep is provided
+* add all 'Makefile.in' to the repo so that users don't have to use 'autoreconf'
 
 Bug fixes
 * in 'hm', update pi0 in the hierarchical model (bug absent in paper's results)
