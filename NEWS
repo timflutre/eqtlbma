@@ -2,14 +2,16 @@
 ===============
 
 New features
-* allow to launch 'hm' on any subset of the configurations (via a script option)
-* change the format of the covariate files to make them readable by MatrixEQTL
-* skip features (genes) if no coordinates are provided
-* don't save summary statistics for other covariates by default
+* in 'launch_hm.bash', allow to use only a subset of all configurations
+* in 'eqtlbma', change the format of the covariate files to make them readable by MatrixEQTL
+* in 'eqtlbma', add option --outcv
+* in 'eqtlbma', skip features (genes) if no coordinates are provided and remove option --ftr
+* in 'launch_eqtlbma_parallel.bash', add option --snpD
+* in 'eqtlbma', exit if an empty file of SNPs to keep is provided
 
 Bug fixes
-* update pi0 in the hierarchical model (bug absent in paper's results)
-* allow covariates only for a subset of the subgroups
+* in 'hm', update pi0 in the hierarchical model (bug absent in paper's results)
+* in 'eqtlbma', allow covariates only for a subset of the subgroups
 
 
 2013-02-08 v1.1

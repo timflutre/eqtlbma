@@ -1,7 +1,6 @@
 *.[oa]
 *~
 Makefile
-Makefile.in
 .deps
 *.log
 *.trs

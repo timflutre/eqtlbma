@@ -1,4 +1,4 @@
-AC_INIT([eqtlbma], [1.1], [tflutre@uchicago.edu])
+AC_INIT([eqtlbma], [1.2], [tflutre@uchicago.edu])
 AC_CONFIG_SRCDIR([src/eqtlbma.cpp]) # safety check
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall -Werror])
