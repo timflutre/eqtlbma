@@ -276,7 +276,7 @@ we will test all SNPs falling in the interval [-100kb,+100kb] centered on the
 the start coordinate of the given gene as determined from the BED file given to option @option{--fcoord}.
 
 Following the convention in @url{http://code.google.com/p/bedtools/,BEDTools}, 
-the definition of the @emph{cis} region uses @leq{} and @geq{} instead of < and >.
+the definition of the @emph{cis} region uses <= and >= instead of < and >.
 
 @section Analysis steps and output files
 
