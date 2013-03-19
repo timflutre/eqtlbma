@@ -181,6 +181,7 @@ void help (char ** argv)
        << "\t\totherwise the average ABF over SNPs is used (more Bayesian)" << endl
        << "  -s, --snp\tfile with a list of SNPs to analyze" << endl
        << "\t\tone SNP name per line, useful when launched in parallel" << endl
+       << "\t\tprogram exits if an empty file is given" << endl
        << "      --sbgrp\tidentifier of the subgroup to analyze" << endl
        << "\t\tuseful for quick analysis and debugging" << endl
        << endl;
@@ -436,63 +437,63 @@ parseArgs (
   }
   if (genoPathsFile.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option -g\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (genoPathsFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't file '%s'\n\n", genoPathsFile.c_str());
     help (argv);
     exit (1);
   }
   if (! snpCoordsFile.empty() && ! doesFileExist (snpCoordsFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't file '%s'\n\n", snpCoordsFile.c_str());
     help (argv);
     exit (1);
   }
   if (phenoPathsFile.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option -p\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (phenoPathsFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't find '%s'\n\n", phenoPathsFile.c_str());
     help (argv);
     exit (1);
   }
   if (ftrCoordsFile.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option --fcoord\n\n");
     help (argv);
     exit (1);
   }
   if (! doesFileExist (ftrCoordsFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't find '%s'\n\n", ftrCoordsFile.c_str());
     help (argv);
     exit (1);
   }
   if (anchor.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: SNPs in trans not yet implemented, see --anchor and --cis\n\n");
     help (argv);
     exit (1);
   }
   if (outPrefix.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option -o\n\n");
     help (argv);
     exit (1);
@@ -507,7 +508,7 @@ parseArgs (
   if (whichStep != 1 && whichStep != 2 && whichStep != 3 && whichStep != 4
       && whichStep != 5)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --step should be 1, 2, 3, 4 or 5\n\n");
     help (argv);
     exit (1);
@@ -515,14 +516,14 @@ parseArgs (
   if ((whichStep == 3 || whichStep == 4 || whichStep == 5)
       && largeGridFile.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option --gridL with --step 3, 4 or 5\n\n");
     help (argv);
     exit (1);
   }
   if (! largeGridFile.empty() && ! doesFileExist (largeGridFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't find '%s'\n\n", largeGridFile.c_str());
     help (argv);
     exit (1);
@@ -531,14 +532,14 @@ parseArgs (
       && (whichBfs.compare("sin") == 0 || whichBfs.compare("all") == 0)
       && smallGridFile.empty())
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: missing compulsory option --gridS with --step 3, 4 or 5 and --bfs sin or all\n\n");
     help (argv);
     exit (1);
   }
   if (! smallGridFile.empty() && ! doesFileExist (smallGridFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't find '%s'\n\n", smallGridFile.c_str());
     help (argv);
     exit (1);
@@ -546,7 +547,7 @@ parseArgs (
   if (whichBfs.compare("gen") != 0 && whichBfs.compare("sin") != 0
       && whichBfs.compare("all") != 0)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --bf should be 'gen', 'sin' or 'all'\n\n");
     help (argv);
     exit (1);
@@ -555,21 +556,21 @@ parseArgs (
     fprintf (stderr, "WARNING: separate analysis won't be performed with --mvlr\n\n");
   if ((whichStep == 2 || whichStep == 4 || whichStep == 5) && nbPerms == 0)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --step %i but nbPerms = 0, see --nperm\n\n", whichStep);
     help (argv);
     exit (1);
   }
   if (trick != 0 && trick != 1 && trick != 2)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --trick should be 0, 1 or 2\n\n");
     help (argv);
     exit (1);
   }
   if (trick != 0 && trickCutoff > nbPerms)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --tricut is larger than --nperm\n\n");
     help (argv);
     exit (1);
@@ -577,7 +578,7 @@ parseArgs (
   if ((whichStep == 2 || whichStep == 5) &&
       whichPermSep != 1 && whichPermSep != 2)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: --permsep should be 1 or 2\n\n");
     help (argv);
     exit (1);
@@ -585,7 +586,7 @@ parseArgs (
   if ((whichStep == 4 || whichStep == 5) && whichBfs.compare("gen") == 0
       && whichPermBf.compare("gen") != 0)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: if --bfs gen, then --pbf should be 'gen' too\n\n");
     help (argv);
     exit (1);
@@ -593,14 +594,14 @@ parseArgs (
   if ((whichStep == 4 || whichStep == 5) && whichBfs.compare("sin") == 0
       && whichPermBf.compare("all") == 0)
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: if --bfs sin, then --pbf should be 'gen', 'sin' or 'gen-sin'\n\n");
     help (argv);
     exit (1);
   }
   if (! snpsToKeepFile.empty() && ! doesFileExist (snpsToKeepFile))
   {
-    getCmdLine (argc, argv);
+    cout << "cmd-line: " << getCmdLine (argc, argv) << endl;
     fprintf (stderr, "ERROR: can't find '%s'\n\n", snpsToKeepFile.c_str());
     help (argv);
     exit (1);
@@ -1902,12 +1903,12 @@ Ftr_show (
   const Ftr & iFtr,
   ostream & os)
 {
-  os << iFtr.name << " " << iFtr.chr << " " << iFtr.start << " " << iFtr.end << endl
+  os << iFtr.name << " " << iFtr.chr << " " << iFtr.start << " " << iFtr.end
+     << endl
      << "subgroups=" << iFtr.vvPhenos.size() << endl;
   for(size_t s = 0; s < iFtr.vvPhenos.size(); ++s)
-  {
-    os << "subgroup=" << (s+1) << " samples=" << iFtr.vvPhenos[s].size() << endl;
-  }
+    os << "subgroup=" << (s+1) << " samples=" << iFtr.vvPhenos[s].size()
+       << endl;
 }
 
 bool
@@ -1946,16 +1947,19 @@ Ftr_getCisSnps (
 {
   map<string, vector<Snp*> >::const_iterator itVecPtSnps =
     mChr2VecPtSnps.find(iFtr.chr);
-  for (size_t snpId = 0; snpId < itVecPtSnps->second.size(); ++snpId)
+  if (itVecPtSnps != mChr2VecPtSnps.end()) // useful for sex chromosomes
   {
-    Snp * ptSnp = (itVecPtSnps->second)[snpId];
-    int inCis = Snp_isInCis (*ptSnp, iFtr.start, iFtr.end,
-			     anchor, lenCis);
-    if (inCis == 1)
-      break;
-    else if (inCis == -1)
-      continue;
-    iFtr.vPtCisSnps.push_back ((itVecPtSnps->second)[snpId]);
+    for (size_t snpId = 0; snpId < itVecPtSnps->second.size(); ++snpId)
+    {
+      Snp * ptSnp = (itVecPtSnps->second)[snpId];
+      int inCis = Snp_isInCis (*ptSnp, iFtr.start, iFtr.end,
+			       anchor, lenCis);
+      if (inCis == 1)
+	break;
+      else if (inCis == -1)
+	continue;
+      iFtr.vPtCisSnps.push_back ((itVecPtSnps->second)[snpId]);
+    }
   }
 }
 
@@ -2928,6 +2932,12 @@ loadSnpsToKeep (
   }
   closeFile (snpsToKeepFile, stream);
   
+  if (sSnpsToKeep.size() == 0)
+  {
+    cerr << "ERROR: no SNP to keep, exit" << endl;
+    exit (1);
+  }
+  
   if (verbose > 0)
     cout << "items loaded: " << sSnpsToKeep.size() << endl;
   
@@ -3252,7 +3262,8 @@ loadGenosAndSnpInfo (
 				     minMaf, vSubgroups, s, sSnpsToKeep,
 				     mChr2VecPtFtrs, nbSnpsToKeepPerSubgroup,
 				     mSnps, mChr2VecPtSnps);
-    else if (line.compare(0, 2, "id") == 0)
+    else if (line.compare(0, 2, "id") == 0 || line.compare(0, 2, "Id") == 0
+	     || line.compare(0, 2, "ID") == 0)
     {
       cerr << "ERROR: file " << mGenoPaths.find(vSubgroups[s])->second
 	   << " seems to be in the custom format but --scoord is missing"
@@ -3765,7 +3776,7 @@ inferAssos (
   }
   
   clock_t startTime = clock();
-  size_t nbAnalyzedPairs = 0;
+  size_t nbAnalyzedFtrs = 0,  nbAnalyzedPairs = 0;
   size_t countFtrs = 0;
   
   for (map<string, Ftr>::iterator itF = mFtrs.begin();
@@ -3790,6 +3801,7 @@ inferAssos (
 		      whichStep, needQnorm, vSbgrp2Covars, outCovars,
 		      iGridL, iGridS, whichBfs, mvlr, propFitSigma,
 		      verbose-1);
+      ++nbAnalyzedFtrs;
       nbAnalyzedPairs += itF->second.vResFtrSnps.size();
     }
   }
@@ -3799,7 +3811,8 @@ inferAssos (
     if(verbose == 1)
       cout << " (" << fixed << setprecision(2) << getElapsedTime (startTime)
 	   << " sec)" << endl << flush;
-    cout << "nb of analyzed feature-SNP pairs: " << nbAnalyzedPairs << endl;
+    cout << "nb of analyzed feature-SNP pairs: " << nbAnalyzedPairs
+	 << " (" << nbAnalyzedFtrs << " features)" << endl;
   }
 }
 
