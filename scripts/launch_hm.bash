@@ -28,7 +28,7 @@ function help () {
     msg+="\n"
     msg+="Examples:\n"
     msg+="  ${0##*/} --p2b ~/bin/hm --inp \"out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz\" --nbC 7 --nbG 10 --outp out_hm\n"
-    msg+="  ${0##*/} --p2b ~/bin/hm --inp \"out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz\" --nbC 3 --nbG 10 --outp out_hm\n --reconf \"^1$|^3$|^1-3$\""
+    msg+="  ${0##*/} --p2b ~/bin/hm --inp \"out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz\" --nbC 3 --nbG 10 --outp out_hm_1-3 --reconf \"^1$|^3$|^1-3$\""
     echo -e "$msg"
 }
 

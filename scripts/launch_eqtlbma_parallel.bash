@@ -16,7 +16,7 @@ function help () {
     msg+="      --p2b\tpath to the binary 'eqtlbma'\n"
     msg+="      --ftrD\tdirectory with lists of features to analyze (BED files)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
-    msg+="      --snpD\tdirectory with lists of SNPs to analyze\n"
+    msg+="      --snpD\tdirectory with lists of SNPs to analyze (optional)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="\t\teach SNP file should correspond to a feature file, in the same order\n"
     msg+="      --seedF\tfile with seeds (as many as files in --ftrD)\n"
@@ -167,7 +167,12 @@ function parseArgs () {
 	help
 	exit 1
     fi
-    if [ ! -f "${seedFile}" ]; then
+    if [ ! -z "${snpDir}" -a ! -d "${snpDir}" ]; then
+	echo -e "ERROR: can't find SNP directory '${snpDir}'\n"
+	help
+	exit 1
+    fi
+    if [ ! -z "${seedFile}" -a ! -f "${seedFile}" ]; then
 	echo -e "ERROR: can't find seed file '${seedFile}'\n"
 	help
 	exit 1
