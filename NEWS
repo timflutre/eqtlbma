@@ -10,7 +10,7 @@ New features
 * in 'eqtlbma', exit if an empty file of SNPs to keep is provided
 * add all 'Makefile.in' to the repo so that users don't have to use 'autoreconf'
 * add C++ code used to simulate data in Flutre et al.
-* improve the manual, especially the FAQ
+* improve the manual and add the pdf to the repo so that users can immediately read it
 
 Bug fixes
 * in 'hm', update pi0 in the hierarchical model (bug absent in paper's results)
