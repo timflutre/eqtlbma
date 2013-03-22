@@ -2768,11 +2768,6 @@ loadFtrInfo (
        it != mChr2VecPtFtrs.end(); ++it)
     sort (it->second.begin(), it->second.end(), Ftr_compByCoord);
   
-  if (mFtrs.size() == 0)
-  {
-    cerr << "ERROR: no feature to analyze" << endl;
-    exit (1);
-  }
   if (verbose > 0)
     cout << "total nb of features with coordinates: " << mFtrs.size() << endl;
 }
@@ -2787,6 +2782,9 @@ loadPhenos (
   map<string, Ftr> & mFtrs,
   const int & verbose)
 {
+  if (mFtrs.empty())
+    return;
+  
   if (verbose > 0)
     cout << "load phenotypes ..." << endl << flush;
   
@@ -2879,69 +2877,55 @@ loadPhenos (
       ++it;
   }
   
-  if (mFtrs.size() == 0)
-  {
-    cerr << "ERROR: no feature to analyze" << endl;
-    exit (1);
-  }
   if (verbose > 0)
     cout << "total nb of features to analyze: " << mFtrs.size() << endl;
 }
 
-set<string>
+void
 loadSnpsToKeep (
   const string & snpsToKeepFile,
+  set<string> & sSnpsToKeep,
   const int & verbose)
 {
-  set<string> sSnpsToKeep;
-  
-  if (snpsToKeepFile.empty())
-    return sSnpsToKeep;
-  
-  string line;
-  gzFile stream;
-  vector<string> tokens;
-  size_t line_id = 0;
-  
-  openFile (snpsToKeepFile, stream, "rb");
-  if (verbose > 0)
-    cout <<"load file " << snpsToKeepFile << " ..." << endl;
-  
-  while (getline (stream, line))
-  {
-    line_id++;
-    split (line, " \t,", tokens);
-    if (tokens.size() != 1)
+  if (! snpsToKeepFile.empty())
+  {  
+    string line;
+    gzFile stream;
+    vector<string> tokens;
+    size_t line_id = 0;
+    
+    openFile (snpsToKeepFile, stream, "rb");
+    if (verbose > 0)
+      cout <<"load file " << snpsToKeepFile << " ..." << endl;
+    
+    while (getline (stream, line))
     {
-      cerr << "ERROR: file " << snpsToKeepFile
-	   << " should have only one column"
-	   << " at line " << line_id << endl;
+      line_id++;
+      split (line, " \t,", tokens);
+      if (tokens.size() != 1)
+      {
+	cerr << "ERROR: file " << snpsToKeepFile
+	     << " should have only one column"
+	     << " at line " << line_id << endl;
+	exit (1);
+      }
+      if (tokens[0][0] == '#')
+	continue;
+      if (sSnpsToKeep.find (tokens[0]) == sSnpsToKeep.end())
+	sSnpsToKeep.insert (tokens[0]);
+    }
+    
+    if (! gzeof (stream))
+    {
+      cerr << "ERROR: can't read successfully file "
+	   << snpsToKeepFile << " up to the end" << endl;
       exit (1);
     }
-    if (tokens[0][0] == '#')
-      continue;
-    if (sSnpsToKeep.find (tokens[0]) == sSnpsToKeep.end())
-      sSnpsToKeep.insert (tokens[0]);
+    closeFile (snpsToKeepFile, stream);
+    
+    if (verbose > 0)
+      cout << "nb of SNPs to keep: " << sSnpsToKeep.size() << endl;
   }
-  
-  if (! gzeof (stream))
-  {
-    cerr << "ERROR: can't read successfully file "
-	 << snpsToKeepFile << " up to the end" << endl;
-    exit (1);
-  }
-  closeFile (snpsToKeepFile, stream);
-  
-  if (sSnpsToKeep.size() == 0)
-  {
-    cerr << "ERROR: no SNP to keep, exit" << endl;
-    exit (1);
-  }
-  
-  if (verbose > 0)
-    cout << "items loaded: " << sSnpsToKeep.size() << endl;
-  
-  return sSnpsToKeep;
 }
 
 void
@@ -3353,11 +3337,6 @@ loadSnpInfo (
        it != mChr2VecPtSnps.end(); ++it)
     sort (it->second.begin(), it->second.end(), Snp_compByCoord);
   
-  if (mSnps.size() == 0)
-  {
-    cerr << "ERROR: no SNP to analyze" << endl;
-    exit (1);
-  }
   if (verbose > 0)
     cout << "total nb of SNPs with coordinates: " << mSnps.size()
 	 << " (loaded in " << fixed << setprecision(2)
@@ -3376,6 +3355,9 @@ loadGenos (
   map<string, Snp> & mSnps,
   const int & verbose)
 {
+  if (mSnps.empty())
+    return;
+  
   if (verbose > 0)
     cout << "load genotypes ..." << endl << flush;
   
@@ -4587,10 +4569,18 @@ run (
   map<string, vector<Ftr*> > mChr2VecPtFtrs;
   loadFtrInfo (ftrCoordsFile, mFtrs, mChr2VecPtFtrs, verbose);
   loadPhenos (mPhenoPaths, vSubgroups, mFtrs, verbose);
+  if (mFtrs.empty())
+    return;
   
+  set<string> sSnpsToKeep;
+  if (! snpsToKeepFile.empty())
+  {
+    loadSnpsToKeep (snpsToKeepFile, sSnpsToKeep, verbose);
+    if (sSnpsToKeep.empty())
+      return;
+  }
   map<string, Snp> mSnps;
   map<string, vector<Snp*> > mChr2VecPtSnps;
-  set<string> sSnpsToKeep = loadSnpsToKeep (snpsToKeepFile, verbose);
   if (snpCoordFile.empty())
     loadGenosAndSnpInfo (mGenoPaths, minMaf, vSubgroups, sSnpsToKeep,
 			 mChr2VecPtFtrs, mSnps, mChr2VecPtSnps, verbose);
@@ -4599,6 +4589,8 @@ run (
     loadSnpInfo (snpCoordFile, sSnpsToKeep, mSnps, mChr2VecPtSnps, verbose);
     loadGenos (mGenoPaths, minMaf, vSubgroups, mSnps, verbose);
   }
+  if (mSnps.empty())
+    return;
   
   Grid iGridL (largeGridFile, true, verbose);
   Grid iGridS (smallGridFile, false, verbose);
