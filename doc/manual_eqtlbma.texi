@@ -1,4 +1,5 @@
 \input texinfo   @c -*-texinfo-*-
+@finalout @comment{prevent TeX from printing a black rectangle beside overful hbox}
 @c %**start of header
 @setfilename manual_eqtlbma.info
 @include version.texi
@@ -465,6 +466,8 @@ Such files are necessary to run the hierarchical model (see below).
 For steps 4 and 5, there will also be a file with the results of the permutations,
 with suffix ``_jointPermPvals.txt.gz''.
 
+An FAQ entry describes how to concatenate the output files from all batches, for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a single file.
+
 @c=============================================================================
 
 @node Running the hierarchical model
@@ -517,6 +520,15 @@ launch_hm.bash \
 --outp out_hm
 @end verbatim
 
+If the number of subgroups is large, you may also want to fit the hierarchical model for pairs of subgroups.
+This can be done easily with the option @option{--reconf}.
+You only need to follow it with a regular expression able to catch the configurations you are interested in.
+For instance, if you are interested in configurations @command{1} and @command{3}, you will run:
+@verbatim
+launch_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
+--nbG 10 --outp out_hm --nbC 3 --reconf ``^1$|^3$|^1-3$"
+@end verbatim
+
 @c=============================================================================
 
 @node Frequently asked questions
@@ -525,19 +537,19 @@ launch_hm.bash \
 @cindex FAQ
 
 @itemize
+
 @item
 @strong{How do I cite this package?}
 
 For the moment, you can cite the preprint available on @url{http://arxiv.org/abs/1212.4786, arXiv}: ``A statistical framework for joint eQTL analysis in multiple tissues'' by T.Flutre, X.Wen, J.Pritchard and M.Stephens (arXiv:1212.4786).
 
+@sp 1
 
 @item
 @strong{How do I make the file(s) for the grid(s)?}
 
-Using R, you can use the following function:
-
+You can use the following R function:
 @verbatim
-
 getGrid <- function(grid.type="general", no.het=FALSE){
   oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
   oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
@@ -560,57 +572,75 @@ getGrid <- function(grid.type="general", no.het=FALSE){
   }
   return(grid)
 }
-
 @end verbatim
 
 A typical code would look like this:
-
 @verbatim
-
 gridL <- getGrid(``general'')
 write.table(x=gridL, file=gzfile(``grid_phi2_oma2_general.txt.gz''),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
 gridS <- getGrid(``configs'')
 write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
-
 @end verbatim
 
+@sp 1
 
 @item
 @strong{How do I transform my phenotypes beforehand into the quantiles of a standard Normal?}
 
-Using R, you can use the following command, assuming that @command{matrix.original} has genes in rows and samples in columns:
-
+You can use the following R command, assuming that @command{matrix.original} has genes in rows and samples in columns:
 @verbatim
-
 matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
   qqnorm(exp.per.gene, plot.it=FALSE)$x
 }))
 colnames(matrix.qnormed) <- colnames(matrix.original)
-
 @end verbatim
 
 In the presence of ties, it's better to break them randomly:
-
 @verbatim
-
+set.seed(1859)
 matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
   idx <- sample(length(exp.per.gene))
   tmp <- qqnorm(exp.per.gene[idx], plot.it=FALSE)$x
   tmp[sort(idx, index.return=TRUE)$ix]
 }))
 colnames(matrix.qnormed) <- colnames(matrix.original)
-
 @end verbatim
 
+@sp 1
+
+@item
+@strong{How do I easily concatenate the output files from all batches?}
+
+When launching @command{eqtlbma} in parallel, you will get output files for each batch.
+Below are simple bash commands to concatenate them into a single file and compress it:
+@verbatim
+sbgrp="Tissue3"; i=0; \
+ls out_eqtlbma_[0-9][0-9][0-9]_sumstats_${sbgrp}.txt.gz | while read f; do \
+let i=i+1; echo $i; \
+if [ $i -eq "1" ]; then zcat $f > out_eqtlbma_sumstats_${sbgrp}.txt; \
+else zcat $f | sed 1d >> out_eqtlbma_sumstats_${sbgrp}.txt; fi; done
+gzip out_eqtlbma_sumstats_${sbgrp}.txt
+@end verbatim
+
+@sp 1
 
 @item
 @strong{Is this packaged tested?}
 
-We implemented some R code in order to perform functional tests.
-Launching them is automatized via @option{make --check}.
+We implemented some R code in order to perform functional tests on @command{eqtlbma}.
+Launching them is automatized via @option{make check}.
 
+You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
+It can thus be used to test the @command{hm} program.
+To compile it, enter into the @command{src/} directory and run:
+@verbatim
+g++ -Wall -Wextra -g utils.cpp simul_flutre_et_al.cpp -lgsl -lgslcblas -lz
+@end verbatim
+As usual, a help message is available with the option @command{-h}.
+
+@sp 1
 
 @item
 @strong{How can I contribute?}
