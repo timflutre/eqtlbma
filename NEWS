@@ -1,8 +1,8 @@
-2013-00-00 v1.2
+2013-03-22 v1.2
 ===============
 
 New features
-* in 'launch_hm.bash', allow to use only a subset of all configurations
+* in 'launch_hm.bash', add option --reconf
 * in 'eqtlbma', change the format of the covariate files to make them readable by MatrixEQTL
 * in 'eqtlbma', add option --outcv
 * in 'eqtlbma', skip features (genes) if no coordinates are provided and remove option --ftr
