@@ -9,6 +9,7 @@ autom4te.cache/
 config.status
 doc/manual_eqtlbma.info
 doc/manual_eqtlbma.t2p/
+doc/manual_eqtlbma.pdf
 doc/stamp-vti
 doc/version.texi
 eqtlbma-*.tar.gz

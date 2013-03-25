@@ -529,6 +529,12 @@ launch_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
 --nbG 10 --outp out_hm --nbC 3 --reconf ``^1$|^3$|^1-3$"
 @end verbatim
 
+It is also possible to use option @option{--pi0} to fix the value of pi0 (the probability for a gene to have no eQTL).
+This means that pi0 won't be updated by the EM algorithm.
+
+In order to speed-up the program, you can use option @option{--skip-ci}.
+As a result, only maximum-likelihood estimates of the hyper-parameters will be reported, i.e. without confidence intervals.
+
 @c=============================================================================
 
 @node Frequently asked questions

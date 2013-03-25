@@ -1,3 +1,10 @@
+2013-00-00 v1.3
+===============
+
+New features
+* in 'launch_hm.bash' (and 'hm'), add option --pi0 and --skip-ci
+
+
 2013-03-22 v1.2
 ===============
 
