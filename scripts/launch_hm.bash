@@ -23,8 +23,8 @@ function help () {
     msg+="      --outp\tprefix for the output files\n"
     msg+="      --reconf\tregexp for which configuration(s) to keep (if --inp)\n"
     msg+="\t\tused for the 3rd column, 'config', of input files\n"
-    # msg+="      --init\tinitialisation file (for EM only, allows to fix pi0)\n"
-    # msg+="      --dtss\tfile with distance to the TSS\n"
+    msg+="      --skip-ci\tonly report MLE, not confidence intervals (speed-up)\n"
+    msg+="      --pi0\tfixed value of pi0 (which hence won't be updated)\n"
     msg+="\n"
     msg+="Examples:\n"
     msg+="  ${0##*/} --p2b ~/bin/hm --inp \"out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz\" --nbC 7 --nbG 10 --outp out_hm\n"
@@ -59,7 +59,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,inp:,inf:,nbC:,nbG:,outp:,reconf:,init:,dtss: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,inp:,inf:,nbC:,nbG:,outp:,reconf:,skip-ci,pi0: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ]; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -75,8 +75,8 @@ function parseArgs () {
     	    --nbG) nbGrids=$2; shift 2;;
     	    --outp) outPrefix=$2; shift 2;;
 	    --reconf) reConf=$2; shift 2;;
-    	    --init) initFile=$2; shift 2;;
-	    --dtss) dtssFile=$2; shift 2;;
+    	    --skip-ci) skipCi=true; shift;;
+	    --pi0) pi0=$2; shift 2;;
             --) shift; break;;
             *) echo "ERROR: options parsing failed" >&2; exit 1;;
 	esac
@@ -136,8 +136,8 @@ nbConfigs=""
 nbGrids=""
 outPrefix=""
 reConf=""
-initFile=""
-dtssFile=""
+skipCi=false
+pi0=""
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then
@@ -189,8 +189,8 @@ cmd="${pathToBin}"
 cmd+=" -d ${tmpFile}"
 cmd+=" -s ${nbConfigs}"
 cmd+=" -g ${nbGrids}"
-if [ "x${initFile}" != "x" ]; then cmd+=" -i ${initFile}"; fi
-if [ "x${dtssFile}" != "x" ]; then cmd+=" -f ${dtssFile}"; fi
+if $skipCi; then cmd+=" -skipci"; fi
+if [ ! -z "${pi0}" ]; then cmd+=" -pi0 ${pi0}"; fi
 cmd+=" 1> ${outPrefix}_stdout.txt"
 cmd+=" 2> ${outPrefix}_stderr.txt"
 echo $cmd

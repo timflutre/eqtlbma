@@ -135,7 +135,7 @@ class eQTL_controller {
   // storage
   vector<gene_eQTL> geqVec;
   
-    
+  double fixed_pi0_;
       
   // parameters need to be estimated
   double * pi0; // non-eqtl prob
@@ -163,7 +163,7 @@ class eQTL_controller {
   
   void init_params(int option=0);
   void init_params(char * init_file);
-  
+  void fix_pi0(const double & fixed_pi0) { fixed_pi0_ = fixed_pi0; };
   
   void randomize_parameter_sp();
   
@@ -182,7 +182,7 @@ class eQTL_controller {
   void update_param_est(size_t index, double val);
   
   
-  void estimate_profile_ci();
+  void estimate_profile_ci(const bool & skip_ci);
   
   void run_EM(double thresh);
   void compute_posterior();

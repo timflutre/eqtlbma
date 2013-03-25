@@ -179,168 +179,156 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
   
 }
 
-void eQTL_controller::estimate_profile_ci(){
-  
+void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
+{
   double tick = 0.001;
   double max = compute_log10_lik();
   
-  // estimating for pi0
+  // estimate CI for pi0
   double pi0_mle = pi0[0];
   double left_pi0 = pi0[0];
   double right_pi0 = pi0[0];
-
-  while(left_pi0>=0){
-    left_pi0 -= tick;
-    if(left_pi0<0){
-      left_pi0 = 0;
-      break;
+  if (! skip_ci) {
+    while(left_pi0>=0){
+      left_pi0 -= tick;
+      if(left_pi0<0){
+	left_pi0 = 0;
+	break;
+      }
+      pi0[0] = left_pi0;  
+      if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){  
+	left_pi0 += tick; 
+	break;
+      }    
     }
-    pi0[0] = left_pi0;  
-    if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){  
-      left_pi0 += tick; 
-      break;
-    }    
+    while(right_pi0<=1){
+      right_pi0 += tick;
+      if(right_pi0 >1){
+	right_pi0 = 1;
+	break;
+      }
+      pi0[0] = right_pi0;  
+      if(compute_log10_lik()/log10(exp(1))< max/log10(exp(1))-2.0){
+	right_pi0 -= tick;
+	break;
+      }
+      
+    }
   }
-  
-  while(right_pi0<=1){
-    right_pi0 += tick;
-    if(right_pi0 >1){
-      right_pi0 = 1;
-      break;
-    }
-    pi0[0] = right_pi0;  
-    if(compute_log10_lik()/log10(exp(1))< max/log10(exp(1))-2.0){
-      right_pi0 -= tick;
-      break;
-    }
-    
-  }
-  
   fprintf(stderr,"\nProfile-likelihood Confidence Intervals\n");
   fprintf(stderr,"pi0: %.3f [%.3f, %.3f]\n",pi0_mle,left_pi0,right_pi0);
   fprintf(stderr,"config: ");
   
   pi0[0] = pi0_mle;
   
+  // estimate CI for config
   double *config_mle = new double[config_size];
   memcpy(config_mle, config_prior, config_size*sizeof(double));
-  
   for (size_t i=0;i<config_size;i++){
     double right_cp = config_mle[i];
     double left_cp = config_mle[i];
     double cp_mle = config_mle[i];
-    
     double st = 1 - cp_mle;
- 
-
-    while(left_cp>=0){
-      left_cp -= tick;
-      if(left_cp<0){
-	left_cp = 0;
-	break;
+    if (! skip_ci) {
+      while(left_cp>=0){
+	left_cp -= tick;
+	if(left_cp<0){
+	  left_cp = 0;
+	  break;
+	}
+	double diff = cp_mle - left_cp;
+	for(size_t j=0;j<config_size;j++){
+	  if(j==i)
+	    continue;
+	  config_prior[j] = config_mle[j] + diff*config_mle[j]/st;
+	}
+	config_prior[i] = left_cp;
+	
+	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
+	  left_cp += tick;
+	  break;
+	}
       }
-      double diff = cp_mle - left_cp;
-      for(size_t j=0;j<config_size;j++){
-	if(j==i)
-	  continue;
-	config_prior[j] = config_mle[j] + diff*config_mle[j]/st;
-      }
-      config_prior[i] = left_cp;
-      
-      if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-	left_cp += tick;
-	break;
+      while(right_cp<=1){
+	right_cp += tick;
+	if(right_cp>1){
+	  right_cp = 1;
+	  break;
+	}
+	double diff = cp_mle - right_cp;
+	for(size_t j=0;j<config_size;j++){
+	  if(j==i)
+	    continue;
+	  config_prior[j] = config_mle[j]+ diff*config_mle[j]/st;
+	}
+	config_prior[i] = right_cp;
+	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
+	  right_cp -= tick;
+	  break;
+	}
       }
     }
-    
-    while(right_cp<=1){
-      right_cp += tick;
-      if(right_cp>1){
-	right_cp = 1;
-	break;
-      }
-      double diff = cp_mle - right_cp;
-      for(size_t j=0;j<config_size;j++){
-        if(j==i)
-	  continue;
-        config_prior[j] = config_mle[j]+ diff*config_mle[j]/st;
-      }
-      config_prior[i] = right_cp;
-      if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-        right_cp -= tick;
-	break;
-      }
-    }
-    
     fprintf(stderr,"%s  %.3f [%.3f, %.3f]  ",type_vec[i].c_str(), config_mle[i],left_cp, right_cp);
     fflush(stdout);
   }
-  
   memcpy(config_prior, config_mle,config_size*sizeof(double));
-
   fprintf(stderr,"\n");
   delete[] config_mle;
-    
+  
+  // estimate CI for grid
   fprintf(stderr,"grid:  ");
-
   double *grid_mle = new double[grid_size];
   memcpy(grid_mle, grid_wts, grid_size*sizeof(double));
-
   for (size_t i=0;i<grid_size;i++){
     double right_cp = grid_mle[i];
     double left_cp = grid_mle[i];
     double cp_mle = grid_mle[i];
-
     double st = 1 - cp_mle;
-
-
-    while(left_cp>=0){
-      left_cp -= tick;
-      if(left_cp<0){
-        left_cp = 0;
-        break;
-      }
-      double diff = cp_mle - left_cp;
-      for(size_t j=0;j<grid_size;j++){
-        if(j==i)
-          continue;
-        grid_wts[j] = grid_mle[j] + diff*grid_mle[j]/st;
-      }
-      grid_wts[i] = left_cp;
-
-      if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-        left_cp += tick;
-        break;
-      }
-    }
-
-    while(right_cp<=1){
-      right_cp += tick;
-      if(right_cp>1){
-        right_cp = 1;
-        break;
-      }
-      double diff = cp_mle - right_cp;
-      for(size_t j=0;j<grid_size;j++){
-        if(j==i)
-          continue;
-        grid_wts[j] = grid_mle[j]+ diff*grid_mle[j]/st;
-      }
-      grid_wts[i] = right_cp;
-      if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-        right_cp -= tick;
-        break;
+    if (! skip_ci) {
+      while(left_cp>=0){
+	left_cp -= tick;
+	if(left_cp<0){
+	  left_cp = 0;
+	  break;
+	}
+	double diff = cp_mle - left_cp;
+	for(size_t j=0;j<grid_size;j++){
+	  if(j==i)
+	    continue;
+	  grid_wts[j] = grid_mle[j] + diff*grid_mle[j]/st;
+	}
+	grid_wts[i] = left_cp;
 	
+	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
+	  left_cp += tick;
+	  break;
+	}
+      }
+      while(right_cp<=1){
+	right_cp += tick;
+	if(right_cp>1){
+	  right_cp = 1;
+	  break;
+	}
+	double diff = cp_mle - right_cp;
+	for(size_t j=0;j<grid_size;j++){
+	  if(j==i)
+	    continue;
+	  grid_wts[j] = grid_mle[j]+ diff*grid_mle[j]/st;
+	}
+	grid_wts[i] = right_cp;
+	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
+	  right_cp -= tick;
+	  break;
+	  
+	}
       }
     }
-    
     fprintf(stderr,"%.3f [%.3f, %.3f]  ",grid_mle[i],left_cp, right_cp);
     fflush(stdout);
   }
-
   fprintf(stderr,"\n");
   delete[] grid_mle;
-
 }
 
 
@@ -498,14 +486,17 @@ void eQTL_controller::em_update_snp_prior(){
 
 void eQTL_controller::em_update_pi0(){
   
-  // update pi0
-  double sum = 0;
-  for(size_t i=0;i<geqVec.size();i++){
-    //geqVec[i].update_snp_prior();
-    sum += geqVec[i].em_update_pi0();
+  if (fixed_pi0_ == -1.0) {
+    double sum = 0;
+    for(size_t i=0;i<geqVec.size();i++){
+      //geqVec[i].update_snp_prior();
+      sum += geqVec[i].em_update_pi0();
+    }
+    new_pi0 = sum/geqVec.size();
   }
+  else
+    new_pi0 = fixed_pi0_;
   
-  new_pi0 = sum/geqVec.size();
   return;
   
 }
@@ -684,9 +675,9 @@ void eQTL_controller::compute_posterior(){
 
 
 void eQTL_controller::print_result(){
-  printf("gene_name\tgene_posterior_prob\tgene_log10_bf\t\tsnp_name\tsnp_log10_bf\t\t");
+  printf("gene\tgene_posterior_prob\tgene_log10_bf\t\tsnp\tsnp_log10_bf\t\t");
   for(size_t i=0;i<type_vec.size();i++){
-    printf("%s\t",type_vec[i].c_str());
+    printf("log10_bf_%s\t",type_vec[i].c_str());
   }
   printf("\n");
   
@@ -695,74 +686,69 @@ void eQTL_controller::print_result(){
 }
 
 
-int main(int argc, char **argv){
-  
+int main(int argc, char **argv)
+{
   time_t startRawTime, endRawTime;
   time (&startRawTime);
   
-  // creating the grid
-  
-  //olist.push_back(0.1);
-  //phlist.push_back(0.05);
-
   char data_file[128];
   size_t csize = string::npos;
   size_t gsize = string::npos;
   memset(data_file,0,128);
-
-
+  
   char init_file[128];
   int option = 0;
-
+  
   char ci_file[128];
   memset(ci_file,0,128); 
   memset(data_file,0,128); 
   memset(init_file,0,128);
   
-  
   double thresh = 0.05;
   
-
+  bool skip_ci = false;
+  
+  double fixed_pi0 = -1.0;
+  
   for(int i=1;i<argc;i++){
-    
     if(strcmp(argv[i], "-d")==0 || strcmp(argv[i], "-data")==0){
       strcpy(data_file,argv[++i]);
       continue;
     }
-    
     if(strcmp(argv[i], "-s")==0){
       csize = atoi(argv[++i]);
       continue;	
     }
-    
     if(strcmp(argv[i], "-g")==0 || strcmp(argv[i], "-grid")==0){
       gsize = atoi(argv[++i]);
       continue;
     }
     
     ////////////////////// optional ///////////////////////////
-
     if(strcmp(argv[i],"-i")==0 || strcmp(argv[i],"-init")==0){
       strcpy(init_file, argv[++i]);
       continue;
     }
-    
-   if(strcmp(argv[i], "-r")==0 || strcmp(argv[i],"-ran")==0){
-     option = 1;
-     continue;
-   }
-   
-   if(strcmp(argv[i], "-t")==0 || strcmp(argv[i], "-thresh")==0){
-     thresh = atof(argv[++i]);
-     continue;
-   }
-   
-   if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"-ci")==0){
-     strcpy(ci_file, argv[++i]);
-     continue;
-   }
-   
-
+    if(strcmp(argv[i], "-r")==0 || strcmp(argv[i],"-ran")==0){
+      option = 1;
+      continue;
+    }
+    if(strcmp(argv[i], "-t")==0 || strcmp(argv[i], "-thresh")==0){
+      thresh = atof(argv[++i]);
+      continue;
+    }
+    if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"-ci")==0){
+      strcpy(ci_file, argv[++i]);
+      continue;
+    }
+    if(strcmp(argv[i],"-skipci")==0){
+      skip_ci = true;
+      continue;
+    }
+    if(strcmp(argv[i], "-pi0")==0){
+      fixed_pi0 = atof(argv[++i]);
+      continue;
+    }
   }
 
   // checking mandatory arguments
@@ -770,18 +756,15 @@ int main(int argc, char **argv){
     fprintf(stderr,"Error: data file unspecified\n");
     exit(1);
   }
-
   if(csize == string::npos){
     fprintf(stderr,"Error: number of model types unspecified\n");
     exit(1);
   }
-  
   if(gsize == string::npos){
     fprintf(stderr,"Error: number of model grids unspecified\n");
     exit(1);
   }
-
-    
+  
   // a global variable 
   eQTL_controller controller;
   controller.output_option = 1;
@@ -790,19 +773,21 @@ int main(int argc, char **argv){
   
   if(strlen(ci_file)>0){
     controller.init_params(ci_file);
-    controller.estimate_profile_ci();
+    controller.estimate_profile_ci(skip_ci);
     return 0;
   }
-
+  
   if(strlen(init_file)>0)
     controller.init_params(init_file);
   else
     controller.init_params(option);
   
+  controller.fix_pi0(fixed_pi0);
+  
   controller.run_EM(thresh);
   controller.compute_posterior();
   controller.print_result();
-  controller.estimate_profile_ci();
+  controller.estimate_profile_ci(skip_ci);
   
   time (&endRawTime);
   cerr << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
