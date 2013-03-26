@@ -108,9 +108,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
   }
 }
 
-getSimulatedData <- function(rmvGenesFromSbgrps=FALSE,
-                             withCovars=FALSE,
-                             verbose=0){
+getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
 
@@ -122,8 +120,7 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE,
   inds <- data.frame(id=paste0("ind", 1:nb.inds),
                      name=paste0("individual ", 1:nb.inds),
                      stringsAsFactors=FALSE)
-  if(withCovars)
-    inds$sex <- sample(c(0, 1), nb.inds, replace=TRUE)
+  inds$sex <- sample(c(0, 1), nb.inds, replace=TRUE)
   
   nb.pairs <- 14
   params$nb.pairs <- nb.pairs
@@ -270,7 +267,8 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE,
               configs=configs))
 }
 
-writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
+writeSimulatedData <- function(data=NULL, geno.format="custom",
+                               verbose=0){
   stopifnot(! is.null(data))
   
   if(verbose > 0)
@@ -322,13 +320,13 @@ writeSimulatedData <- function(data=NULL, geno.format="custom", verbose=0){
 }
 
 ## Calculate the summary statistics in each tissue
-calcSstatsOnSimulatedData <- function(data=NULL){
+calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
   stopifnot(! is.null(data))
   sstats <- lapply(data$phenos, function(x){
     tmp <- data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
                       pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
                       betapval.geno=NA, stringsAsFactors=FALSE)
-    if("sex" %in% names(data$inds)){
+    if(withCovars && "sex" %in% names(data$inds)){
       tmp$betahat.sex <- NA
       tmp$sebetahat.sex <- NA
       tmp$betapval.sex <- NA
@@ -351,7 +349,7 @@ calcSstatsOnSimulatedData <- function(data=NULL){
           (2 * length(data$phenos[[s]][g,]))
         if(gene %in% rownames(data$phenos[[s]])){
           sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
-          if(! "sex" %in% names(data$inds)){
+          if(! (withCovars && "sex" %in% names(data$inds))){
             tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
                               as.numeric(data$geno.counts[p,])))
           } else
@@ -363,7 +361,7 @@ calcSstatsOnSimulatedData <- function(data=NULL){
           sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
           sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
           sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
-          if("sex" %in% names(data$inds)){
+          if(withCovars && "sex" %in% names(data$inds)){
             sstats[[s]]$betahat.sex[i] <- tmp$coefficients[3,"Estimate"]
             sstats[[s]]$sebetahat.sex[i] <- tmp$coefficients[3,"Std. Error"]
             sstats[[s]]$betapval.sex[i] <- tmp$coefficients[3,"Pr(>|t|)"]
@@ -661,12 +659,13 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
   return(l10abfs.avg)
 }
 
-getResultsOnSimulatedData <- function(data=NULL, grids=NULL, verbose=0){
+getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
+                                      verbose=0){
   stopifnot(! is.null(data), ! is.null(grids))
   if(verbose > 0)
     message("get results on simulated data with R ...")
   
-  sstats <- calcSstatsOnSimulatedData(data)
+  sstats <- calcSstatsOnSimulatedData(data, withCovars)
   
   l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids)
   
@@ -715,13 +714,12 @@ run <- function(){
   if(params$verbose > 0)
     message(paste0("START functional_tests.R (", date(), ")"))
   setwd(params$dir.name)
-  data <- getSimulatedData(params$rmvGenesFromSbgrps,
-                           params$withCovars,
-                           params$verbose)
+  data <- getSimulatedData(params$rmvGenesFromSbgrps, params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
-  res <- getResultsOnSimulatedData(data, grids, params$verbose)
+  res <- getResultsOnSimulatedData(data, grids, params$withCovars,
+                                   params$verbose)
   writeResultsOnSimulatedData(res, params$verbose)
   if(params$verbose > 0)
     message(paste0("END functional_tests.R (", date(), ")"))
