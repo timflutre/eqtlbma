@@ -216,7 +216,7 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
     }
   }
   fprintf(stderr,"\nProfile-likelihood Confidence Intervals\n");
-  fprintf(stderr,"pi0: %.3f [%.3f, %.3f]\n",pi0_mle,left_pi0,right_pi0);
+  fprintf(stderr,"pi0: %7.3e [%7.3e, %7.3e]\n",pi0_mle,left_pi0,right_pi0);
   fprintf(stderr,"config: ");
   
   pi0[0] = pi0_mle;
@@ -645,7 +645,7 @@ void eQTL_controller::run_EM(double thresh){
     if(output_option==1){
       // output 
       fprintf(stderr,"iter  %4zu  loglik = %.4f   ",count++,curr_log10_lik);
-      fprintf(stderr,"pi0  %.4f     config ", pi0[0]);
+      fprintf(stderr,"pi0  %7.3e     config ", pi0[0]);
 	      
       for(size_t i=0;i<config_size;i++)
 	fprintf(stderr,"%.3f  ",new_config_prior[i]);

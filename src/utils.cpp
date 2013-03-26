@@ -154,8 +154,8 @@ getElapsedTime (
     nbMins = floor (fmod ((elapsed / 60), 60)),
     nbSecs = floor (fmod (elapsed, 60));
   char buffer[100];
-  int n = snprintf (buffer, 100, "%01.0fd %01.0fh %01.0fm %01.0fs",
-		    nbDays, nbHours, nbMins, nbSecs);
+  snprintf (buffer, 100, "%01.0fd %01.0fh %01.0fm %01.0fs",
+	    nbDays, nbHours, nbMins, nbSecs);
   return string(buffer);
 }
 
@@ -167,9 +167,9 @@ getDateTime (
 {
   struct tm * ptTm = localtime (&inTime);
   char buffer[100];
-  int n = snprintf (buffer, 126, "%i-%02i-%02i %02i:%02i:%02i",
-		    1900 + ptTm->tm_year, ptTm->tm_mon + 1, ptTm->tm_mday,
-		    ptTm->tm_hour, ptTm->tm_min, ptTm->tm_sec);
+  snprintf (buffer, 126, "%i-%02i-%02i %02i:%02i:%02i",
+	    1900 + ptTm->tm_year, ptTm->tm_mon + 1, ptTm->tm_mday,
+	    ptTm->tm_hour, ptTm->tm_min, ptTm->tm_sec);
   return string(buffer);
 }
 
