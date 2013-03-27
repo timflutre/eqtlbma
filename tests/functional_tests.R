@@ -375,6 +375,7 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
 }
 
 getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
+                                               nbCovars,
                                                correct=TRUE){
   std.sstats.corr <- do.call(rbind, lapply(sstats, function(x){
     N <- x[x$ftr == data$gene.coords$id[g] &
@@ -394,7 +395,7 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
                      8]
       bhat <- betahat / sigmahat
       sebhat <- sebetahat / sigmahat
-      t <- qnorm(pt(-abs(bhat/sebhat), N-2, log=TRUE), log=TRUE)
+      t <- qnorm(pt(-abs(bhat/sebhat), N-2-nbCovars, log=TRUE), log=TRUE)
       if(correct){
         if(abs(t) > 10^(-8)){
           sigmahat <- abs(betahat) / (abs(t) * sebhat)
@@ -510,7 +511,8 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
   return(l10abfs)
 }
 
-calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL){
+calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
+                                       withCovars=FALSE){
   stopifnot(! is.null(data), ! is.null(sstats), ! is.null(grids))
   l10abfs.raw <- data.frame(ftr=rep(NA, 10*data$params$nb.pairs),
                             snp=NA, config=NA)
@@ -525,7 +527,11 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL){
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
-      std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats, g, p)
+      nbCovars <- 0
+      if (withCovars && "sex" %in% names(data$inds))
+        nbCovars <-  1
+      std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats, g, p,
+                                                            nbCovars)
       
       l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridL(std.sstats.corr,
                                                           grids$gridL)
@@ -667,7 +673,7 @@ getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
   
   sstats <- calcSstatsOnSimulatedData(data, withCovars)
   
-  l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids)
+  l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars)
   
   l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw)
   

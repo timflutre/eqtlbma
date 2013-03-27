@@ -883,6 +883,7 @@ struct ResFtrSnp
   // key: name of predictors ; values: summary stats
   // 0:betahat ; 1:sebetahat ; 2:betaPval
   vector<map<string, vector<double> > > vMapPredictors;
+  vector<size_t> vNbCovars; // per subgroup, e.g. genotype PCs, etc
   
   // raw ABFs
   // keys: 'gen', 'gen-fix', 'gen-maxh', '1-2-3', '1', '2', etc
@@ -1006,6 +1007,7 @@ ResFtrSnp_init (
   iResFtrSnp.vNs.assign (nbSubgroups, 0);
   iResFtrSnp.vMapPredictors.assign (nbSubgroups,
   				    map<string, vector<double> > ());
+  iResFtrSnp.vNbCovars.assign (nbSubgroups, 0);
   for (size_t s = 0; s < nbSubgroups; ++s)
     iResFtrSnp.vMapPredictors[s]["genotype"] =
       vector<double>  (3, numeric_limits<double>::quiet_NaN());
@@ -1114,6 +1116,7 @@ ResFtrSnp_getSstatsOneSbgrp (
 				 iResFtrSnp.vSigmahats[s],
 				 vvResPredictors);
     iResFtrSnp.vMapPredictors[s]["genotype"] = vvResPredictors[0];
+    iResFtrSnp.vNbCovars[s] = vvCovars.size();
     if (outCovars)
     {
       j = 1;
@@ -1231,6 +1234,7 @@ ResFtrSnp_getSstatsPermOneSbgrp (
 				 iResFtrSnp.vSigmahats[s],
 				 vvResPredictors);
     iResFtrSnp.vMapPredictors[s]["genotype"] = vvResPredictors[0];
+    iResFtrSnp.vNbCovars[s] = vvCovars.size();
   }
 }
 
@@ -1254,7 +1258,8 @@ ResFtrSnp_getStdStatsAndCorrSmallSampleSize (
 	t = bhat / sebhat;
       // apply quantile-quantile transformation
       t = gsl_cdf_gaussian_Pinv (gsl_cdf_tdist_P (-fabs(bhat/sebhat),
-						  n-2), 1.0);
+						  n - 2 - iResFtrSnp.vNbCovars[s]),
+				 1.0);
       vector<double> vStdSstats;
       if (fabs(t) > 1e-8)
       {
