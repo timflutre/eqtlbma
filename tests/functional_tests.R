@@ -323,7 +323,7 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
 calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
   stopifnot(! is.null(data))
   sstats <- lapply(data$phenos, function(x){
-    tmp <- data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
+    tmp <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
                       pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
                       betapval.geno=NA, stringsAsFactors=FALSE)
     if(withCovars && "sex" %in% names(data$inds)){
@@ -343,7 +343,7 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
       i <- i + 1
       gene <- data$gene.coords$id[g]
       for(s in 1:length(data$phenos)){
-        sstats[[s]]$ftr[i] <- gene
+        sstats[[s]]$gene[i] <- gene
         sstats[[s]]$snp[i] <- data$snp.coords$id[p]
         sstats[[s]]$maf[i] <- sum(as.numeric(data$geno.counts[p,])) /
           (2 * length(data$phenos[[s]][g,]))
@@ -378,19 +378,19 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
                                                nbCovars,
                                                correct=TRUE){
   std.sstats.corr <- do.call(rbind, lapply(sstats, function(x){
-    N <- x[x$ftr == data$gene.coords$id[g] &
+    N <- x[x$gene == data$gene.coords$id[g] &
            x$snp == data$snp.coords$id[p],
            "n"]
     if(N == 0){
       c(NA, NA, NA)
     } else{
-      sigmahat <- x[x$ftr == data$gene.coords$id[g] &
+      sigmahat <- x[x$gene == data$gene.coords$id[g] &
                     x$snp == data$snp.coords$id[p],
                     6]
-      betahat <- x[x$ftr == data$gene.coords$id[g] &
+      betahat <- x[x$gene == data$gene.coords$id[g] &
                    x$snp == data$snp.coords$id[p],
                    7]
-      sebetahat <- x[x$ftr == data$gene.coords$id[g] &
+      sebetahat <- x[x$gene == data$gene.coords$id[g] &
                      x$snp == data$snp.coords$id[p],
                      8]
       bhat <- betahat / sigmahat
@@ -514,7 +514,7 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
 calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
                                        withCovars=FALSE){
   stopifnot(! is.null(data), ! is.null(sstats), ! is.null(grids))
-  l10abfs.raw <- data.frame(ftr=rep(NA, 10*data$params$nb.pairs),
+  l10abfs.raw <- data.frame(gene=rep(NA, 10*data$params$nb.pairs),
                             snp=NA, config=NA)
   for(i in 1:nrow(grids$gridL)){
     l10abfs.raw <- cbind(l10abfs.raw, NA)
@@ -536,7 +536,7 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
       l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridL(std.sstats.corr,
                                                           grids$gridL)
       for(m in 1:nrow(l10abfs.raw.const.gridL)){
-        l10abfs.raw$ftr[i] <- data$gene.coords$id[g]
+        l10abfs.raw$gene[i] <- data$gene.coords$id[g]
         l10abfs.raw$snp[i] <- data$snp.coords$id[p]
         l10abfs.raw$config[i] <- rownames(l10abfs.raw.const.gridL)[m]
         l10abfs.raw[i,-c(1:3)] <- l10abfs.raw.const.gridL[m,]
@@ -547,7 +547,7 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
                                                       grids$gridS,
                                                       data$configs)
       for(m in 1:nrow(l10abfs.raw.all.gridS)){
-        l10abfs.raw$ftr[i] <- data$gene.coords$id[g]
+        l10abfs.raw$gene[i] <- data$gene.coords$id[g]
         l10abfs.raw$snp[i] <- data$snp.coords$id[p]
         l10abfs.raw$config[i] <- rownames(l10abfs.raw.all.gridS)[m]
         l10abfs.raw[i,4:(4+ncol(l10abfs.raw.all.gridS)-1)] <- l10abfs.raw.all.gridS[m,]
@@ -601,7 +601,7 @@ calcAvgAbfAll <- function(l10abfs.avg, i, configs){
 
 calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
   stopifnot(! is.null(data), ! is.null(l10abfs.raw))
-  l10abfs.avg <- data.frame(ftr=rep(NA, data$params$nb.pairs), snp=NA,
+  l10abfs.avg <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA,
                             nb.subgroups=NA, nb.samples=NA)
   for(i in c("l10abf.gen", "l10abf.gen.fix", "l10abf.gen.maxh",
              "l10abf.sin", "l10abf.gen.sin", "l10abf.all")){
@@ -621,29 +621,29 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
-      l10abfs.avg$ftr[i] <- data$gene.coords$id[g]
+      l10abfs.avg$gene[i] <- data$gene.coords$id[g]
       l10abfs.avg$snp[i] <- data$snp.coords$id[p]
       l10abfs.avg$nb.subgroups[i] <- 0
       l10abfs.avg$nb.samples[i] <- 0
       
-      tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
+      tmp <- l10abfs.raw[l10abfs.raw$gene == l10abfs.avg$gene[i] &
                          l10abfs.raw$snp == l10abfs.avg$snp[i] &
                          l10abfs.raw$config == "gen",
                          c(4:ncol(l10abfs.raw))]
       l10abfs.avg$l10abf.gen[i] <- log10WeightedSum(tmp)
-      tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
+      tmp <- l10abfs.raw[l10abfs.raw$gene == l10abfs.avg$gene[i] &
                          l10abfs.raw$snp == l10abfs.avg$snp[i] &
                          l10abfs.raw$config == "gen-fix",
                          c(4:ncol(l10abfs.raw))]
       l10abfs.avg$l10abf.gen.fix[i] <- log10WeightedSum(tmp)
-      tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
+      tmp <- l10abfs.raw[l10abfs.raw$gene == l10abfs.avg$gene[i] &
                          l10abfs.raw$snp == l10abfs.avg$snp[i] &
                          l10abfs.raw$config == "gen-maxh",
                          c(4:ncol(l10abfs.raw))]
       l10abfs.avg$l10abf.gen.maxh[i] <- log10WeightedSum(tmp)
       
       for(config in configs){
-        tmp <- l10abfs.raw[l10abfs.raw$ftr == l10abfs.avg$ftr[i] &
+        tmp <- l10abfs.raw[l10abfs.raw$gene == l10abfs.avg$gene[i] &
                            l10abfs.raw$snp == l10abfs.avg$snp[i] &
                            l10abfs.raw$config == config,
                            c(4:13)]
