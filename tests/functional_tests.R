@@ -693,9 +693,9 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     tmp <- cbind(res$sstats[[s]][row.ids,1:2],
                  sprintf(fmt="%.06e", res$sstats[[s]][row.ids,3]),
                  res$sstats[[s]][row.ids,4])
-    for(j in 5:ncol(res$sstats[[s]]))
+    for(j in 5:9) #ncol(res$sstats[[s]])) <- don't save covariates results
       tmp <- cbind(tmp, sprintf(fmt="%.06e", res$sstats[[s]][row.ids,j]))
-    colnames(tmp) <- colnames(res$sstats[[s]])
+    colnames(tmp) <- colnames(res$sstats[[s]])[1:9]
     write.table(x=tmp, file=gzfile(paste0("exp_eqtlbma_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep=" ", na="nan")
   }
