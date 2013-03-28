@@ -504,7 +504,7 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
           l10abfs[config,] <- l10abfs[config.present,]
         }
       } else if(isAbsentInSbgrp[as.numeric(config)]) # absent singleton
-        l10abfs[config,] <- rep(1, ncol(gridS))
+        l10abfs[config,] <- rep(0, ncol(gridS))
     }
   }
   
@@ -647,7 +647,7 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
                            l10abfs.raw$snp == l10abfs.avg$snp[i] &
                            l10abfs.raw$config == config,
                            c(4:13)]
-        if(length(grep("-", config)) == 0 && sum(tmp == 1.0) != length(tmp)){
+        if(length(grep("-", config)) == 0 && sum(tmp == 0.0) != length(tmp)){
           l10abfs.avg$nb.subgroups[i] <- l10abfs.avg$nb.subgroups[i] + 1
           l10abfs.avg$nb.samples[i] <- l10abfs.avg$nb.samples[i] +
             ncol(data$phenos[[as.numeric(config)]])

@@ -1362,7 +1362,7 @@ ResFtrSnp_calcAbfsSingletons (
   {
     ssConfig.str("");
     ssConfig << (s+1);
-    vL10Abfs.assign (iGridS.size(), 1);
+    vL10Abfs.assign (iGridS.size(), 0.0);
     
     if (iResFtrSnp.vNs[s] > 2)
     {
@@ -1385,13 +1385,19 @@ ResFtrSnp_calcAbfsSingletons (
 						   vvStdSstatsSingletons,
 						   iGridS.phi2s[gridIdx],
 						   iGridS.oma2s[gridIdx]);
+      iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						    vL10Abfs));
+      iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
+						 log10_weighted_sum (
+						   &(vL10Abfs[0]),
+						   vL10Abfs.size())));
     }
-    iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
-						  vL10Abfs));
-    iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
-					       log10_weighted_sum (
-						 &(vL10Abfs[0]),
-						 vL10Abfs.size())));
+    else
+    {
+      iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						    vL10Abfs));
+      iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(), 0.0));
+    }
   }
 }
 
@@ -1504,7 +1510,7 @@ ResFtrSnp_calcAbfsAllConfigs (
 	  vvStdSstatsSubset.push_back (vector<double> (3, 0));
 	}
       }
-      vL10Abfs.assign (iGridS.size(), 1);
+      vL10Abfs.assign (iGridS.size(), 0.0);
       if (accumulate (vNs.begin(), vNs.end(), 0) > 2)
       {
 	for (size_t gridIdx = 0; gridIdx < iGridS.size(); ++gridIdx)
@@ -1512,13 +1518,18 @@ ResFtrSnp_calcAbfsAllConfigs (
 						     vvStdSstatsSubset,
 						     iGridS.phi2s[gridIdx],
 						     iGridS.oma2s[gridIdx]);
+	iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						      vL10Abfs));
+	iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
+						   log10_weighted_sum (
+						     &(vL10Abfs[0]),
+						     vL10Abfs.size())));
       }
-      iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
-						    vL10Abfs));
-      iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(),
-						 log10_weighted_sum (
-						   &(vL10Abfs[0]),
-						   vL10Abfs.size())));
+      else{
+	iResFtrSnp.mUnweightedAbfs.insert (make_pair (ssConfig.str(),
+						      vL10Abfs));
+	iResFtrSnp.mWeightedAbfs.insert (make_pair(ssConfig.str(), 0.0));
+      }
       if (gsl_combination_next (comb) != GSL_SUCCESS)
 	break;
     }

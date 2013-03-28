@@ -626,6 +626,8 @@ void eQTL_controller::update_params(){
 void eQTL_controller::run_EM(double thresh){  
 
   // start iteration
+  time_t startRawTime, endRawTime;
+  time (&startRawTime);
   
   size_t count = 1;
   double last_log10_lik = -9999999;
@@ -664,6 +666,8 @@ void eQTL_controller::run_EM(double thresh){
     last_log10_lik = curr_log10_lik;
   }
 
+  time (&endRawTime);
+  cerr << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl;
 }
 
 void eQTL_controller::compute_posterior(){       
@@ -790,6 +794,7 @@ int main(int argc, char **argv)
   controller.estimate_profile_ci(skip_ci);
   
   time (&endRawTime);
-  cerr << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
+  cerr << endl
+       << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
        << "max.mem -> " << getMaxMemUsedByProcess2Str () << endl;
 }
