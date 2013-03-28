@@ -16,6 +16,7 @@ Bug fixes
 * in 'hm', update pi0 in the hierarchical model (bug absent in paper's results)
 * in 'eqtlbma', allow covariates only for a subset of the subgroups
 * in 'eqtlbma', use the nb of covariates per subgroup for small sample size correction
+* in 'eqtlbma', use 0.0 as log10(BF) of genes unexpressed in some subgroups
 
 
 2013-02-08 v1.1
