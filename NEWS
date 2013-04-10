@@ -1,3 +1,14 @@
+2013-00-00 v1.3
+===============
+
+New features
+* in 'eqtlbma', allow to account for correlated errors when some individuals
+are missing in some subgroups
+* major refactoring of 'eqtlbma' (use a static library), which causes some 
+options to change, see the manual
+* add tests for the multivariate Bayes Factor
+
+
 2013-03-28 v1.2
 ===============
 

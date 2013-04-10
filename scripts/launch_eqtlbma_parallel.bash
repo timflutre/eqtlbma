@@ -14,12 +14,12 @@ function help () {
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
     msg+="      --p2b\tpath to the binary 'eqtlbma'\n"
-    msg+="      --ftrD\tdirectory with lists of features to analyze (BED files)\n"
+    msg+="      --geneD\tdirectory with lists of features to analyze (BED files)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="      --snpD\tdirectory with lists of SNPs to analyze (optional)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="\t\teach SNP file should correspond to a feature file, in the same order\n"
-    msg+="      --seedF\tfile with seeds (as many as files in --ftrD)\n"
+    msg+="      --seedF\tfile with seeds (as many as files in --geneD)\n"
     msg+="\t\toptional, default=list_seeds.txt.gz (should be gzipped)\n"
     msg+="      --task\ttask identifier (not for SGE, for SLURM only)\n"
     msg+="\n"
@@ -27,20 +27,19 @@ function help () {
     msg+="      --geno\tfile with absolute paths to genotype files\n"
     msg+="\t\tdefault=list_genotypes.txt\n"
     msg+="      --scoord\tfile with the SNP coordinates\n"
-    msg+="      --pheno\tfile with absolute paths to phenotype files\n"
-    msg+="\t\tdefault=list_phenotypes.txt\n"
+    msg+="      --exp\tfile with absolute paths to expression level files\n"
+    msg+="\t\tdefault=list_expressions.txt\n"
     msg+="      --anchor\tfeature boundary(ies) for the cis region\n"
-    msg+="\t\tdefault=FSS\n"
+    msg+="\t\tdefault=TSS\n"
     msg+="      --cis\tlength of half of the cis region (in bp)\n"
     msg+="\t\tdefault=100000\n"
     msg+="      --out\tprefix for the output files\n"
     msg+="\t\tdefault=out_eqtlbma\n"
-    msg+="      --step\tstep of the analysis to perform (1/2/3/4/5)\n"
-    msg+="\t\tdefault=1\n"
+    msg+="      --type\ttype of analysis to perform (sep/join/sep+join)\n"
+    msg+="\t\tdefault=sep\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
-    msg+="      --outcv\twrite the results for the other covariates when --outss\n"
     msg+="      --outraw\twrite the output file with all raw ABFs\n"
-    msg+="      --qnorm\tquantile-normalize the phenotypes to a N(0,1)\n"
+    msg+="      --qnorm\tquantile-normalize the expression levels to a N(0,1)\n"
     msg+="      --maf\tminimum minor allele frequency\n"
     msg+="\t\tdefault=0\n"
     msg+="      --covar\tfile with absolute paths to covariate files\n"
@@ -49,25 +48,26 @@ function help () {
     msg+="      --gridS\tfile with a 'small' grid for prior variances\n"
     msg+="\t\tdefault=grid_phi2_oma2_with-configs.txt.gz\n"
     msg+="      --bfs\twhich Bayes Factors to compute for the joint analysis\n"
-    msg+="\t\tdefault=all\n"
-    msg+="      --mvlr\tuse the multivariate version of the ABF\n"
-    msg+="      --fitsig\tparam used when estimating the variance of the errors with --mvlr\n"
-    msg+="\t\tdefault=0.0\n"
+    msg+="\t\tdefault=gen\n"
+    msg+="      --error\tmodel for the errors (uvlr/mvlr/hybrid)\n"
+    msg+="\t\tdefault=uvlr\n"
+    msg+="      --fiterr\tparam used when estimating the variance of the errors\n"
+    msg+="\t\tdefault=0.5\n"
     msg+="      --nperm\tnumber of permutations\n"
-    msg+="\t\tdefault=10000\n"
+    msg+="\t\tdefault=0\n"
     msg+="      --trick\tapply trick to speed-up permutations\n"
     msg+="\t\tdefault=2\n"
     msg+="      --tricut\tcutoff for the trick\n"
     msg+="\t\tdefault=10\n"
     msg+="      --permsep\twhich permutation procedure for the separate analysis\n"
-    msg+="\t\tdefault=1\n"
+    msg+="\t\tdefault=0\n"
     msg+="      --pbf\twhich BF to use as the test statistic for the joint-analysis permutations\n"
-    msg+="\t\tdefault=all\n"
+    msg+="\t\tdefault=none\n"
     msg+="      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations\n"
     msg+="      --sbgrp\tidentifier of the subgroup to analyze\n"
     msg+="\n"
     msg+="Examples:\n"
-    msg+="  ${0##*/} --p2b ~/bin/eqtlbma --ftrD ./lists_genes/\n"
+    msg+="  ${0##*/} --p2b ~/bin/eqtlbma --geneD ./lists_genes/\n"
     echo -e "$msg"
 }
 
@@ -98,7 +98,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,ftrD:,snpD:,seedF:,task:,geno:,scoord:,pheno:,fcoord:,anchor:,cis:,out:,step:,outss,outcv,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,mvlr,fitsig:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -108,20 +108,19 @@ function parseArgs () {
             -V|--version) version; exit 0; shift;;
             -v|--verbose) verbose=$2; shift 2;;
 	    --p2b) pathToBin=$2; shift 2;;
-	    --ftrD) ftrDir=$2; shift 2;;
+	    --geneD) geneDir=$2; shift 2;;
 	    --snpD) snpDir=$2; shift 2;;
 	    --seedF) seedFile=$2; shift 2;;
 	    --task) task=$2; shift 2;;
 	    --geno) geno=$2; shift 2;;
 	    --scoord) scoord=$2; shift 2;;
-	    --pheno) pheno=$2; shift 2;;
+	    --exp) exp=$2; shift 2;;
 	    --fcoord) fcoord=$2; shift 2;;
 	    --anchor) anchor=$2; shift 2;;
 	    --cis) cis=$2; shift 2;;
 	    --out) out=$2; shift 2;;
-	    --step) step=$2; shift 2;;
+	    --type) type=$2; shift 2;;
 	    --outss) outss=true; shift;;
-	    --outcv) outss=true; shift;;
 	    --outraw) outraw=true; shift;;
 	    --qnorm) qnorm=true; shift;;
 	    --maf) maf=$2; shift 2;;
@@ -129,8 +128,8 @@ function parseArgs () {
 	    --gridL) gridL=$2; shift 2;;
 	    --gridS) gridS=$2; shift 2;;
 	    --bfs) bfs=$2; shift 2;;
-	    --mvlr) mvlr=true; shift;;
-	    --fitsig) fitsig=$2; shift 2;;
+	    --error) error=$2; shift 2;;
+	    --fiterr) fiterr=$2; shift 2;;
 	    --nperm) nperm=$2; shift 2;;
 	    --trick) trick=$2; shift 2;;
 	    --tricut) trickCutoff=$2; shift 2;;
@@ -157,13 +156,13 @@ function parseArgs () {
 	help
 	exit 1
     fi
-    if [ -z "${ftrDir}" ]; then
-	echo -e "ERROR: missing compulsory option --ftrDir\n"
+    if [ -z "${geneDir}" ]; then
+	echo -e "ERROR: missing compulsory option --geneDir\n"
 	help
 	exit 1
     fi
-    if [ ! -d "${ftrDir}" ]; then
-	echo -e "ERROR: can't find feature directory '${ftrDir}'\n"
+    if [ ! -d "${geneDir}" ]; then
+	echo -e "ERROR: can't find feature directory '${geneDir}'\n"
 	help
 	exit 1
     fi
@@ -184,33 +183,32 @@ function parseArgs () {
 
 verbose=1
 pathToBin=""
-ftrDir=""
+geneDir=""
 snpDir=""
 seedFile=""
 task=""
 geno="list_genotypes.txt"
 scoord=""
-pheno="list_phenotypes.txt"
-anchor="FSS"
+exp="list_expressions.txt"
+anchor="TSS"
 cis=100000
 out="out_eqtlbma"
-step=1
+type="sep"
 outss=false
-outcv=false
 outraw=false
 qnorm=false
 maf=0
 covar=""
 gridL="grid_phi2_oma2_general.txt.gz"
 gridS="grid_phi2_oma2_with-configs.txt.gz"
-bfs="all"
-mvlr=false
-fitsig=0
-nperm=10000
+bfs="gen"
+error="uvlr"
+fiterr=0.5
+nperm=0
 trick=2
 trickCutoff=10
-permsep=1
-pbf="all"
+permsep=0
+pbf="none"
 maxbf=false
 sbgrp=""
 parseArgs "$@"
@@ -223,9 +221,9 @@ if [ $verbose -gt "0" ]; then
     uname -a
 fi
 
-# prepare the feature list + misc
-fcoord=$(ls ${ftrDir}/* | awk -v i=${task} 'NR==i{print;exit}');
-split=$(echo ${fcoord} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
+# prepare the gene list + misc
+gcoord=$(ls ${geneDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+split=$(echo ${gcoord} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
 snp=""
 if [ ! -z "${snpDir}" ]; then
     snp=$(ls ${snpDir}/* | awk -v i=${task} 'NR==i{print;exit}');
@@ -236,21 +234,18 @@ fi
 
 # build the command-line
 cmd="${pathToBin}"
-cmd+=" -g ${geno}"
+cmd+=" --geno ${geno}"
 if [ ! -z "${scoord}" ]; then
     cmd+=" --scoord ${scoord}"
 fi
-cmd+=" -p ${pheno}"
-cmd+=" --fcoord ${fcoord}"
+cmd+=" --exp ${exp}"
+cmd+=" --gcoord ${gcoord}"
 cmd+=" --anchor ${anchor}"
 cmd+=" --cis ${cis}"
 cmd+=" --out ${out}_${split}"
-cmd+=" --step ${step}"
+cmd+=" --type ${type}"
 if $outss; then
     cmd+=" --outss"
-fi
-if $outcv; then
-    cmd+=" --outcv"
 fi
 if $outraw; then
     cmd+=" --outraw"
@@ -262,24 +257,24 @@ cmd+=" --maf ${maf}"
 if [ ! -z "${covar}" ]; then
     cmd+=" --covar ${covar}"
 fi
-if [ "x${step}" != "x1" -a "x${step}" != "x2" ]; then
+if [ "x${type}" == "xjoin" ]; then
     cmd+=" --gridL ${gridL}"
     cmd+=" --gridS ${gridS}"
     cmd+=" --bfs ${bfs}"
+    cmd+=" --error ${error}"
+    cmd+=" --fiterr ${fiterr}"
 fi
-if $mvlr; then
-    cmd+=" --mvlr"
-    cmd+=" --fitsig ${fitsig}"
-fi
-if [ "x${step}" != "x1" -a "x${step}" != "x3" ]; then
+if [ $nperm -gt "0" ]; then
     cmd+=" --nperm ${nperm}"
     if [ ! -z "${seed}$" ]; then
 	cmd+=" --seed ${seed}"
     fi
     cmd+=" --trick ${trick}"
     cmd+=" --tricut ${trickCutoff}"
-    cmd+=" --permsep ${permsep}"
-    if [ "x${step}" == "x4" -o "x${step}" == "x5" ]; then
+    if [ $permsep != "0" ]; then
+	cmd+=" --permsep ${permsep}"
+    fi
+    if [ "x${pbf}" != "xnone" ]; then
 	cmd+=" --pbf ${pbf}"
 	if $maxbf; then
 	    cmd+=" --maxbf"

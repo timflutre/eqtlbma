@@ -90,9 +90,9 @@ function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz \
-	-p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 \
-	-o obs_eqtlbma --outss --outraw --step 3 --bfs all \
+    $pathToEqtlBma --geno list_genotypes.txt --scoord snp_coords.bed.gz \
+	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
+	--out obs_eqtlbma --outss --outraw --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
 	-v 1 >& stdout_eqtlbma
@@ -108,7 +108,7 @@ function comp_obs_vs_exp () {
     # if [ ! $nbDiffs -eq 0 ]; then
 	if ! zcmp -s obs_eqtlbma_sumstats_s${i}.txt.gz exp_eqtlbma_sumstats_s${i}.txt.gz; then
 	    echo "file 'obs_eqtlbma_sumstats_s${i}.txt.gz' has differences with exp"
-		exit 1
+	    exit 1
 	fi
     done
     

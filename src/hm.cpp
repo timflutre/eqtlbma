@@ -1,4 +1,4 @@
-/** \file hm.cc
+/** \file hm.cpp
  *
  *  `hm' implements the EM algorithm to learn the hierarchical model from eQtlBma.
  *  Copyright (C) 2012-2013 Xiaoquan Wen
@@ -15,20 +15,23 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- *  g++ -Wall -Wextra -g utils.cpp hm_methods.cpp hm.cpp -lz -lgsl -lgslcblas -o hm
  */
 
-#include "hm_classes.h"
+#include <cmath>
+#include <cstring>
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <string.h>
-#include <math.h>
+using namespace std;
+
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
-#include "utils.h"
+#include "quantgen/utils_io.hpp"
+using namespace quantgen;
+
+#include "hm_classes.h"
 
 
 void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
@@ -688,6 +691,7 @@ void eQTL_controller::print_result(){
   for(size_t i=0;i<geqVec.size();i++)
     geqVec[i].print_result();
 }
+
 
 
 int main(int argc, char **argv)

@@ -23,8 +23,10 @@ sink(file=stdout(), type="message")
 parseArgs <- function(){
   params <- list(verbose=1,
                  dir.name=NULL,
-                 rmvGenesFromSbgrps=FALSE,
-                 withCovars=FALSE)
+                 rmvGenesFromSbgrp=FALSE,
+                 withCovars=FALSE,
+                 mvlr=FALSE,
+                 rmvIndsFromSbgrp=FALSE)
   
   args <- commandArgs(trailingOnly=TRUE)
   ## print(args)
@@ -36,18 +38,34 @@ parseArgs <- function(){
     else if(args[i] == "--dir")
       params$dir.name <- args[i+1]
     else if(args[i] == "--rgs")
-      params$rmvGenesFromSbgrps <- TRUE
+      params$rmvGenesFromSbgrp <- TRUE
     else if(args[i] == "--cvrt")
       params$withCovars <- TRUE
+    else if(args[i] == "--mvlr")
+      params$mvlr <- TRUE
+    else if(args[i] == "--ris")
+      params$rmvIndsFromSbgrp <- TRUE
   }
   if(params$verbose > 1)
     print(params)
+  
+  if(params$mvlr || params$rmvIndsFromSbgrp)
+    suppressPackageStartupMessages(require(MASS)) # for ginv()
   
   return(params)
 }
 
 ##-----------------------------------------------------------------------------
 ## list of functions
+
+print.mat2 <- function(mat, a, b){
+  for(i in 1:min(a, nrow(mat))){
+    for(j in 1:min(b, ncol(mat))){
+      cat(sprintf("%.6e  ", mat[i,j]))
+    }
+    cat("\n")
+  }
+}
 
 getGrid <- function(grid.type="general", no.het=FALSE){
   oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
@@ -108,15 +126,16 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
   }
 }
 
-getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
+getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
+                             verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
-
+  
   params <- list()
   params$seed <- 1859
   set.seed(params$seed)
   
-  nb.inds <- 500
+  nb.inds <- 500 # don't change, see rmvIndsFromSbgrp
   inds <- data.frame(id=paste0("ind", 1:nb.inds),
                      name=paste0("individual ", 1:nb.inds),
                      stringsAsFactors=FALSE)
@@ -247,7 +266,7 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
   }
   
   ## rmv gene9 in s3
-  if(rmvGenesFromSbgrps){
+  if(rmvGenesFromSbgrp){
     phenos[["s3"]] <- phenos[["s3"]][-9,]
     tmp <- truth
     tmp[tmp$gene == "gene9", "config"] <-
@@ -256,6 +275,10 @@ getSimulatedData <- function(rmvGenesFromSbgrps=FALSE, verbose=0){
     tmp[tmp$gene == "gene9", c("mu3", "b3", "sigma3")] <- NA
     truth <- tmp
   }
+  
+  ## rmv 250 inds from s3
+  if(rmvIndsFromSbgrp)
+    phenos[["s3"]] <- phenos[["s3"]][,1:250]
   
   return(list(inds=inds,
               gene.coords=gene.coords,
@@ -320,8 +343,10 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
 }
 
 ## Calculate the summary statistics in each tissue
-calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
+calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE, verbose=0){
   stopifnot(! is.null(data))
+  if(verbose > 0)
+    message("calculate the summary statistics in each tissue ...")
   sstats <- lapply(data$phenos, function(x){
     tmp <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
                       pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
@@ -340,22 +365,25 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE){
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
+      if(verbose > 0)
+        message(paste(data$gene.coords$id[g], data$snp.coords$id[p]))
       i <- i + 1
       gene <- data$gene.coords$id[g]
       for(s in 1:length(data$phenos)){
         sstats[[s]]$gene[i] <- gene
         sstats[[s]]$snp[i] <- data$snp.coords$id[p]
         sstats[[s]]$maf[i] <- sum(as.numeric(data$geno.counts[p,])) /
-          (2 * length(data$phenos[[s]][g,]))
+          (2 * length(as.numeric(data$geno.counts[p,])))
         if(gene %in% rownames(data$phenos[[s]])){
           sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
+          common.inds.idx <- which(data$inds$id %in% colnames(data$phenos[[s]]))
           if(! (withCovars && "sex" %in% names(data$inds))){
-            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
-                              as.numeric(data$geno.counts[p,])))
+            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                              as.numeric(data$geno.counts[p,common.inds.idx])))
           } else
-            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,]) ~
-                              as.numeric(data$geno.counts[p,]) +
-                              as.numeric(data$inds$sex)))
+            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                              as.numeric(data$geno.counts[p,common.inds.idx]) +
+                              as.numeric(data$inds$sex[common.inds.idx])))
           sstats[[s]]$pve[i] <- tmp$r.squared
           sstats[[s]]$sigmahat[i] <- tmp$sigma
           sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
@@ -413,7 +441,7 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
   return(std.sstats.corr)
 }
 
-## Calculate the log10(ABF) of Wen & Stephens
+## Calculate the log10(ABF) of Wen & Stephens (arXiv 2011)
 calcL10Abf <- function(sstats, phi2, oma2){
   l10abf <- NA
   
@@ -511,9 +539,445 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
   return(l10abfs)
 }
 
+print.mat <- function(mat){
+  a <- nrow(mat)
+  b <- ncol(mat)
+  for(i in 1:a){
+    for(j in 1:b){
+      cat(sprintf("%e  ", mat[i,j]))
+    }
+    cat("\n")
+  }
+}
+
+## Return the log10(ABF) from Wen (arXiv 2012)
+## using raw data or summary statistics
+##
+## betag.hat is a vector [SNP 1 in all tissues, SNP 2 in all tissues, etc]
+## Vg is a matrix (covariance of betag.hat)
+calcL10AbfMvlr <- function(Y=NULL, Xg=NULL, Xc=NULL,
+                           betag.hat=NULL, Sigma.hat=NULL, Vg=NULL,
+                           gamma, phi2, oma2, alpha, model="ES", debug=FALSE){
+  require(MASS)
+  if((is.null(Y) || is.null(Xg) || is.null(Xc)) &&
+     (is.null(betag.hat) || is.null(Sigma.hat) || is.null(Vg)))
+    stop("need to provide Y, Xg and Xc, or betag.hat, Sigma.hat and Vg")
+  if(alpha != 0.0)
+    warning("the small sample correction is not performed")
+  if(debug){message(paste0("phi2=",phi2," oma2=",oma2))}
+  
+  S <- ifelse(!is.null(Y), ncol(Y), ncol(Vg)) # nb of subgroups
+  W <- matrix(rep(oma2,S*S),S,S) + diag(rep(phi2,S),S,S)
+  if(debug){message("W="); print.mat2(W, 4, 4)}
+  P <- ifelse(!is.null(Xg), ncol(Xg), length(betag.hat)/S) # nb of snps
+  Wg <- diag(rep(1,P)) %x% W
+  Wg <- Wg * (gamma %*% t(gamma))
+  if(debug){message("W="); print.mat2(W, 4, 4)}
+  
+  # inputs are raw data
+  if(! is.null(Y) && ! is.null(Xg) && ! is.null(Xc)){
+    ## add intercept
+    if(ncol(Xc) == 0){
+      Xc <- matrix(1, nrow=nrow(Xg), ncol=1)
+    } else
+      Xc <- matrix(cbind(1,Xc), nrow=nrow(Xg), ncol=ncol(Xc)+1)
+    X <- cbind(Xc, Xg)
+    
+    N <- dim(Y)[1] # nb of individuals
+    Q <- dim(Xc)[2] # nb of other covariates + intercept
+    m <- Q+S+1 # degrees of freedom for the Wishart
+    if(debug){message(paste0("N=",N," P=",P," S=",S," Q=",Q," m=",m))}
+    
+    Sigma.hat.full <- (t(Y)%*%(diag(rep(1,N)) - X%*%ginv(t(X)%*%X)%*%t(X))%*%Y + diag(rep(1e-8,S),S,S)) / (N+m-Q-S-1)
+    Sigma.hat.null <- (t(Y)%*%(diag(rep(1,N)) - Xc%*%solve(t(Xc)%*%Xc)%*%t(Xc))%*%Y + diag(rep(1e-8,S),S,S)) / (N+m-Q-S-1)
+    if(debug){message("Sigma.hat.full="); print.mat(Sigma.hat.full)}
+    if(debug){message("Sigma.hat.null="); print.mat(Sigma.hat.null)}
+    
+    Sigma.hat <- alpha*Sigma.hat.full + (1-alpha)*Sigma.hat.null
+    Sigma.hat.inv <- solve(Sigma.hat)
+    if(debug){message("Sigma.hat="); print.mat(Sigma.hat)}
+    
+    Vg.inv <- (t(Xg)%*%Xg - t(Xg)%*%Xc%*%solve(t(Xc)%*%Xc)%*%t(Xc)%*%Xg) %x% Sigma.hat.inv
+    
+    vec <- matrix(as.vector(t(Y-Xc%*%solve(t(Xc)%*%Xc)%*%t(Xc)%*%Y)), ncol=1)
+    
+    bVi <- t(vec) %*% (Xg %x% Sigma.hat.inv)
+  } else{ # inputs are summary stats
+    Vg.inv <- solve(Vg)
+    if(debug){message("Vg.inv="); print.mat(Vg.inv)}
+    bVi <- t(betag.hat) %*% Vg.inv
+    if(debug){message("bVi="); print.mat(bVi)}
+  }
+  
+  if(model == "ES"){
+    if(nrow(Sigma.hat) == 1 && ncol(Sigma.hat)){
+      Wg <- matrix(Sigma.hat,1,1)^.5 %*% Wg %*% matrix(Sigma.hat,1,1)^.5
+    } else
+      Wg <- diag(diag(Sigma.hat))^.5 %*% Wg %*% diag(diag(Sigma.hat))^.5
+  }
+  if(debug){message("Wg="); print.mat(Wg)}
+  
+  ivw <- diag(rep(1,P*S)) + Vg.inv %*% Wg
+  if(debug){message("ivw="); print.mat(ivw)}
+  
+  if(debug){message(paste0("det=",determinant(ivw)$modulus[[1]]))}
+  
+  l10abf <- (- 0.5 * determinant(ivw)$modulus[[1]] +
+             0.5 * bVi %*% Wg %*% solve(ivw) %*% t(bVi)) /
+               log(10)
+  if(debug){message(paste0("l10abf=",l10abf))}
+  
+  return(l10abf)
+}
+
+calcL10AbfsRawConstGridLMvlr <- function(data, g, p, gridL, prop.fit.sigma){
+  l10abfs <- matrix(data=NA, nrow=3, ncol=nrow(gridL))
+  rownames(l10abfs) <- c("gen", "gen-fix", "gen-maxh")
+  
+  Y <- matrix(do.call(cbind, lapply(data$phenos, function(X){X[g,]})),
+              nrow=nrow(data$inds), ncol=length(data$phenos))
+  Xg <- matrix(data$geno.counts[p,], nrow=nrow(data$inds), ncol=1)
+  Xc <- matrix(nrow=0, ncol=0)
+  gamma <- matrix(rep(1, ncol(Y)), ncol=1)
+  
+  for(i in 1:nrow(gridL)){
+    l10abfs[1,i] <- calcL10AbfMvlr(Y=Y, Xg=Xg, Xc=Xc, gamma=gamma,
+                                   phi2=gridL[i,"phi2"], oma2=gridL[i,"oma2"],
+                                   alpha=prop.fit.sigma)
+    l10abfs[2,i] <- calcL10AbfMvlr(Y=Y, Xg=Xg, Xc=Xc, gamma=gamma,
+                                   phi2=0, oma2=gridL[i,"phi2"] + gridL[i,"oma2"],
+                                   alpha=prop.fit.sigma)
+    l10abfs[3,i] <- calcL10AbfMvlr(Y=Y, Xg=Xg, Xc=Xc, gamma=gamma,
+                                   phi2=gridL[i,"phi2"] + gridL[i,"oma2"], oma2=0,
+                                   alpha=prop.fit.sigma)
+  }
+  
+  return(l10abfs)
+}
+
+calcL10AbfsRawAllGridSMvlr <- function(data, g, p, gridS, configs,
+                                       prop.fit.sigma){
+  l10abfs <- matrix(data=NA, nrow=nrow(configs)-1, ncol=nrow(gridS))
+  rownames(l10abfs) <- c("1", "2", "3", "1-2", "1-3", "2-3", "1-2-3")
+  
+  Y <- matrix(do.call(cbind, lapply(data$phenos, function(X){X[g,]})),
+              nrow=nrow(data$inds), ncol=length(data$phenos))
+  Xg <- matrix(data$geno.counts[p,], nrow=nrow(data$inds), ncol=1)
+  Xc <- matrix(nrow=0, ncol=0)
+  
+  for(config in rownames(l10abfs)){
+    gamma <- rep(0, ncol(Y))
+    gamma[as.numeric(strsplit(config, "-")[[1]])] <- 1
+    gamma <- matrix(gamma, ncol=1)
+    for(i in 1:nrow(gridS))
+      l10abfs[config,i] <- calcL10AbfMvlr(Y=Y, Xg=Xg, Xc=Xc, gamma=gamma,
+                                          phi2=gridS[i,"phi2"],
+                                          oma2=gridS[i,"oma2"],
+                                          alpha=prop.fit.sigma)
+  }
+  
+  return(l10abfs)
+}
+
+calcBetahatsAndDiagsPerSubgroup <- function(y, Xg, Xc, alpha=0.0, verbose=0){
+  stopifnot(is.list(y), is.list(Xg), is.list(Xc))
+  
+  S <- length(y) # nb of subgroups
+  
+  tmp <- lapply(1:S, function(s){
+    Y <- y[[s]] # N x 1
+    N <- nrow(Y)
+    
+    ## add intercept
+    if(ncol(Xc[[s]]) == 0){
+      Xc[[s]] <- matrix(1, nrow=N, ncol=1)
+    } else
+      Xc[[s]] <- matrix(cbind(1,Xc[[s]]), nrow=N, ncol=ncol(Xc[[s]])+1)
+    Q <- ncol(Xc[[s]])
+    X <- cbind(Xc[[s]], Xg[[s]]) # N x (Q+P) where P=1 (single SNP)
+    idx.geno <- ncol(X) # index of column corresponding to genotype
+    
+    if(verbose > 0){message("MLE of full model")}
+    X.svd <- svd(X) # X = U D V'
+    if(length(X.svd$d) > 1){
+      D.inv <- diag(1/X.svd$d)
+    } else
+      D.inv <- diag(1/X.svd$d,1,1)
+    X.ps <- X.svd$v %*% D.inv %*% t(X.svd$u) # pseudo-inverse
+    B.hat.full <- X.ps %*% Y
+    E.hat <- Y - X %*% B.hat.full # residuals
+    sigma2.hat.full <- ((1/N) * t(E.hat) %*% E.hat)[1,1]
+    if(verbose > 0){message(paste0("sigma2.hat.full=",sigma2.hat.full))}
+    
+    if(verbose > 0){message("MLE of null model")}
+    Xc.svd <- svd(Xc[[s]])
+    if(length(Xc.svd$d) > 1){
+      Dc.inv <- diag(1/Xc.svd$d)
+    } else
+      Dc.inv <- diag(1/Xc.svd$d,1,1)
+    Xc.ps <- Xc.svd$v %*% Dc.inv %*% t(Xc.svd$u)
+    B.hat.null <- Xc.ps %*% Y
+    E.hat <- Y - Xc[[s]] %*% B.hat.null
+    sigma2.hat.null <- ((1/N) * t(E.hat) %*% E.hat)[1,1]
+    if(verbose > 0){message(paste0("sigma2.hat.null=",sigma2.hat.null))}
+    
+    ## final estimates
+    betag.hat <- B.hat.full[idx.geno,1]
+    sigma2.hat <- alpha*sigma2.hat.full + (1-alpha)*sigma2.hat.null
+    varbetag.hat <- (sigma2.hat * X.svd$v %*% D.inv^2 %*% t(X.svd$v))[idx.geno,idx.geno]
+    
+    return(list(betag.hat=betag.hat,
+                sigma2.hat=sigma2.hat,
+                varbetag.hat=varbetag.hat))
+  })
+  
+  return(list(betag.hat=do.call(c, lapply(tmp, function(x){x$betag.hat})),
+              sigma2.hat=do.call(c, lapply(tmp, function(x){x$sigma2.hat})),
+              varbetag.hat=do.call(c, lapply(tmp, function(x){x$varbetag.hat}))))
+}
+
+## in subgroup s: A = (Xc'Xc + Xu'Xu)^(-1) %*% Xc'
+getMatricesA <- function(inds, X, s1, s2, verbose=0){
+  A <- list()
+  
+  inds.com.s1s2 <- inds[[s1]][which(inds[[s1]] %in% inds[[s2]])]
+  Xs1s2 <- X[[s1]][inds.com.s1s2,]
+  tXs1s2.Xs1s2 <- t(Xs1s2) %*% Xs1s2
+  
+  inds.uniq.s1 <- inds[[s1]][which(! inds[[s1]] %in% inds[[s2]])]
+  if(length(inds.uniq.s1) == 0){
+    A[["s1"]] <- solve(tXs1s2.Xs1s2) %*% t(Xs1s2)
+  } else{
+    Xu.s1 <- X[[s1]][inds.uniq.s1,]
+    A[["s1"]] <- solve(tXs1s2.Xs1s2 + t(Xu.s1) %*% Xu.s1) %*% t(Xs1s2)
+  }
+  
+  inds.uniq.s2 <- inds[[s2]][which(! inds[[s2]] %in% inds[[s1]])]
+  if(length(inds.uniq.s2) == 0){
+    A[["s2"]] <- solve(tXs1s2.Xs1s2) %*% t(Xs1s2)
+  } else{
+    Xu.s2 <- X[[s2]][inds.uniq.s2,]
+    A[["s2"]] <- solve(tXs1s2.Xs1s2 + t(Xu.s2) %*% Xu.s2) %*% t(Xs1s2)
+  }
+  
+  return(A)
+}
+
+## warning, no small sample correction
+getErrCovSigmaBtwPairSubgroups <- function(inds, X, y, s1, s2){
+  Sigma <- list()
+  
+  inds.com.s1s2 <- inds[[s1]][which(inds[[s1]] %in% inds[[s2]])]
+  N.s1s2 <- length(inds.com.s1s2)
+  Y.s1s2 <- cbind(y[[s1]][inds.com.s1s2,], y[[s2]][inds.com.s1s2,])
+  X.s1s2 <- X[[s1]][inds.com.s1s2,]
+  Xc.s1s2 <- X.s1s2[,-2]
+  
+  X.s1s2.svd <- svd(X.s1s2)
+  Bhat.full <- X.s1s2.svd$v %*% diag(1/X.s1s2.svd$d) %*% t(X.s1s2.svd$u) %*% Y.s1s2
+  Sigma[["full"]] <- (1/N.s1s2) * t(Y.s1s2 - X.s1s2 %*% Bhat.full) %*% (Y.s1s2 - X.s1s2 %*% Bhat.full)
+  
+  Xc.s1s2.svd <- svd(Xc.s1s2)
+  if(length(Xc.s1s2.svd$d) > 1){
+    Dc.s1s2.inv <- diag(1/Xc.s1s2.svd$d)
+  } else
+    Dc.s1s2.inv <- diag(1/Xc.s1s2.svd$d,1,1)
+  Bhat.null <- Xc.s1s2.svd$v %*% Dc.s1s2.inv %*% t(Xc.s1s2.svd$u) %*% Y.s1s2
+  Sigma[["null"]] <- (1/N.s1s2) * t(Y.s1s2 - Xc.s1s2 %*% Bhat.null) %*% (Y.s1s2 - Xc.s1s2 %*% Bhat.null)
+  
+  return(Sigma)
+}
+
+calcOffDiagCovarsFromPairsOfSubgroups <- function(y, Xg, Xc, sigma2.hat,
+                                                  varbetag.hat, alpha=0.0,
+                                                  verbose=0){
+  stopifnot(is.list(y), is.list(Xg), is.list(Xc), is.vector(sigma2.hat),
+            is.vector(varbetag.hat))
+  
+  S <- length(y) # nb of subgroups
+  Sigma.hat <- matrix(0, nrow=S, ncol=S)
+  diag(Sigma.hat) <- sigma2.hat
+  Vg <- matrix(0, nrow=S, ncol=S)
+  diag(Vg) <- varbetag.hat
+  
+  inds <- lapply(y, rownames)
+  
+  X <- lapply(1:S, function(s){
+    if(ncol(Xc[[s]]) == 0){
+      tmp <- matrix(cbind(1, Xg[[s]]), nrow=nrow(Xg[[s]]), ncol=2)
+    } else
+      tmp <- matrix(cbind(1,Xg[[s]],Xc[[s]]), nrow=nrow(Xg[[s]]), ncol=ncol(Xc[[s]])+2)
+    rownames(tmp) <- rownames(Xg[[s]])
+    tmp
+  })
+  
+  ## for each pair of subgroups, get the covariance between residuals
+  ## and between genotype betahats
+  for(s1 in 1:(S-1)){
+    for(s2 in (s1+1):S){
+      ## message(paste0("s1=",s1," s2=",s2))
+      A <- getMatricesA(inds, X, s1, s2)
+      ## message("A_s1=")
+      ## print.mat(A[["s1"]][,1:4])
+      ## message("A_s2=")
+      ## print.mat(A[["s2"]][,1:4])
+      
+      Sigmas.s1s2.hat <- getErrCovSigmaBtwPairSubgroups(inds, X, y, s1, s2)
+      ## message("Sigma_full")
+      ## print.mat(Sigmas.s1s2.hat[["full"]])
+      ## message("Sigma_null")
+      ## print.mat(Sigmas.s1s2.hat[["null"]])
+      
+      Sigma.s1s2.hat <- alpha * Sigmas.s1s2.hat[["full"]] +
+        (1-alpha) * Sigmas.s1s2.hat[["null"]]
+      Sigma.hat[s1,s2] <- Sigma.s1s2.hat[1,2]
+      
+      cov.betahat1.betahat2 <- Sigma.hat[s1,s2] * A[["s1"]] %*% t(A[["s2"]])
+      ## message("cov.betahat1.betahat2")
+      ## print.mat2(cov.betahat1.betahat2, 4, 4)
+      Vg[s1,s2] <- cov.betahat1.betahat2[2,2]
+      
+      ## message("Sigma.hat="); print(Sigma.hat)
+      ## message("Vg="); print(Vg)
+    }
+  }
+  
+  ## fill the lower part of each symmetric matrix
+  Sigma.hat <- Sigma.hat + t(Sigma.hat) - diag(diag(Sigma.hat))
+  Vg <- Vg + t(Vg) - diag(diag(Vg))
+  
+  return(list(Sigma.hat=Sigma.hat, Vg=Vg))
+}
+
+calcSstatsBoth <- function(data, g, p, prop.fit.sigma){
+  S <- length(data$phenos)
+  
+  ## prepare raw data for each subgroup
+  y <- lapply(1:S, function(s){
+    tmp <- matrix(data$phenos[[s]][g,], ncol=1)
+    rownames(tmp) <- colnames(data$phenos[[s]])
+    tmp
+  })
+  Xg <- lapply(1:S, function(s){
+    tmp <- matrix(data$geno.counts[p,colnames(data$phenos[[s]])], ncol=1)
+    rownames(tmp) <- colnames(data$phenos[[s]])
+    tmp
+  })
+  Xc <- lapply(1:S, function(s){
+    matrix(nrow=0, ncol=0)
+  })
+  
+  ## for each subgroup separately, calc betag.hat, diag of Vg
+  ## and diags of Sigma.hat.full and Sigma.hat.null
+  sstats.uvlr <- calcBetahatsAndDiagsPerSubgroup(
+    y=y, Xg=Xg, Xc=Xc, alpha=prop.fit.sigma, verbose=0)
+  if(data$gene.coords$id[g] == "gene1" && data$snp.coords$id[p] == "snp1"){
+    message(paste0("gene1-snp1:",
+                   " sigma2hat.s1=", sprintf("%.6e", sstats.uvlr$sigma2.hat[1]),
+                   " betag.hat.s1=", sprintf("%.6e", sstats.uvlr$betag.hat[1]),
+                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[1]), ")",
+                   " sigma2hat.s2=", sprintf("%.6e", sstats.uvlr$sigma2.hat[2]),
+                   " betag.hat.s2=", sprintf("%.6e", sstats.uvlr$betag.hat[2]),
+                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[2]), ")",
+                   " sigma2hat.s3=", sprintf("%.6e", sstats.uvlr$sigma2.hat[3]),
+                   " betag.hat.s3=", sprintf("%.6e", sstats.uvlr$betag.hat[3]),
+                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[3]), ")"))
+  }
+  
+  ## for common individuals between each pair of subgroups,
+  ## calc each off-diagonal element of Vg as well as both Sigma's
+  sstats.mvlr <- calcOffDiagCovarsFromPairsOfSubgroups(
+    y=y, Xg=Xg, Xc=Xc, sigma2.hat=sstats.uvlr$sigma2.hat,
+    varbetag.hat=sstats.uvlr$varbetag.hat, alpha=prop.fit.sigma, verbose=0)
+  if(data$gene.coords$id[g] == "gene1" && data$snp.coords$id[p] == "snp1"){
+    message("gene1-snp1:")
+    message("Sigma.hat=")
+    print.mat(sstats.mvlr$Sigma.hat)
+    message("Vg=")
+    print.mat(sstats.mvlr$Vg)
+  }
+  
+  return(list(betag.hat=sstats.uvlr$betag.hat,
+              Sigma.hat=sstats.mvlr$Sigma.hat,
+              Vg=sstats.mvlr$Vg))
+}
+
+calcL10AbfsRawConstGridLFromSstats <- function(sstats.both, gridL,
+                                               prop.fit.sigma,
+                                               debug=FALSE){
+  l10abfs <- matrix(data=NA, nrow=3, ncol=nrow(gridL))
+  rownames(l10abfs) <- c("gen", "gen-fix", "gen-maxh")
+  
+  S <- length(sstats.both$betag.hat)
+  gamma <- matrix(rep(1, S), ncol=1)
+  
+  for(i in 1:nrow(gridL)){
+    l10abfs[1,i] <- calcL10AbfMvlr(betag.hat=sstats.both$betag.hat,
+                                   Sigma.hat=sstats.both$Sigma.hat,
+                                   Vg=sstats.both$Vg,
+                                   gamma=gamma,
+                                   phi2=gridL[i,"phi2"],
+                                   oma2=gridL[i,"oma2"],
+                                   alpha=prop.fit.sigma)
+    l10abfs[2,i] <- calcL10AbfMvlr(betag.hat=sstats.both$betag.hat,
+                                   Sigma.hat=sstats.both$Sigma.hat,
+                                   Vg=sstats.both$Vg,
+                                   gamma=gamma,
+                                   phi2=0,
+                                   oma2=gridL[i,"phi2"] + gridL[i,"oma2"],
+                                   alpha=prop.fit.sigma)
+    l10abfs[3,i] <- calcL10AbfMvlr(betag.hat=sstats.both$betag.hat,
+                                   Sigma.hat=sstats.both$Sigma.hat,
+                                   Vg=sstats.both$Vg,
+                                   gamma=gamma,
+                                   phi2=gridL[i,"phi2"] + gridL[i,"oma2"],
+                                   oma2=0,
+                                   alpha=prop.fit.sigma)
+  }
+
+  if(debug)
+    tmp <- calcL10AbfMvlr(betag.hat=sstats.both$betag.hat,
+                          Sigma.hat=sstats.both$Sigma.hat,
+                          Vg=sstats.both$Vg,
+                          gamma=gamma,
+                          phi2=0.0075,
+                          oma2=0.0025,
+                          alpha=prop.fit.sigma,
+                          debug=TRUE)
+  
+  return(l10abfs)
+}
+
+calcL10AbfsRawAllGridSFromSstats <- function(sstats.both, gridS, configs,
+                                             prop.fit.sigma){
+  l10abfs <- matrix(data=NA, nrow=nrow(configs)-1, ncol=nrow(gridS))
+  rownames(l10abfs) <- c("1", "2", "3", "1-2", "1-3", "2-3", "1-2-3")
+  
+  S <- length(sstats.both$betag.hat)
+  
+  for(config in rownames(l10abfs)){
+    gamma <- rep(0, S)
+    gamma[as.numeric(strsplit(config, "-")[[1]])] <- 1
+    gamma <- matrix(gamma, ncol=1)
+    for(i in 1:nrow(gridS))
+      l10abfs[config,i] <- calcL10AbfMvlr(betag.hat=sstats.both$betag.hat,
+                                          Sigma.hat=sstats.both$Sigma.hat,
+                                          Vg=sstats.both$Vg,
+                                          gamma=gamma,
+                                          phi2=gridS[i,"phi2"],
+                                          oma2=gridS[i,"oma2"],
+                                          alpha=prop.fit.sigma)
+  }
+  
+  return(l10abfs)
+}
+
 calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
-                                       withCovars=FALSE){
+                                       withCovars=FALSE, mvlr=FALSE,
+                                       rmvIndsFromSbgrp=FALSE, verbose=0){
   stopifnot(! is.null(data), ! is.null(sstats), ! is.null(grids))
+  if(verbose > 0)
+    message("calculate raw ABFs ...")
   l10abfs.raw <- data.frame(gene=rep(NA, 10*data$params$nb.pairs),
                             snp=NA, config=NA)
   for(i in 1:nrow(grids$gridL)){
@@ -527,14 +991,35 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
+      isAbsentInSbgrp <- do.call(c, lapply(data$phenos, function(X){
+        ! data$gene.coords$id[g] %in% rownames(X)}))
+      if(mvlr && any(isAbsentInSbgrp))
+        next # gene unexpressed in some subgroups
       nbCovars <- 0
-      if (withCovars && "sex" %in% names(data$inds))
+      if(withCovars && "sex" %in% names(data$inds))
         nbCovars <-  1
-      std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats, g, p,
-                                                            nbCovars)
-      
-      l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridL(std.sstats.corr,
-                                                          grids$gridL)
+      if(! mvlr && ! rmvIndsFromSbgrp){
+        std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats, g, p,
+                                                              nbCovars)
+        l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridL(std.sstats.corr,
+                                                            grids$gridL)
+        l10abfs.raw.all.gridS <- calcL10AbfsRawAllGridS(std.sstats.corr,
+                                                        grids$gridS,
+                                                        data$configs)
+      } else if(mvlr && ! rmvIndsFromSbgrp){
+        l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridLMvlr(data, g, p,
+                                                                grids$gridL,
+                                                                0.0)
+        l10abfs.raw.all.gridS <- calcL10AbfsRawAllGridSMvlr(data, g, p,
+                                                            grids$gridS,
+                                                            data$configs, 0.0)
+      } else{
+        sstats.both <- calcSstatsBoth(data, g, p, 0.0)
+        l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridLFromSstats(
+          sstats.both, grids$gridL, 0.0, debug=ifelse(data$gene.coords$id[g] == "gene1" && data$snp.coords$id[p] == "snp1", TRUE, FALSE))
+        l10abfs.raw.all.gridS <- calcL10AbfsRawAllGridSFromSstats(
+          sstats.both, grids$gridS, data$configs, 0.0)
+      }
       for(m in 1:nrow(l10abfs.raw.const.gridL)){
         l10abfs.raw$gene[i] <- data$gene.coords$id[g]
         l10abfs.raw$snp[i] <- data$snp.coords$id[p]
@@ -542,10 +1027,6 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
         l10abfs.raw[i,-c(1:3)] <- l10abfs.raw.const.gridL[m,]
         i <- i + 1
       }
-      
-      l10abfs.raw.all.gridS <- calcL10AbfsRawAllGridS(std.sstats.corr,
-                                                      grids$gridS,
-                                                      data$configs)
       for(m in 1:nrow(l10abfs.raw.all.gridS)){
         l10abfs.raw$gene[i] <- data$gene.coords$id[g]
         l10abfs.raw$snp[i] <- data$snp.coords$id[p]
@@ -576,7 +1057,6 @@ calcAvgAbfsSinAndGenSin <- function(l10abfs.avg, i){
       weights <- c(weights, (1/2)*(1/choose(3,1)))
     }
   }
-  l10abfs.avg$l10abf.sin[i] <- log10WeightedSum(tmp)
   
   tmp <- c(tmp, l10abfs.avg$l10abf.gen[i])
   weights <- c(weights, (1/2))
@@ -599,12 +1079,15 @@ calcAvgAbfAll <- function(l10abfs.avg, i, configs){
   return(l10abfs.avg)
 }
 
-calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
+calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
+                                       rmvIndsFromSbgrp=FALSE, verbose=0){
   stopifnot(! is.null(data), ! is.null(l10abfs.raw))
+  if(verbose > 0)
+    message("calculate average ABFs ...")
   l10abfs.avg <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA,
                             nb.subgroups=NA, nb.samples=NA)
   for(i in c("l10abf.gen", "l10abf.gen.fix", "l10abf.gen.maxh",
-             "l10abf.sin", "l10abf.gen.sin", "l10abf.all")){
+             "l10abf.gen.sin", "l10abf.all")){
     l10abfs.avg <- cbind(l10abfs.avg, NA)
     colnames(l10abfs.avg)[ncol(l10abfs.avg)] <- i
   }
@@ -621,6 +1104,13 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
+      isAbsentInSbgrp <- do.call(c, lapply(data$phenos, function(X){
+        ! data$gene.coords$id[g] %in% rownames(X)}))
+      if(mvlr && any(isAbsentInSbgrp))
+        next # gene unexpressed in some subgroups
+      if(verbose > 0)
+        message(paste(data$gene.coords$id[g], data$snp.coords$id[p]))
+      
       l10abfs.avg$gene[i] <- data$gene.coords$id[g]
       l10abfs.avg$snp[i] <- data$snp.coords$id[p]
       l10abfs.avg$nb.subgroups[i] <- 0
@@ -666,16 +1156,19 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL){
 }
 
 getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
+                                      mvlr=FALSE, rmvIndsFromSbgrp=FALSE,
                                       verbose=0){
   stopifnot(! is.null(data), ! is.null(grids))
   if(verbose > 0)
     message("get results on simulated data with R ...")
   
-  sstats <- calcSstatsOnSimulatedData(data, withCovars)
+  sstats <- calcSstatsOnSimulatedData(data, withCovars, verbose-1)
   
-  l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars)
+  l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars,
+                                            mvlr, rmvIndsFromSbgrp, verbose-1)
   
-  l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw)
+  l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw, mvlr,
+                                            rmvIndsFromSbgrp, verbose-1)
   
   return(list(sstats=sstats,
               l10abfs.raw=l10abfs.raw,
@@ -697,7 +1190,7 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
       tmp <- cbind(tmp, sprintf(fmt="%.06e", res$sstats[[s]][row.ids,j]))
     colnames(tmp) <- colnames(res$sstats[[s]])[1:9]
     write.table(x=tmp, file=gzfile(paste0("exp_eqtlbma_sumstats_",s,".txt.gz")),
-                quote=FALSE, row.names=FALSE, sep=" ", na="nan")
+                quote=FALSE, row.names=FALSE, sep="\t", na="nan")
   }
   
   tmp <- res$l10abfs.raw[,1:3]
@@ -705,14 +1198,14 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.raw[,j])))
   colnames(tmp) <- colnames(res$l10abfs.raw)
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_raw.txt.gz"),
-              quote=FALSE, row.names=FALSE, sep=" ", na="nan")
+              quote=FALSE, row.names=FALSE, sep="\t", na="nan")
   
   tmp <- res$l10abfs.avg[,1:4]
   for(j in 5:ncol(res$l10abfs.avg))
     tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.avg[,j])))
   colnames(tmp) <- colnames(res$l10abfs.avg)
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_avg-grids.txt.gz"),
-              quote=FALSE, row.names=FALSE, sep=" ", na="nan")
+              quote=FALSE, row.names=FALSE, sep="\t", na="nan")
 }
 
 run <- function(){
@@ -720,11 +1213,13 @@ run <- function(){
   if(params$verbose > 0)
     message(paste0("START functional_tests.R (", date(), ")"))
   setwd(params$dir.name)
-  data <- getSimulatedData(params$rmvGenesFromSbgrps, params$verbose)
+  data <- getSimulatedData(params$rmvGenesFromSbgrp, params$rmvIndsFromSbgrp,
+                           params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$withCovars,
+                                   params$mvlr, params$rmvIndsFromSbgrp,
                                    params$verbose)
   writeResultsOnSimulatedData(res, params$verbose)
   if(params$verbose > 0)

@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch a functional test with genes absent in some subgroups
+# Aim: launch a functional test for eqtlbma with mvlr
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`${0##*/}' launches a functional test with genes absent in some subgroups.\n"
+    msg="\`${0##*/}' launches a functional test for eqtlbma with mvlr.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -32,7 +32,7 @@ function version () {
     echo -e "$msg"
 }
 
-# source http://www.linuxjournal.com/content/use-date-command-measure-elapsed-time
+# http://www.linuxjournal.com/content/use-date-command-measure-elapsed-time
 function timer () {
     if [[ $# -eq 0 ]]; then
         echo $(date '+%s')
@@ -83,7 +83,7 @@ function simul_data_and_calc_exp_res () {
 	echo "simulate data and calculate expected results ..."
     fi
     R --no-restore --no-save --slave --vanilla --file=${pathToRscript} \
-	--args --verbose 1 --dir $(pwd) --rgs >& stdout_simul_exp
+	--args --verbose 1 --dir $(pwd) --mvlr >& stdout_simul_exp
 }
 
 function calc_obs_res () {
@@ -95,6 +95,7 @@ function calc_obs_res () {
 	--out obs_eqtlbma --outss --outraw --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
+	--error mvlr --fiterr 0.0 \
 	-v 1 >& stdout_eqtlbma
 }
 
@@ -102,15 +103,6 @@ function comp_obs_vs_exp () {
     if [ $verbose -gt "0" ]; then
 	echo "compare obs vs exp results ..."
     fi
-    
-    for i in {1..3}; do
-    # nbDiffs=$(diff <(zcat obs_eqtlbma_sumstats_s${i}.txt.gz) <(zcat exp_eqtlbma_sumstats_s${i}.txt.gz) | wc -l)
-    # if [ ! $nbDiffs -eq 0 ]; then
-	if ! zcmp -s obs_eqtlbma_sumstats_s${i}.txt.gz exp_eqtlbma_sumstats_s${i}.txt.gz; then
-	    echo "file 'obs_eqtlbma_sumstats_s${i}.txt.gz' has differences with exp"
-		exit 1
-	fi
-    done
     
     if ! zcmp -s obs_eqtlbma_l10abfs_raw.txt.gz exp_eqtlbma_l10abfs_raw.txt.gz; then
     	echo "file 'obs_eqtlbma_l10abfs_raw.txt.gz' has differences with exp"

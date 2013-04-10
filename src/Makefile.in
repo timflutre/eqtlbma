@@ -61,13 +61,19 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_eqtlbma_OBJECTS = eqtlbma-eqtlbma.$(OBJEXT) eqtlbma-utils.$(OBJEXT) \
-	eqtlbma-MVLR.$(OBJEXT)
+am_eqtlbma_OBJECTS = eqtlbma-eqtlbma.$(OBJEXT)
 eqtlbma_OBJECTS = $(am_eqtlbma_OBJECTS)
-eqtlbma_LDADD = $(LDADD)
-am_hm_OBJECTS = hm.$(OBJEXT) hm_methods.$(OBJEXT) utils.$(OBJEXT)
+am__DEPENDENCIES_1 =
+eqtlbma_DEPENDENCIES = $(top_builddir)/src/quantgen/libquantgen.a \
+	$(am__DEPENDENCIES_1)
+eqtlbma_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(eqtlbma_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_hm_OBJECTS = hm-hm.$(OBJEXT) hm-hm_methods.$(OBJEXT)
 hm_OBJECTS = $(am_hm_OBJECTS)
-hm_LDADD = $(LDADD)
+hm_DEPENDENCIES = $(top_builddir)/src/quantgen/libquantgen.a \
+	$(am__DEPENDENCIES_1)
+hm_LINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(hm_LDFLAGS) $(LDFLAGS) \
+	-o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -142,7 +148,10 @@ CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_CXXFLAGS = -I$(top_srcdir)/src @AM_CXXFLAGS@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
+AM_LDFLAGS = @AM_LDFLAGS@
+AR = @AR@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -181,6 +190,7 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+RANLIB = @RANLIB@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
@@ -189,6 +199,7 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
+ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
 am__include = @am__include@
@@ -228,14 +239,18 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-eqtlbma_SOURCES = eqtlbma.cpp utils.h utils.cpp MVLR.h MVLR.cc
-eqtlbma_CPPFLAGS = -DEQTLBMA_MAIN -DLIB_MVLR #-pg
-#eqtlbma_LDFLAGS = -pg
-hm_SOURCES = hm.cpp hm_classes.h hm_methods.cpp utils.cpp
+eqtlbma_SOURCES = eqtlbma.cpp
+eqtlbma_CPPFLAGS = 
+eqtlbma_LDFLAGS = #-pg
+eqtlbma_LDADD = $(top_builddir)/src/quantgen/libquantgen.a $(AM_LDFLAGS)
+hm_SOURCES = hm.cpp hm_classes.h hm_methods.cpp
+hm_CPPFLAGS = 
+hm_LDFLAGS = #-pg
+hm_LDADD = $(top_builddir)/src/quantgen/libquantgen.a $(AM_LDFLAGS)
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .cc .cpp .o .obj
+.SUFFIXES: .cpp .o .obj
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -310,10 +325,10 @@ clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 eqtlbma$(EXEEXT): $(eqtlbma_OBJECTS) $(eqtlbma_DEPENDENCIES) $(EXTRA_eqtlbma_DEPENDENCIES) 
 	@rm -f eqtlbma$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(eqtlbma_OBJECTS) $(eqtlbma_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(eqtlbma_LINK) $(eqtlbma_OBJECTS) $(eqtlbma_LDADD) $(LIBS)
 hm$(EXEEXT): $(hm_OBJECTS) $(hm_DEPENDENCIES) $(EXTRA_hm_DEPENDENCIES) 
 	@rm -f hm$(EXEEXT)
-	$(AM_V_CXXLD)$(CXXLINK) $(hm_OBJECTS) $(hm_LDADD) $(LIBS)
+	$(AM_V_CXXLD)$(hm_LINK) $(hm_OBJECTS) $(hm_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -321,21 +336,18 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma-MVLR.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma-eqtlbma.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma-utils.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hm.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hm_methods.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hm-hm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hm-hm_methods.Po@am__quote@
 
-.cc.o:
+.cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
 
-.cc.obj:
+.cpp.obj:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
@@ -356,47 +368,33 @@ eqtlbma-eqtlbma.obj: eqtlbma.cpp
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma-eqtlbma.obj `if test -f 'eqtlbma.cpp'; then $(CYGPATH_W) 'eqtlbma.cpp'; else $(CYGPATH_W) '$(srcdir)/eqtlbma.cpp'; fi`
 
-eqtlbma-utils.o: utils.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma-utils.o -MD -MP -MF $(DEPDIR)/eqtlbma-utils.Tpo -c -o eqtlbma-utils.o `test -f 'utils.cpp' || echo '$(srcdir)/'`utils.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma-utils.Tpo $(DEPDIR)/eqtlbma-utils.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='utils.cpp' object='eqtlbma-utils.o' libtool=no @AMDEPBACKSLASH@
+hm-hm.o: hm.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hm-hm.o -MD -MP -MF $(DEPDIR)/hm-hm.Tpo -c -o hm-hm.o `test -f 'hm.cpp' || echo '$(srcdir)/'`hm.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hm-hm.Tpo $(DEPDIR)/hm-hm.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='hm.cpp' object='hm-hm.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma-utils.o `test -f 'utils.cpp' || echo '$(srcdir)/'`utils.cpp
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hm-hm.o `test -f 'hm.cpp' || echo '$(srcdir)/'`hm.cpp
 
-eqtlbma-utils.obj: utils.cpp
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma-utils.obj -MD -MP -MF $(DEPDIR)/eqtlbma-utils.Tpo -c -o eqtlbma-utils.obj `if test -f 'utils.cpp'; then $(CYGPATH_W) 'utils.cpp'; else $(CYGPATH_W) '$(srcdir)/utils.cpp'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma-utils.Tpo $(DEPDIR)/eqtlbma-utils.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='utils.cpp' object='eqtlbma-utils.obj' libtool=no @AMDEPBACKSLASH@
+hm-hm.obj: hm.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hm-hm.obj -MD -MP -MF $(DEPDIR)/hm-hm.Tpo -c -o hm-hm.obj `if test -f 'hm.cpp'; then $(CYGPATH_W) 'hm.cpp'; else $(CYGPATH_W) '$(srcdir)/hm.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hm-hm.Tpo $(DEPDIR)/hm-hm.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='hm.cpp' object='hm-hm.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma-utils.obj `if test -f 'utils.cpp'; then $(CYGPATH_W) 'utils.cpp'; else $(CYGPATH_W) '$(srcdir)/utils.cpp'; fi`
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hm-hm.obj `if test -f 'hm.cpp'; then $(CYGPATH_W) 'hm.cpp'; else $(CYGPATH_W) '$(srcdir)/hm.cpp'; fi`
 
-eqtlbma-MVLR.o: MVLR.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma-MVLR.o -MD -MP -MF $(DEPDIR)/eqtlbma-MVLR.Tpo -c -o eqtlbma-MVLR.o `test -f 'MVLR.cc' || echo '$(srcdir)/'`MVLR.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma-MVLR.Tpo $(DEPDIR)/eqtlbma-MVLR.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='MVLR.cc' object='eqtlbma-MVLR.o' libtool=no @AMDEPBACKSLASH@
+hm-hm_methods.o: hm_methods.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hm-hm_methods.o -MD -MP -MF $(DEPDIR)/hm-hm_methods.Tpo -c -o hm-hm_methods.o `test -f 'hm_methods.cpp' || echo '$(srcdir)/'`hm_methods.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hm-hm_methods.Tpo $(DEPDIR)/hm-hm_methods.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='hm_methods.cpp' object='hm-hm_methods.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma-MVLR.o `test -f 'MVLR.cc' || echo '$(srcdir)/'`MVLR.cc
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hm-hm_methods.o `test -f 'hm_methods.cpp' || echo '$(srcdir)/'`hm_methods.cpp
 
-eqtlbma-MVLR.obj: MVLR.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma-MVLR.obj -MD -MP -MF $(DEPDIR)/eqtlbma-MVLR.Tpo -c -o eqtlbma-MVLR.obj `if test -f 'MVLR.cc'; then $(CYGPATH_W) 'MVLR.cc'; else $(CYGPATH_W) '$(srcdir)/MVLR.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma-MVLR.Tpo $(DEPDIR)/eqtlbma-MVLR.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='MVLR.cc' object='eqtlbma-MVLR.obj' libtool=no @AMDEPBACKSLASH@
+hm-hm_methods.obj: hm_methods.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT hm-hm_methods.obj -MD -MP -MF $(DEPDIR)/hm-hm_methods.Tpo -c -o hm-hm_methods.obj `if test -f 'hm_methods.cpp'; then $(CYGPATH_W) 'hm_methods.cpp'; else $(CYGPATH_W) '$(srcdir)/hm_methods.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/hm-hm_methods.Tpo $(DEPDIR)/hm-hm_methods.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='hm_methods.cpp' object='hm-hm_methods.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma-MVLR.obj `if test -f 'MVLR.cc'; then $(CYGPATH_W) 'MVLR.cc'; else $(CYGPATH_W) '$(srcdir)/MVLR.cc'; fi`
-
-.cpp.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
-
-.cpp.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(hm_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o hm-hm_methods.obj `if test -f 'hm_methods.cpp'; then $(CYGPATH_W) 'hm_methods.cpp'; else $(CYGPATH_W) '$(srcdir)/hm_methods.cpp'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique

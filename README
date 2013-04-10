@@ -18,7 +18,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 Installation
 ============
 
-eQtlBma follows the standard GNU installation procedure.  Please consult
+eQtlBma follows the standard GNU installation procedure. Please consult
 the INSTALL file in this distribution for more detailed instructions.
 
 For the impatients:
@@ -33,5 +33,9 @@ More information about eQtlBma
 
 To generate the manual in the doc/ directory, type:
     make pdf
+or
+   make html
 
 See the NEWS file for recent changes to the package.
+
+See also the wiki on GitHub: https://github.com/timflutre/eqtlbma/wiki
