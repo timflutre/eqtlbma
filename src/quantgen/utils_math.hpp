@@ -88,7 +88,7 @@ namespace quantgen {
   void CalcMleErrorCovariance(const gsl_matrix * Y, const gsl_matrix * X,
 			      gsl_matrix * XtX, gsl_matrix * Sigma_hat);
 
-  void print_matrix(const gsl_matrix * M, const size_t M, const size_t N);
+  void print_matrix(const gsl_matrix * A, const size_t M, const size_t N);
 
   void mygsl_linalg_outer(const gsl_vector * vec1, const gsl_vector * vec2,
 			  gsl_matrix * mat);
