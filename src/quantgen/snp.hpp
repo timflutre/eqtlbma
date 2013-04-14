@@ -29,16 +29,20 @@
 #include "quantgen/utils_math.hpp"
 
 namespace quantgen {
-
+  
+  struct Genotypes {
+    vector<double> values;
+    double maf; // minor allele frequency
+  };
+  
   class Snp {
   private:
     string name_;
     string chromosome_;
     size_t pos_; // 1-based
-  
-    map<string,vector<double> > subgroup2genotypes_;
-    map<string,double> subgroup2maf_; // minor allele frequency
-  
+    
+    map<string,Genotypes> subgroup2genotypes_;
+    
   public:
     Snp(void);
     Snp(const string & name, const string & chr, const string & coord);
@@ -46,20 +50,27 @@ namespace quantgen {
     string GetChromosome(void) const { return chromosome_; };
     size_t GetPosition(void) const { return pos_; };
     size_t GetNbSubgroups(void) const { return subgroup2genotypes_.size(); };
+    size_t GetNbSamples(const string & subgroup) const;
+    double GetMinorAlleleFreq(const string & subgroup) const;
     bool HasGenotypesInAtLeastOneSubgroup(void) const;
     bool HasGenotypes(const string & subgroup) const;
     bool HasGenotypesInAllSubgroups(const vector<string> & subgroups) const;
-    double GetMinorAllelFreq(const string & subgroup) const;
     void Show(ostream & os);
     void AddSubgroupFromImputeLine(const string & subgroup,
 				   const vector<string>::const_iterator & begin,
-				   const vector<string>::const_iterator & end);
+				   const vector<string>::const_iterator & end,
+				   vector<double> & genotypes,
+				   double & minor_allele_freq);
     void AddSubgroupFromVcfLine(const string & subgroup,
 				const vector<string>::const_iterator & begin,
-				const vector<string>::const_iterator & end);
+				const vector<string>::const_iterator & end,
+				vector<double> & genotypes,
+				double & minor_allele_freq);
     void AddSubgroupFromDoseLine(const string & subgroup,
 				 const vector<string>::const_iterator & begin,
-				 const vector<string>::const_iterator & end);
+				 const vector<string>::const_iterator & end,
+				 vector<double> & genotypes,
+				 double & minor_allele_freq);
     void AddSubgroup(const string & subgroup,
 		     const vector<string>::const_iterator & begin,
 		     const vector<string>::const_iterator & end,

@@ -1085,7 +1085,7 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
   if(verbose > 0)
     message("calculate average ABFs ...")
   l10abfs.avg <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA,
-                            nb.subgroups=NA, nb.samples=NA)
+                            nb.subgroups=NA)
   for(i in c("l10abf.gen", "l10abf.gen.fix", "l10abf.gen.maxh",
              "l10abf.gen.sin", "l10abf.all")){
     l10abfs.avg <- cbind(l10abfs.avg, NA)
@@ -1114,7 +1114,6 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
       l10abfs.avg$gene[i] <- data$gene.coords$id[g]
       l10abfs.avg$snp[i] <- data$snp.coords$id[p]
       l10abfs.avg$nb.subgroups[i] <- 0
-      l10abfs.avg$nb.samples[i] <- 0
       
       tmp <- l10abfs.raw[l10abfs.raw$gene == l10abfs.avg$gene[i] &
                          l10abfs.raw$snp == l10abfs.avg$snp[i] &
@@ -1137,11 +1136,8 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
                            l10abfs.raw$snp == l10abfs.avg$snp[i] &
                            l10abfs.raw$config == config,
                            c(4:13)]
-        if(length(grep("-", config)) == 0 && sum(tmp == 0.0) != length(tmp)){
+        if(length(grep("-", config)) == 0 && sum(tmp == 0.0) != length(tmp))
           l10abfs.avg$nb.subgroups[i] <- l10abfs.avg$nb.subgroups[i] + 1
-          l10abfs.avg$nb.samples[i] <- l10abfs.avg$nb.samples[i] +
-            ncol(data$phenos[[as.numeric(config)]])
-        }
         l10abfs.avg[i, paste0("l10abf.",config)] <- log10WeightedSum(tmp)
       }
       
@@ -1200,8 +1196,8 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_raw.txt.gz"),
               quote=FALSE, row.names=FALSE, sep="\t", na="nan")
   
-  tmp <- res$l10abfs.avg[,1:4]
-  for(j in 5:ncol(res$l10abfs.avg))
+  tmp <- res$l10abfs.avg[,1:3]
+  for(j in 4:ncol(res$l10abfs.avg))
     tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.avg[,j])))
   colnames(tmp) <- colnames(res$l10abfs.avg)
   write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_avg-grids.txt.gz"),

@@ -81,18 +81,20 @@ namespace quantgen {
   void Snp::AddSubgroupFromImputeLine(
     const string & subgroup,
     const vector<string>::const_iterator & begin,
-    const vector<string>::const_iterator & end)
+    const vector<string>::const_iterator & end,
+    vector<double> & genotypes,
+    double & minor_allele_freq)
   {
-    if ((end - begin) % 3 != 0) {
+    if((end - begin) % 3 != 0){
       cerr << "ERROR: SNP " << name_
 	   << " from IMPUTE file has not the right number of columns" << endl;
-      exit (1);
+      exit(1);
     }
     size_t nb_samples = static_cast<size_t>((end - begin) / 3);
-    vector<double> genotypes(nb_samples, NaN);
-    double AA, BB, AB, minor_allele_freq = 0;
+    genotypes.assign(nb_samples, NaN);
+    double AA, BB, AB;
     bool any_missing_value = false;
-    for (size_t i = 0; i < nb_samples; ++i) {
+    for(size_t i = 0; i < nb_samples; ++i){
       AA = atof((begin+3*i)->c_str());
       AB = atof((begin+3*i+1)->c_str());
       BB = atof((begin+3*i+2)->c_str());
@@ -105,29 +107,28 @@ namespace quantgen {
       genotypes[i] = 0 * AA + 1 * AB + 2 * BB;
       minor_allele_freq += genotypes[i];
     }
-    if (! any_missing_value) {
+    if(! any_missing_value){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
 			   : 1 - minor_allele_freq);
-      subgroup2genotypes_.insert(make_pair(subgroup, genotypes));
-      subgroup2maf_.insert(make_pair(subgroup, minor_allele_freq));
     }
   }
 
   void Snp::AddSubgroupFromVcfLine(
     const string & subgroup,
     const vector<string>::const_iterator & begin,
-    const vector<string>::const_iterator & end)
+    const vector<string>::const_iterator & end,
+    vector<double> & genotypes,
+    double & minor_allele_freq)
   {
     size_t nb_samples = static_cast<size_t>(end - begin + 1);
-    vector<double> genotypes(nb_samples, NaN);
-    double minor_allele_freq = 0;
+    genotypes.assign(nb_samples, NaN);
     vector<string> tokens2, tokens3;
     bool any_missing_value = false;
-    for (size_t i = 0; i < nb_samples; ++i) {
+    for(size_t i = 0; i < nb_samples; ++i){
       split(*(begin+i), ":", tokens2);
-      if (tokens2[0].find(".") != string::npos) {
+      if(tokens2[0].find(".") != string::npos) {
 	cerr << "WARNING: skip snp " << name_ << " in subgroup " << subgroup
 	     << " because of missing value" << endl;
 	any_missing_value = true;
@@ -135,34 +136,33 @@ namespace quantgen {
       }
       split(tokens2[0], "|/", tokens3);
       genotypes[i] = 0;
-      if (tokens3[0].compare("1") == 0)
+      if(tokens3[0].compare("1") == 0)
 	genotypes[i] += 1;
-      if (tokens3[1].compare("1") == 0)
+      if(tokens3[1].compare("1") == 0)
 	genotypes[i] += 1;
       minor_allele_freq += genotypes[i];
     }
-    if (! any_missing_value) {
+    if(! any_missing_value){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
 			   : 1 - minor_allele_freq);
-      subgroup2genotypes_.insert(make_pair(subgroup, genotypes));
-      subgroup2maf_.insert(make_pair(subgroup, minor_allele_freq));
     }
   }
 
   void Snp::AddSubgroupFromDoseLine(
     const string & subgroup,
     const vector<string>::const_iterator & begin,
-    const vector<string>::const_iterator & end)
+    const vector<string>::const_iterator & end,
+    vector<double> & genotypes,
+    double & minor_allele_freq)
   {
     size_t nb_samples = static_cast<size_t>(end - begin);
-    vector<double> genotypes(nb_samples, NaN);
-    double minor_allele_freq = 0;
+    genotypes.assign(nb_samples, NaN);
     bool any_missing_value = false;
-    for (size_t i = 0; i < nb_samples; ++i) {
-      if ((begin+i)->compare("NA") == 0 || (begin+i)->compare("na") == 0
-	  || (begin+i)->compare("NaN") == 0 || (begin+i)->compare("nan") == 0) {
+    for(size_t i = 0; i < nb_samples; ++i){
+      if((begin+i)->compare("NA") == 0 || (begin+i)->compare("na") == 0
+	  || (begin+i)->compare("NaN") == 0 || (begin+i)->compare("nan") == 0){
 	cerr << "WARNING: skip snp " << name_ << " in subgroup " << subgroup
 	     << " because of missing value" << endl;
 	any_missing_value = true;
@@ -171,13 +171,11 @@ namespace quantgen {
       genotypes[i] = atof((begin+i)->c_str());
       minor_allele_freq += genotypes[i];
     }
-    if (! any_missing_value) {
+    if(! any_missing_value){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
 			   : 1 - minor_allele_freq);
-      subgroup2genotypes_.insert(make_pair(subgroup, genotypes));
-      subgroup2maf_.insert(make_pair(subgroup, minor_allele_freq));
     }
   }
 
@@ -186,35 +184,56 @@ namespace quantgen {
 			const vector<string>::const_iterator & end,
 			const string & format)
   {
-    if (format.compare("impute") == 0)
-      AddSubgroupFromImputeLine(subgroup, begin, end);
-    else if (format.compare("vcf") == 0)
-      AddSubgroupFromVcfLine(subgroup, begin, end);
-    else if (format.compare("dose") == 0)
-      AddSubgroupFromDoseLine(subgroup, begin, end);
-    else {
+    vector<double> genotypes;
+    double minor_allele_freq = 0;
+    if(format.compare("impute") == 0)
+      AddSubgroupFromImputeLine(subgroup, begin, end,
+				genotypes, minor_allele_freq);
+    else if(format.compare("vcf") == 0)
+      AddSubgroupFromVcfLine(subgroup, begin, end,
+			     genotypes, minor_allele_freq);
+    else if(format.compare("dose") == 0)
+      AddSubgroupFromDoseLine(subgroup, begin, end,
+			      genotypes, minor_allele_freq);
+    else{
       cerr << "ERROR: genotype format '" << format << "' is not recognized" << endl;
       exit(1);
     }
+    Genotypes genos;
+    genos.values = genotypes;
+    genos.maf = minor_allele_freq;
+    subgroup2genotypes_.insert(make_pair(subgroup, genos));
+  }
+
+  size_t Snp::GetNbSamples(const string & subgroup) const
+  {
+    return subgroup2genotypes_.find(subgroup)->second.values.size();
+  }
+
+  double Snp::GetMinorAlleleFreq(const string & subgroup) const
+  {
+    return subgroup2genotypes_.find(subgroup)->second.maf;
   }
 
   void Snp::Show(ostream & os)
   {
     os << name_ << " " << chromosome_ << " " << pos_ << endl
        << GetNbSubgroups() << " subgroups" << endl;
-    for (map<string,vector<double> >::const_iterator it =
+    for (map<string,Genotypes>::const_iterator it =
 	   subgroup2genotypes_.begin(); it != subgroup2genotypes_.end(); ++it)
-      os << it->first << ": " << it->second.size() << " samples" << endl;
+      os << it->first << ": " << GetNbSamples(it->first) << " samples "
+	 << " (maf=" << GetMinorAlleleFreq(it->first) << ")" << endl;
   }
 
   void Snp::EraseIfLowMafPerSubgroup(const double & min_maf)
   {
-    map<string,double>::iterator it = subgroup2maf_.begin();
-    while (it != subgroup2maf_.end())
-      if (it->second < min_maf) {
-	subgroup2genotypes_.erase(it->first);
-	subgroup2maf_.erase(it++);
-      }
+    map<string,Genotypes>::iterator it = subgroup2genotypes_.begin();
+    while(it != subgroup2genotypes_.end()){
+      if(GetMinorAlleleFreq(it->first) < min_maf)
+	subgroup2genotypes_.erase(it++);
+      else
+	++it;
+    }
   }
 
   void Snp::DuplicateGenotypesFromFirstSubgroup(const string & subgroup_old,
@@ -222,15 +241,14 @@ namespace quantgen {
   {
     subgroup2genotypes_.insert(make_pair(subgroup_new,
 					 subgroup2genotypes_[subgroup_old]));
-    subgroup2maf_.insert(make_pair(subgroup_new, subgroup2maf_[subgroup_old]));
   }
 
   bool Snp::HasGenotypesInAtLeastOneSubgroup(void) const
   {
     bool res = false;
-    for (map<string,vector<double> >::const_iterator it =
+    for (map<string,Genotypes>::const_iterator it =
 	   subgroup2genotypes_.begin(); it != subgroup2genotypes_.end(); ++it)
-      if (it->second.size() > 0) {
+      if (GetNbSamples(it->first) > 0){
 	res = true;
 	break;
       }
@@ -264,7 +282,8 @@ namespace quantgen {
 
   bool Snp::HasGenotypes(const string & subgroup) const
   {
-    return subgroup2genotypes_.find(subgroup) != subgroup2genotypes_.end();
+    return (subgroup2genotypes_.find(subgroup) != subgroup2genotypes_.end() &&
+	    GetNbSamples(subgroup) > 0);
   }
 
   bool Snp::HasGenotypesInAllSubgroups(const vector<string> & subgroups) const
@@ -279,14 +298,9 @@ namespace quantgen {
     return res;
   }
 
-  double Snp::GetMinorAllelFreq(const string & subgroup) const
-  {
-    return subgroup2maf_.find(subgroup)->second;
-  }
-
   double Snp::GetGenotype(const string & subgroup, const size_t & idx) const
   {
-    return subgroup2genotypes_.find(subgroup)->second[idx];
+    return subgroup2genotypes_.find(subgroup)->second.values[idx];
   }
 
 } // namespace quantgen

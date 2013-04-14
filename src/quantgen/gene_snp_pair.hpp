@@ -237,7 +237,6 @@ namespace quantgen {
       const double & propFitSigma,
       const gsl_permutation * perm);
     size_t GetNbSubgroups(void) const { return subgroup2samplesize_.size(); };
-    size_t GetCumulativeSampleSize(void) const;
     size_t GetSampleSize(const string & subgroup) const;
     double GetPve(const string & subgroup) const;
     double GetSigmahat(const string & subgroup) const;

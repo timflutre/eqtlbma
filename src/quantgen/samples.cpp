@@ -70,39 +70,43 @@ namespace quantgen {
     return indices_of_all_in_subgroup;
   }
 
-  void Samples::AddSamplesFromGenotypes(
-    const map<string,vector<string> > & subgroup2samples)
+  /** \brief Fill attribute subgroup2present_
+   */
+  void Samples::AddSubgroup(const string & subgroup,
+			    const vector<size_t> & indices_of_all_in_subgroup)
   {
-    const vector<string> * pt_samples;
-    for (map<string,vector<string> >::const_iterator it = 
-	   subgroup2samples.begin(); it != subgroup2samples.end(); ++it) {
-      pt_samples = &(it->second);
-      subgroup2genotypes_.insert(
-	make_pair(it->first, MapAllSamplesToTheGivenSubgroup(pt_samples)));
-    }
+    if(subgroup2present_.find(subgroup) == subgroup2present_.end())
+      subgroup2present_.insert(
+	make_pair(subgroup, vector<bool>(GetTotalNbSamples(), false)));
+  
+    for(vector<size_t>::const_iterator it = 
+	  indices_of_all_in_subgroup.begin();
+	it != indices_of_all_in_subgroup.end(); ++it)
+      if(*it != string::npos)
+	subgroup2present_.find(subgroup)->second
+	  [it - indices_of_all_in_subgroup.begin()] = true;
   }
 
-  void Samples::AddSamplesFromExplevels(
-    const map<string,vector<string> > & subgroup2samples)
+  void Samples::AddSamplesFromData(
+    const map<string,vector<string> > & subgroup2samples,
+    const string & type_data)
   {
     const vector<string> * pt_samples;
+    vector<size_t> indices_of_all_in_subgroup;
     for (map<string,vector<string> >::const_iterator it = 
 	   subgroup2samples.begin(); it != subgroup2samples.end(); ++it) {
       pt_samples = &(it->second);
-      subgroup2explevels_.insert(
-	make_pair(it->first, MapAllSamplesToTheGivenSubgroup(pt_samples)));
-    }
-  }
-
-  void Samples::AddSamplesFromCovariates(
-    const map<string,vector<string> > & subgroup2samples)
-  {
-    const vector<string> * pt_samples;
-    for (map<string,vector<string> >::const_iterator it = 
-	   subgroup2samples.begin(); it != subgroup2samples.end(); ++it) {
-      pt_samples = &(it->second);
-      subgroup2covariates_.insert(
-	make_pair(it->first, MapAllSamplesToTheGivenSubgroup(pt_samples)));
+      indices_of_all_in_subgroup = MapAllSamplesToTheGivenSubgroup(pt_samples);
+      if(type_data.compare("genotype") == 0)
+	subgroup2genotypes_.insert(make_pair(it->first,
+					     indices_of_all_in_subgroup));
+      else if(type_data.compare("explevel") == 0)
+	subgroup2explevels_.insert(make_pair(it->first,
+					     indices_of_all_in_subgroup));
+      else if(type_data.compare("covariate") == 0)
+	subgroup2covariates_.insert(make_pair(it->first,
+					      indices_of_all_in_subgroup));
+      AddSubgroup(it->first, indices_of_all_in_subgroup);
     }
   }
 
@@ -128,6 +132,9 @@ namespace quantgen {
     vector<size_t> & inds_s1,
     vector<size_t> & inds_s2) const
   {
+    inds_s1s2.clear();
+    inds_s1.clear();
+    inds_s2.clear();
     bool present_in_s1, present_in_s2;
     for (size_t idx_all = 0; idx_all < all_.size(); ++idx_all) {
       present_in_s1 = (
@@ -142,6 +149,27 @@ namespace quantgen {
 	inds_s1.push_back(idx_all);
       else if (! present_in_s1 && present_in_s2)
 	inds_s2.push_back(idx_all);
+    }
+  }
+
+  void Samples::ShowPairs(ostream & os) const
+  {
+    vector<string> subgroup_names;
+    keys2vec(subgroup2present_, subgroup_names);
+    string subgroup1, subgroup2;
+    vector<size_t> inds_s1s2, inds_s1, inds_s2;
+    for(size_t s1 = 0; s1 < subgroup_names.size() - 1; ++s1){
+      subgroup1 = subgroup_names[s1];
+      for(size_t s2 = s1 + 1; s2 < subgroup_names.size(); ++s2){
+	subgroup2 = subgroup_names[s2];
+	GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
+	  subgroup1, subgroup2, inds_s1s2, inds_s1, inds_s2);
+	os << subgroup1 << "-" << subgroup2 << ": "
+	   << inds_s1s2.size() << " in both, "
+	   << inds_s1.size() << " in " << subgroup1 << ", "
+	   << inds_s2.size() << " in " << subgroup2
+	   << endl;
+      }
     }
   }
 

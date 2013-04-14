@@ -42,76 +42,87 @@
 
 namespace quantgen {
 
-vector<string> & split (const string & s, char delim, vector<string> & tokens);
+  vector<string> & split (const string & s, char delim, vector<string> & tokens);
 
-vector<string> split (const string & s, char delim);
+  vector<string> split (const string & s, char delim);
 
-vector<string> & split (const string & s, const char * delim,
-			vector<string> & tokens);
+  vector<string> & split (const string & s, const char * delim,
+			  vector<string> & tokens);
 
-vector<string> split (const string & s, const char * delim);
+  vector<string> split (const string & s, const char * delim);
 
-string split (const string & s, const char * delim, const size_t & idx);
+  string split (const string & s, const char * delim, const size_t & idx);
 
-double getElapsedTime (const clock_t & startTime);
+  double getElapsedTime (const clock_t & startTime);
 
-string getElapsedTime (const time_t & startRawTime, const time_t & endRawTime);
+  string getElapsedTime (const time_t & startRawTime, const time_t & endRawTime);
 
-string getDateTime (const time_t & inTime);
+  string getDateTime (const time_t & inTime);
 
-void openFile (const string & pathToFile, ifstream & fileStream);
+  void openFile (const string & pathToFile, ifstream & fileStream);
 
-void openFile (const string & pathToFile, ofstream & fileStream);
+  void openFile (const string & pathToFile, ofstream & fileStream);
 
-void openFile (const string & pathToFile, gzFile & fileStream,
-	       const char * mode);
+  void openFile (const string & pathToFile, gzFile & fileStream,
+		 const char * mode);
 
-void closeFile (const string & pathToFile, ifstream & fileStream);
+  void closeFile (const string & pathToFile, ifstream & fileStream);
 
-void closeFile (const string & pathToFile, ofstream & fileStream);
+  void closeFile (const string & pathToFile, ofstream & fileStream);
 
-void closeFile (const string & pathToFile, gzFile & fileStream);
+  void closeFile (const string & pathToFile, gzFile & fileStream);
 
-int getline (gzFile & fileStream, string & line);
+  int getline (gzFile & fileStream, string & line);
 
-void gzwriteLine (gzFile & fileStream, const string & line,
-		  const string & pathToFile, const size_t & lineId);
+  void gzwriteLine (gzFile & fileStream, const string & line,
+		    const string & pathToFile, const size_t & lineId);
 
-vector<size_t> getCounters (const size_t & nbIterations,
-			    const size_t & nbSteps);
+  vector<size_t> getCounters (const size_t & nbIterations,
+			      const size_t & nbSteps);
 
-void printCounter (const size_t & currentIter,
-		   const vector<size_t> & vCounters);
+  void printCounter (const size_t & currentIter,
+		     const vector<size_t> & vCounters);
 
-void progressBar (string msg, double currentIter, double nbIterations);
+  void progressBar (string msg, double currentIter, double nbIterations);
 
-template <class T> inline string toString (const T & t);
+  template <class T> inline string toString (const T & t);
 
-string copyString (const string input);
+  string copyString (const string input);
 
-void replaceAll (string & str, const string & from, const string & to);
+  void replaceAll (string & str, const string & from, const string & to);
 
-bool doesFileExist (const string & filename);
+  bool doesFileExist (const string & filename);
 
-vector<string> scanInputDirectory (const string & inDir, const int & verbose);
+  vector<string> scanInputDirectory (const string & inDir, const int & verbose);
 
-bool isDirectory (const char path[]);
+  bool isDirectory (const char path[]);
 
-void createDirectory (const string & dirName);
+  void createDirectory (const string & dirName);
 
-void changeDirectory (const string & dirName);
+  void changeDirectory (const string & dirName);
 
-string getCurrentDirectory (void);
+  string getCurrentDirectory (void);
 
-int removeDir (string path);
+  int removeDir (string path);
 
-void removeFiles (const vector<string> & vFileNames);
+  void removeFiles (const vector<string> & vFileNames);
 
-double getMaxMemUsedByProcess (void);
+  double getMaxMemUsedByProcess (void);
 
-string getMaxMemUsedByProcess2Str (void);
+  string getMaxMemUsedByProcess2Str (void);
 
-string getCmdLine (int argc, char ** argv);
+  string getCmdLine (int argc, char ** argv);
+
+  /** \brief Fill a vector with the keys of a map
+   *  \note http://stackoverflow.com/a/771463/597069
+   *  \note http://stackoverflow.com/a/10632266/597069
+   */
+  template <typename M, typename V>
+  void keys2vec(const M & m, V & v)
+  {
+    for(typename M::const_iterator it = m.begin(); it != m.end(); ++it)
+      v.push_back(it->first);
+  }
 
 } // namespace quantgen
 

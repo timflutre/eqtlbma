@@ -518,6 +518,12 @@ parseCmdLine(
     help(argv);
     exit(1);
   }
+  if(type_errors.compare("hybrid") == 0 && nb_permutations > 0){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: --nperm > 0 is not possible with --error hybrid" << endl << endl;
+    help(argv);
+    exit(1);
+  }
   if(trick != 0 && trick_cutoff > nb_permutations){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --tricut " << trick_cutoff << " is larger than --nperm "
@@ -847,6 +853,7 @@ void loadSamplesFromGenotypes(
 void loadSamples(const map<string,string> & subgroup2genofile,
 		 const map<string,string> & subgroup2explevelfile,
 		 const map<string,string> & subgroup2covarfile,
+		 const string & type_errors,
 		 const int & verbose,
 		 Samples & samples)
 {
@@ -867,7 +874,8 @@ void loadSamples(const map<string,string> & subgroup2genofile,
   samples.AddSamplesIfNew(samples_explevels);
   samples.AddSamplesIfNew(samples_genotypes);
   if(verbose > 0)
-    cout << "total nb of samples: " << samples.GetNbAll() << endl << flush;
+    cout << "total nb of samples: " << samples.GetTotalNbSamples()
+	 << endl << flush;
   
   vector<string> samples_covariates;
   map<string,vector<string> > subgroup2samples_covariates;
@@ -883,9 +891,14 @@ void loadSamples(const map<string,string> & subgroup2genofile,
     }
   
   // do the mapping between the vector of all samples and each subgroup
-  samples.AddSamplesFromGenotypes(subgroup2samples_genotypes);
-  samples.AddSamplesFromExplevels(subgroup2samples_explevels);
-  samples.AddSamplesFromCovariates(subgroup2samples_covariates);
+  samples.AddSamplesFromData(subgroup2samples_genotypes, "genotype");
+  samples.AddSamplesFromData(subgroup2samples_explevels, "explevel");
+  samples.AddSamplesFromData(subgroup2samples_covariates, "covariate");
+  
+  if(type_errors.compare("hybrid") == 0 && verbose > 0){
+    cout << "nb of samples with genotype and exp level (pairs of subgroups):" << endl;
+    samples.ShowPairs(cout);
+  }
 }
 
 /** \brief Parse the BED file
@@ -1251,12 +1264,15 @@ void loadGenosAndSnpInfo(
   }
   
   if(min_maf > 0){
+    if(verbose > 0)
+      cout << "filter SNPs with MAF < " << min_maf << " ..." << endl << flush;
     map<string,Snp>::iterator it = snp2object.begin();
     while(it != snp2object.end()){
       it->second.EraseIfLowMafPerSubgroup(min_maf);
       if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
-	cerr << "WARNING: skip SNP " << it->second.GetName()
-	     << " because it has a low MAF in each subgroup" << endl;
+	if(verbose > 1)
+	  cerr << "WARNING: skip SNP " << it->second.GetName()
+	       << " because it has a low MAF in each subgroup" << endl;
 	snp2object.erase(it++);
       } else
 	++it;
@@ -1394,10 +1410,13 @@ void loadGenos(const map<string, string> & subgroup2genofile,
   }
   
   if(min_maf > 0){
+    if(verbose > 0)
+      cout << "filter SNPs with MAF < " << min_maf << " ..." << endl << flush;
     map<string,Snp>::iterator it = snp2object.begin();
     while(it != snp2object.end()){
       it->second.EraseIfLowMafPerSubgroup(min_maf);
-      if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
+      if(verbose > 1 &&
+	 ! it->second.HasGenotypesInAtLeastOneSubgroup()){
 	cerr << "WARNING: skip SNP " << it->second.GetName()
 	     << " because it has a low MAF in each subgroup" << endl;
 	snp2object.erase(it++);
@@ -1591,7 +1610,7 @@ void testForAssociations(
   }
   
   clock_t startTime = clock();
-  size_t nbAnalyzedGenes = 0,  nbAnalyzedPairs = 0;
+  size_t nbAnalyzedGenes = 0, nbAnalyzedPairs = 0;
   size_t countGenes = 0;
   
   for(map<string,Gene>::iterator itG = gene2object.begin();
@@ -1601,17 +1620,21 @@ void testForAssociations(
       progressBar("", countGenes, gene2object.size());
     if(verbose > 1)
       cerr << "gene " << itG->first << endl;
+    
     itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
     if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
-      cerr << "WARNING: skip gene " << itG->second.GetName()
-	   << " because it has no SNP in cis" << endl;
+      if(verbose > 1)
+	cerr << "WARNING: skip gene " << itG->second.GetName()
+	     << " because it has no SNP in cis" << endl;
       continue;
     }
+    
     if(type_analysis.compare("join") == 0 && type_errors.compare("uvlr") != 0 &&
        ! itG->second.HasExplevelsInAllSubgroups(subgroups)){
-      cerr << "WARNING: skip gene " << itG->second.GetName()
-	   << " because option --error mvlr/hybrid"
-	   << " requires expression levels in all subgroups" << endl;
+      if(verbose > 1)
+	cerr << "WARNING: skip gene " << itG->second.GetName()
+	     << " because option --error mvlr/hybrid"
+	     << " requires expression levels in all subgroups" << endl;
       continue;
     }
     itG->second.TestForAssociations(subgroups, samples, type_analysis,
@@ -1863,7 +1886,7 @@ void writeResSstats(
 	++nb_lines;
 	ssTxt << it_gene->second.GetName()
 	      << sep << it_pair->GetSnpName()
-	      << sep << snp2object.find(it_pair->GetSnpName())->second.GetMinorAllelFreq(subgroup)
+	      << sep << snp2object.find(it_pair->GetSnpName())->second.GetMinorAlleleFreq(subgroup)
 	      << sep << it_pair->GetSampleSize(subgroup)
 	      << sep << it_pair->GetPve(subgroup)
 	      << sep << it_pair->GetSigmahat(subgroup)
@@ -2116,6 +2139,7 @@ void writeResAbfsAvgGrids(
   const map<string, Gene> & gene2object,
   const size_t & nb_subgroups,
   const string & type_bfs,
+  const string & type_errors,
   const int & verbose)
 {
   if(verbose > 0)
@@ -2134,8 +2158,7 @@ void writeResAbfsAvgGrids(
   
   // write header line
   ssTxt << "gene" << sep << "snp" << sep << "nb.subgroups" << sep
-	<< "nb.samples" << sep << "l10abf.gen" << sep << "l10abf.gen.fix"
-	<< sep << "l10abf.gen.maxh";
+	<< "l10abf.gen" << sep << "l10abf.gen.fix" << sep << "l10abf.gen.maxh";
   if(type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0)
     ssTxt << sep << "l10abf.gen.sin";
   if(type_bfs.compare("all") == 0)
@@ -2176,7 +2199,6 @@ void writeResAbfsAvgGrids(
       ssTxt << it_gene->first
 	    << sep << it_pair->GetSnpName()
 	    << sep << it_pair->GetNbSubgroups()
-	    << sep << it_pair->GetCumulativeSampleSize()
 	    << sep << it_pair->GetWeightedAbf("gen")
 	    << sep << it_pair->GetWeightedAbf("gen-fix")
 	    << sep << it_pair->GetWeightedAbf("gen-maxh");
@@ -2304,7 +2326,7 @@ void writeRes(
       writeResAbfsRaw(out_prefix, gene2object, subgroups.size(), iGridL, iGridS,
 		      type_bfs, verbose);
     writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), type_bfs,
-			 verbose);
+			 type_errors, verbose);
   }
   
   if(type_analysis.compare("join") == 0 && nb_permutations > 0)
@@ -2352,7 +2374,7 @@ void run(const string & file_genopaths,
   
   Samples samples;
   loadSamples(subgroup2genofile, subgroup2explevelfile, subgroup2covarfile,
-	      verbose, samples);
+	      type_errors, verbose, samples);
   
   Covariates covariates;
   loadCovariates(subgroup2covarfile, verbose, covariates);

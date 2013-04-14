@@ -169,9 +169,7 @@ namespace quantgen {
       pt_snp = snps_[snp_id];
       for(map<string,vector<double> >::const_iterator it =
 	    subgroup2explevels_.begin(); it != subgroup2explevels_.end(); ++it)
-	if((pt_snp->subgroup2genotypes_.find(it->first) !=
-	    pt_snp->subgroup2genotypes_.end())
-	   && pt_snp->subgroup2genotypes_[it->first].size() > 0){
+	if(pt_snp->HasGenotypes(it->first)){
 	  res = true;
 	  break;
 	}
@@ -241,9 +239,10 @@ namespace quantgen {
       }
       else{ // if mvlr or hybrid
 	if(! pt_snp->HasGenotypesInAllSubgroups(subgroups)){
-	  cerr << "WARNING: skip pair " << name_ << "-" << pt_snp->name_
-	       << " because option --error mvlr/hybrid"
-	       << " requires genotypes in all subgroups" << endl;
+	  if(verbose > 0)
+	    cerr << "WARNING: skip pair " << name_ << "-" << pt_snp->name_
+		 << " because option --error mvlr/hybrid"
+		 << " requires genotypes in all subgroups" << endl;
 	  continue;
 	}
 	if(type_errors.compare("mvlr") == 0)
@@ -318,7 +317,7 @@ namespace quantgen {
   {
     gsl_permutation * perm = NULL;
   
-    perm = gsl_permutation_calloc(samples.GetNbAll());
+    perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
       exit(1);
@@ -424,7 +423,7 @@ namespace quantgen {
   {
     gsl_permutation * perm = NULL;
   
-    perm = gsl_permutation_calloc(samples.GetNbAll());
+    perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
       exit(1);
@@ -498,9 +497,10 @@ namespace quantgen {
   {
     vector<double> l10_abfs;
     for(vector<GeneSnpPair>::const_iterator it_pair = gene_snp_pairs_.begin();
-	it_pair != gene_snp_pairs_.end(); ++it_pair)
+	it_pair != gene_snp_pairs_.end(); ++it_pair){
       if(! isNan(it_pair->GetWeightedAbf(whichPermBf)))
 	l10_abfs.push_back(it_pair->GetWeightedAbf(whichPermBf));
+    }
     l10_abf_true_avg_= log10_weighted_sum(&(l10_abfs[0]), l10_abfs.size());
   }
 
@@ -522,7 +522,7 @@ namespace quantgen {
   {
     gsl_permutation * perm = NULL;
   
-    perm = gsl_permutation_calloc(samples.GetNbAll());
+    perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
       exit(1);
@@ -540,7 +540,7 @@ namespace quantgen {
       FindMaxTrueL10Abf(whichPermBf);
     else
       AvgTrueL10Abfs(whichPermBf);
-  
+    
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
       if(shuffle_only)
@@ -566,14 +566,14 @@ namespace quantgen {
 					       *it, need_qnorm, perm);
 	  gene_snp_pair.CalcAbfsUvlr(subgroups, whichPermBf, iGridL, iGridS);
 	}
-	else{ // not univariate errors
-	  if(! HasExplevelsInAllSubgroups(subgroups))
+	else{ // if mvlr or hybrid
+	  if(! pt_snp->HasGenotypesInAllSubgroups(subgroups))
 	    continue;
 	  if(type_errors.compare("mvlr") == 0)
 	    gene_snp_pair.CalcAbfsMvlr(subgroups, samples, *this, *pt_snp,
 				       covariates, need_qnorm, whichPermBf,
 				       iGridL, iGridS, prop_cov_errors, perm);
-	  else
+	  else if(type_errors.compare("hybrid") == 0)
 	    gene_snp_pair.CalcAbfsHybrid(subgroups, samples, *this, *pt_snp,
 					 covariates, need_qnorm, whichPermBf,
 					 iGridL, iGridS, prop_cov_errors, perm);

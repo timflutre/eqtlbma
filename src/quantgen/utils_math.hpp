@@ -27,6 +27,7 @@
 #include <string>
 #include <limits>
 #include <iostream>
+#include <vector>
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -51,7 +52,9 @@ namespace quantgen {
   size_t getSeed(void);
 
   double round(double x);
-
+  
+  size_t sum_bool(const vector<bool> & vec);
+  
   void qqnorm(double * ptData, const size_t n);
 
   double log10_weighted_sum(const double * vec, const size_t size);

@@ -75,10 +75,10 @@ namespace quantgen {
 	if(perm == NULL)
 	  idx_all = it_all - samples.begin();
 	else
-	  idx_all = gsl_permutation_get (perm, it_all - samples.begin());
+	  idx_all = gsl_permutation_get(perm, it_all - samples.begin());
 	idx_explevel = samples.GetIndexExplevel(idx_all, subgroup);
 	idx_genotype = samples.GetIndexGenotype(it_all - samples.begin(), subgroup);
-	if(idx_explevel != string::npos && idx_genotype != string::npos) {
+	if(idx_explevel != string::npos && idx_genotype != string::npos){
 	  Y_tmp.push_back(gene.GetExplevel(subgroup, idx_explevel));
 	  Xg_tmp.push_back(snp.GetGenotype(subgroup, idx_genotype));
 	  indices_all.push_back(it_all - samples.begin());
@@ -1317,19 +1317,10 @@ namespace quantgen {
       CalcBMAlite(subgroups);
       CalcBMA(subgroups);
     }
-  
+    
     gsl_matrix_free(betas_g_hat);
     gsl_matrix_free(Sigma_hat);
     gsl_matrix_free(Vg);
-  }
-
-  size_t GeneSnpPair::GetCumulativeSampleSize(void) const
-  {
-    size_t res = 0;
-    for(map<string,size_t>::const_iterator it = subgroup2samplesize_.begin();
-	it != subgroup2samplesize_.end(); ++it)
-      res += it->second;
-    return res;
   }
 
   size_t GeneSnpPair::GetSampleSize(const string & subgroup) const

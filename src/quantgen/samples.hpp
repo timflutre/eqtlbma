@@ -24,25 +24,34 @@
 #include <map>
 #include <string>
 #include <algorithm>
+#include <iostream>
+
+#include "quantgen/utils_math.hpp"
+#include "quantgen/utils_io.hpp"
 
 namespace quantgen {
 
   class Samples {
   private:
     vector<string> all_;
+    map<string,vector<bool> > subgroup2present_;
     map<string,vector<size_t> > subgroup2genotypes_;
     map<string,vector<size_t> > subgroup2explevels_;
     map<string,vector<size_t> > subgroup2covariates_;
-    const vector<size_t> MapAllSamplesToTheGivenSubgroup(const vector<string> * pt_samples) const;
+    const vector<size_t> MapAllSamplesToTheGivenSubgroup(
+      const vector<string> * pt_samples) const;
+    void AddSubgroup(const string & subgroup,
+		     const vector<size_t> & indices_of_all_in_subgroup);
   public:
     Samples(void);
-    size_t GetNbAll(void) const { return all_.size(); };
+    size_t GetTotalNbSamples(void) const { return all_.size(); };
+    size_t GetTotalNbSubgroups(void) const { return subgroup2present_.size(); };
     bool IsPresent(const string & sample) const;
     bool IsAbsent(const string & sample) const;
     void AddSamplesIfNew(const vector<string> & samples);
-    void AddSamplesFromGenotypes(const map<string,vector<string> > & subgroup2samples);
-    void AddSamplesFromExplevels(const map<string,vector<string> > & subgroup2samples);
-    void AddSamplesFromCovariates(const map<string,vector<string> > & subgroup2samples);
+    void AddSamplesFromData(
+      const map<string,vector<string> > & subgroup2samples,
+      const string & type_data);
     vector<string>::const_iterator begin(void) const { return all_.begin(); };
     vector<string>::const_iterator end(void) const { return all_.end(); };
     size_t GetIndexExplevel(const size_t & idx, const string & subgroup) const;
@@ -54,6 +63,7 @@ namespace quantgen {
       vector<size_t> & inds_s1s2,
       vector<size_t> & inds_s1,
       vector<size_t> & inds_s2) const;
+    void ShowPairs(ostream & os) const;
   };
 
 } // namespace quantgen

@@ -40,6 +40,15 @@ namespace quantgen {
     return ((size_t) t1.tv_usec * t1.tv_sec);
   }
 
+  size_t sum_bool(const vector<bool> & vec)
+  {
+    size_t res = 0;
+    for(vector<bool>::const_iterator it = vec.begin(); it != vec.end(); ++it)
+      if(*it)
+	++res;
+    return res;
+  }
+
 /** \brief Round the given value.
  *  \note http://stackoverflow.com/a/485549/597069
  */
