@@ -68,7 +68,7 @@ namespace quantgen {
     
       vector<double> Y_tmp, Xg_tmp;
       vector<vector<double> > Xc_tmp;
-      size_t idx_all, idx_explevel, idx_genotype;
+      size_t idx_all, idx_explevel, idx_genotype, idx_covar;
       vector<size_t> indices_all; // used for covariates
       for(vector<string>::const_iterator it_all = samples.begin();
 	  it_all != samples.end(); ++it_all){
@@ -103,13 +103,14 @@ namespace quantgen {
 	  vector<double> covar_values;
 	  for(vector<size_t>::const_iterator it_idx = indices_all.begin();
 	      it_idx != indices_all.end(); ++it_idx){
-	    if(samples.GetIndexCovariate(*it_idx, subgroup) == string::npos){
+	    idx_covar = samples.GetIndexCovariate(*it_idx, subgroup);
+	    if(idx_covar == string::npos){
 	      cerr << "ERROR: missing data at covariate " << it_covars->first
 		   << " of gene " << gene_name_ << " and snp " << snp_name_ << endl;
 	      exit(1);
 	    }
 	    covar_values.push_back(
-	      covariates.GetCovariate(subgroup, it_covars->first, *it_idx));
+	      covariates.GetCovariate(subgroup, it_covars->first, idx_covar));
 	  }
 	  Xc_tmp.push_back(covar_values);
 	}
