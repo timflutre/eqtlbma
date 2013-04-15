@@ -641,7 +641,7 @@ void loadListsGenoExplevelAndCovarFiles(
   while(it != subgroup2explevelfile.end()){
     if(! subgroups_tokeep.empty()
 	&& find(subgroups_tokeep.begin(), subgroups_tokeep.end(), it->first)
-	!= subgroups_tokeep.end())
+       == subgroups_tokeep.end())
       subgroup2explevelfile.erase(it++);
     else
       ++it;
