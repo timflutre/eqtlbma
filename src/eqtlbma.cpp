@@ -518,12 +518,6 @@ parseCmdLine(
     help(argv);
     exit(1);
   }
-  if(type_errors.compare("hybrid") == 0 && nb_permutations > 0){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --nperm > 0 is not possible with --error hybrid" << endl << endl;
-    help(argv);
-    exit(1);
-  }
   if(trick != 0 && trick_cutoff > nb_permutations){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --tricut " << trick_cutoff << " is larger than --nperm "
@@ -895,9 +889,13 @@ void loadSamples(const map<string,string> & subgroup2genofile,
   samples.AddSamplesFromData(subgroup2samples_explevels, "explevel");
   samples.AddSamplesFromData(subgroup2samples_covariates, "covariate");
   
-  if(type_errors.compare("hybrid") == 0 && verbose > 0){
-    cout << "nb of samples with genotype and exp level (pairs of subgroups):" << endl;
-    samples.ShowPairs(cout);
+  if(type_errors.compare("hybrid") == 0){
+    if(verbose > 0){
+      cout << "nb of samples with genotype and exp level (pairs of subgroups):" << endl;
+      samples.ShowPairs(cout);
+    }
+    if(verbose > 1)
+      samples.ShowAllMappings(cerr);
   }
 }
 

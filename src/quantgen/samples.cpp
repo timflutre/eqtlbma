@@ -27,6 +27,17 @@ namespace quantgen {
   {
   }
 
+  string Samples::GetSample(const size_t & idx) const
+  {
+    string res;
+    if(idx > GetTotalNbSamples())
+      cerr << "ERROR: idx " << idx << " is bigger than the number of samples"
+	   << endl;
+    else
+      res = all_[idx];
+    return res;
+  }
+
   bool Samples::IsPresent(const string & sample) const
   {
     return find(all_.begin(), all_.end(), sample) != all_.end();
@@ -169,6 +180,44 @@ namespace quantgen {
 	   << inds_s1.size() << " in " << subgroup1 << ", "
 	   << inds_s2.size() << " in " << subgroup2
 	   << endl;
+      }
+    }
+  }
+
+  void Samples::ShowAllMappings(ostream & os) const
+  {
+    size_t idx;
+    for(vector<string>::const_iterator it_all = all_.begin();
+	it_all != all_.end(); ++it_all){
+      os << (it_all - all_.begin()) + 1 << "/" << all_.size()
+	 << " sample " << *it_all << ":" << endl;
+      for(map<string,vector<bool> >::const_iterator it_sbgrp =
+	    subgroup2present_.begin();
+	  it_sbgrp != subgroup2present_.end(); ++it_sbgrp){
+	os << "subgroup " << it_sbgrp->first << ":";
+	if(! it_sbgrp->second[it_all - all_.begin()])
+	  os << "absent";
+	else{
+	  os << " genotype=";
+	  idx = subgroup2genotypes_.find(it_sbgrp->first)->second
+	    [it_all - all_.begin()];
+	  os << (idx == string::npos ? -1 : idx);
+	  os << " explevel=";
+	  idx = subgroup2explevels_.find(it_sbgrp->first)->second
+	    [it_all - all_.begin()];
+	  if(idx == string::npos)
+	    os << "missing";
+	  else
+	    os << idx;
+	  os << " covariate=";
+	  idx = subgroup2covariates_.find(it_sbgrp->first)->second
+	    [it_all - all_.begin()];
+	  if(idx == string::npos)
+	    os << "missing";
+	  else
+	    os << idx;
+	}
+	os << endl;
       }
     }
   }

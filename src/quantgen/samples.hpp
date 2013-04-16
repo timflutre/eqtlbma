@@ -44,6 +44,7 @@ namespace quantgen {
 		     const vector<size_t> & indices_of_all_in_subgroup);
   public:
     Samples(void);
+    string GetSample(const size_t & idx) const;
     size_t GetTotalNbSamples(void) const { return all_.size(); };
     size_t GetTotalNbSubgroups(void) const { return subgroup2present_.size(); };
     bool IsPresent(const string & sample) const;
@@ -64,6 +65,7 @@ namespace quantgen {
       vector<size_t> & inds_s1,
       vector<size_t> & inds_s2) const;
     void ShowPairs(ostream & os) const;
+    void ShowAllMappings(ostream & os) const;
   };
 
 } // namespace quantgen

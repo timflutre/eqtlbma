@@ -105,8 +105,10 @@ namespace quantgen {
 	      it_idx != indices_all.end(); ++it_idx){
 	    idx_covar = samples.GetIndexCovariate(*it_idx, subgroup);
 	    if(idx_covar == string::npos){
-	      cerr << "ERROR: missing data at covariate " << it_covars->first
-		   << " of gene " << gene_name_ << " and snp " << snp_name_ << endl;
+	      cerr << "ERROR: missing covariate " << it_covars->first
+		   << " of gene " << gene_name_ << " and snp " << snp_name_ 
+		   << " for sample " << samples.GetSample(*it_idx)
+		   << " from subgroup " << subgroup << endl;
 	      exit(1);
 	    }
 	    covar_values.push_back(
