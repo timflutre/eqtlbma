@@ -35,7 +35,7 @@ function help () {
     msg+="\t\tdefault=100000\n"
     msg+="      --out\tprefix for the output files\n"
     msg+="\t\tdefault=out_eqtlbma\n"
-    msg+="      --type\ttype of analysis to perform (sep/join/sep+join)\n"
+    msg+="      --type\ttype of analysis to perform (sep/join)\n"
     msg+="\t\tdefault=sep\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
     msg+="      --outraw\twrite the output file with all raw ABFs\n"
