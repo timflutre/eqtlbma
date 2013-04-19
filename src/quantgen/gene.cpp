@@ -284,9 +284,9 @@ namespace quantgen {
     else
       res = gsl_ran_flat(rng,
 			 ((1 + trick_cutoff) /
-			  ((double) (nbperms_more_extreme + 2))),
+			  ((double) (nbperms_sofar + 2))),
 			 ((1 + trick_cutoff) /
-			  ((double) (nbperms_more_extreme + 1))));
+			  ((double) (nbperms_sofar + 1))));
     return res;
   }
 
@@ -312,6 +312,7 @@ namespace quantgen {
     const size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
+    const int & nb_threads,
     const gsl_rng * rngPerm,
     const gsl_rng * rngTrick)
   {
@@ -326,11 +327,13 @@ namespace quantgen {
     subgroup2nbperms_.insert(make_pair(subgroup, 0));
     subgroup2permpval_.insert(make_pair(subgroup, 1));
   
-    double pval_perm, pval_perm_min;
+    vector<double> pvals_perm; // per SNP
+    double pval_perm_min;
     bool shuffle_only = false;
-    Snp * pt_snp;
   
     FindMinTruePvaluePerSubgroup(subgroup);
+  
+    omp_set_num_threads(nb_threads);
   
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
@@ -338,21 +341,23 @@ namespace quantgen {
 	continue;
     
       ++subgroup2nbperms_[subgroup];
+      pvals_perm.assign(snps_.size(), 1.0);
       pval_perm_min = 1;
-    
-      for(vector<Snp*>::const_iterator it_snp = snps_.begin();
-	  it_snp != snps_.end(); ++it_snp){
-	pt_snp = *it_snp;
+
+#pragma omp parallel for shared(pvals_perm)
+      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
-	if(HasExplevels(subgroup) && pt_snp->HasGenotypes(subgroup))
+	if(HasExplevels(subgroup) && pt_snp->HasGenotypes(subgroup)){
 	  gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
 					   subgroup, need_qnorm, perm);
-	pval_perm = gene_snp_pair.GetBetapvalGeno(subgroup);
-	if(pval_perm < pval_perm_min)
-	  pval_perm_min = pval_perm;
+	  pvals_perm[idx_snp] = gene_snp_pair.GetBetapvalGeno(subgroup);
+	}
       }
     
-      if(pval_perm_min <= pval_true_min_allsbgrps_)
+      pval_perm_min = *min_element(pvals_perm.begin(), pvals_perm.end());
+    
+      if(pval_perm_min <= subgroup2trueminpval_[subgroup])
 	++subgroup2permpval_[subgroup];
       if(trick != 0 && subgroup2permpval_[subgroup] == 1 + trick_cutoff){
 	if(trick == 1)
@@ -418,6 +423,7 @@ namespace quantgen {
     const size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
+    const int & nb_threads,
     const gsl_rng * rngPerm,
     const gsl_rng * rngTrick)
   {
@@ -432,11 +438,13 @@ namespace quantgen {
     nbpermutations_sep_allsbgrps_ = 0;
     pval_perm_sep_allsbgrps_ = 1;
   
-    double pval_perm, pval_perm_min;
+    vector<double> pvals_perm; // per SNP over subgroups
+    double pval_perm_min;
     bool shuffle_only = false;
-    Snp * pt_snp;
   
     FindMinTruePvalueAllSubgroups();
+  
+    omp_set_num_threads(nb_threads);
   
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
@@ -444,22 +452,28 @@ namespace quantgen {
 	continue;
     
       ++nbpermutations_sep_allsbgrps_;
+      pvals_perm.assign(snps_.size(), 1.0);
       pval_perm_min = 1;
     
-      for(vector<Snp*>::const_iterator it_snp = snps_.begin();
-	  it_snp != snps_.end(); ++it_snp){
-	pt_snp = *it_snp;
+#pragma omp parallel for shared(pvals_perm)
+      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
+	double pval_perm_sbgrp, pval_perm_min_sbgrp = 1;
 	for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
 	    it_sbgrp != subgroups.end(); ++it_sbgrp){
-	  if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp))
+	  if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp)){
 	    gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
 					     *it_sbgrp, need_qnorm, perm);
-	  pval_perm = gene_snp_pair.GetBetapvalGeno(*it_sbgrp);
-	  if(pval_perm < pval_perm_min)
-	    pval_perm_min = pval_perm;
+	    pval_perm_sbgrp = gene_snp_pair.GetBetapvalGeno(*it_sbgrp);
+	    if(pval_perm_sbgrp < pval_perm_min_sbgrp)
+	      pval_perm_min_sbgrp = pval_perm_sbgrp;
+	  }
+	  pvals_perm[idx_snp] = pval_perm_min_sbgrp;
 	}
       }
+    
+      pval_perm_min = *min_element(pvals_perm.begin(), pvals_perm.end());
     
       if(pval_perm_min <= pval_true_min_allsbgrps_)
 	++pval_perm_sep_allsbgrps_;
@@ -517,6 +531,7 @@ namespace quantgen {
 				  const size_t & trick_cutoff,
 				  const string & whichPermBf,
 				  const bool & useMaxBfOverSnps,
+				  const int & nb_threads,
 				  const gsl_rng * rngPerm,
 				  const gsl_rng * rngTrick)
   {
@@ -531,15 +546,16 @@ namespace quantgen {
     nbpermutations_join_ = 0;
     pval_perm_join_ = 1;
   
-    double l10_abf_perm, l10_abf_perm_max, l10_abf_perm_avg;
-    vector<double> l10_abfs_perm;
+    vector<double> l10_abfs_perm; // per SNP
+    double l10_abf_perm_max, l10_abf_perm_avg;
     bool shuffle_only = false;
-    Snp * pt_snp;
   
     if(useMaxBfOverSnps)
       FindMaxTrueL10Abf(whichPermBf);
     else
       AvgTrueL10Abfs(whichPermBf);
+    
+    omp_set_num_threads(nb_threads);
     
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
@@ -547,23 +563,22 @@ namespace quantgen {
 	continue;
     
       ++nbpermutations_join_;
+      l10_abfs_perm.assign(snps_.size(), 0.0);
       if(useMaxBfOverSnps)
 	l10_abf_perm_max = - numeric_limits<double>::infinity();
-      else{ // if avg over SNPs
-	l10_abfs_perm.clear();
-	l10_abf_perm_avg = numeric_limits<double>::quiet_NaN();
-      }
+      else
+	l10_abf_perm_avg = NaN;
     
-      for(vector<Snp*>::const_iterator it_snp = snps_.begin();
-	  it_snp != snps_.end(); ++it_snp){
-	pt_snp = *it_snp;
+#pragma omp parallel for shared(l10_abfs_perm)
+      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(type_errors.compare("uvlr") == 0){
-	  for(vector<string>::const_iterator it = subgroups.begin();
-	      it != subgroups.end(); ++it)
-	    if(HasExplevels(*it) && pt_snp->HasGenotypes(*it))
+	  for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
+	      it_sbgrp != subgroups.end(); ++it_sbgrp)
+	    if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp))
 	      gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
-					       *it, need_qnorm, perm);
+					       *it_sbgrp, need_qnorm, perm);
 	  gene_snp_pair.CalcAbfsUvlr(subgroups, whichPermBf, iGridL, iGridS);
 	}
 	else{ // if mvlr or hybrid
@@ -578,21 +593,18 @@ namespace quantgen {
 					 covariates, need_qnorm, whichPermBf,
 					 iGridL, iGridS, prop_cov_errors, perm);
 	}
-	if(useMaxBfOverSnps){
-	  l10_abf_perm = gene_snp_pair.GetWeightedAbf(whichPermBf);
-	  if(l10_abf_perm > l10_abf_perm_max)
-	    l10_abf_perm_max = l10_abf_perm;
-	}
-	else // if avg over SNPs
-	  l10_abfs_perm.push_back(gene_snp_pair.GetWeightedAbf(whichPermBf));
+	l10_abfs_perm[idx_snp] = gene_snp_pair.GetWeightedAbf(whichPermBf);
       }
     
       if(useMaxBfOverSnps){
+	l10_abf_perm_max = *max_element(l10_abfs_perm.begin(),
+					l10_abfs_perm.end());
 	if(l10_abf_perm_max >= l10_abf_true_max_)
 	  ++pval_perm_join_;
       }
       else{ // if avg over SNPs
-	l10_abf_perm_avg = log10_weighted_sum(&(l10_abfs_perm[0]), l10_abfs_perm.size());
+	l10_abf_perm_avg = log10_weighted_sum(&(l10_abfs_perm[0]),
+					      l10_abfs_perm.size());
 	if(l10_abf_perm_avg >= l10_abf_true_avg_)
 	  ++pval_perm_join_;
       }

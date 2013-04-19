@@ -12,4 +12,6 @@ AC_CONFIG_FILES([Makefile src/Makefile src/quantgen/Makefile doc/Makefile tests/
 AC_CHECK_LIB(z, deflatePending, [], [AC_MSG_ERROR([unable to find the zlib library with version >= 1.2.6])])
 AC_CHECK_LIB(gslcblas, cblas_sgemm, [], [AC_MSG_ERROR([unable to find the gslcblas library with the cblas_sgemm() function])], [-lgsl]cblas)
 AC_CHECK_LIB(gsl, gsl_stats_tss, [], [AC_MSG_ERROR([unable to find the gsl library with the gsl_stats_tss() function])], [-lgsl])
+AC_OPENMP
+AM_SILENT_RULES([yes])
 AC_OUTPUT

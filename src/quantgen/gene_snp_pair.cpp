@@ -364,6 +364,7 @@ namespace quantgen {
 					       grid.phi2s[grid_id],
 					       grid.oma2s[grid_id]);
       }
+      
       unweighted_abfs_.insert(make_pair(config_name.str(), l10_abfs));
       weighted_abfs_.insert(
 	make_pair(config_name.str(),
@@ -574,7 +575,7 @@ namespace quantgen {
     vector<vector<int> > vvGamma(1, vector<int>());
     vector<double> l10_abfs;
   
-    for(size_t s = 0; s < Y.size(); ++s) {
+    for(size_t s = 0; s < Y.size(); ++s){ // for each subgroup
       config_name.str("");
       config_name << s + 1;
       l10_abfs.assign(grid.size(), 0.0);
@@ -654,7 +655,7 @@ namespace quantgen {
 		      need_qnorm, perm, Y, Xg, Xc, subgroups_with_data);
   
     CalcAbfsMvlrForConsistentConfiguration(iGridL, propFitSigma, Y, Xg, Xc[0]);
-    if(whichBfs.compare("sin") == 0){
+    if(whichBfs.find("sin") != string::npos){ // can also be 'gen-sin' (permutations)
       CalcAbfsMvlrForSingletons(iGridS, propFitSigma, Y, Xg, Xc[0]);
       CalcBMAlite(subgroups);
     }
@@ -1228,9 +1229,10 @@ namespace quantgen {
 	it_sbgrp != subgroups.end(); ++it_sbgrp){
       config_name.str("");
       config_name << it_sbgrp - subgroups.begin() + 1;
+      l10_abfs.assign(grid.size(), 0.0);
+      
       gsl_vector_set_all(gamma, 0.0);
       gsl_vector_set(gamma, it_sbgrp - subgroups.begin(), 1.0);
-      l10_abfs.assign(grid.size(), 0.0);
       for(size_t grid_id = 0; grid_id < grid.size(); ++grid_id)
 	l10_abfs[grid_id] = CalcLog10AbfMvlr(gamma,
 					     betas_g_hat,
@@ -1238,11 +1240,12 @@ namespace quantgen {
 					     Vg,
 					     grid.phi2s[grid_id],
 					     grid.oma2s[grid_id]);
+      
+      unweighted_abfs_.insert(make_pair(config_name.str(), l10_abfs));
+      weighted_abfs_.insert(
+	make_pair(config_name.str(),
+		  log10_weighted_sum(&(l10_abfs[0]), l10_abfs.size())));
     }
-    unweighted_abfs_.insert(make_pair(config_name.str(), l10_abfs));
-    weighted_abfs_.insert(
-      make_pair(config_name.str(),
-		log10_weighted_sum(&(l10_abfs[0]), l10_abfs.size())));
   
     gsl_vector_free(gamma);
   }
@@ -1310,7 +1313,7 @@ namespace quantgen {
 		     propFitSigma, perm, betas_g_hat, Sigma_hat, Vg);
   
     CalcAbfsHybridForConsistentConfiguration(iGridL, betas_g_hat, Sigma_hat, Vg);
-    if(whichBfs.compare("sin") == 0){
+    if(whichBfs.find("sin") != string::npos){ // can also be 'gen-sin' (permutations)
       CalcAbfsHybridForSingletons(iGridS, subgroups, betas_g_hat, Sigma_hat, Vg);
       CalcBMAlite(subgroups);
     }

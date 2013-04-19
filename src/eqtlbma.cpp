@@ -169,6 +169,7 @@ void help(char ** argv)
        << "\t\t'all': average over all configurations (also called BF_BMA)" << endl
        << "      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations" << endl
        << "\t\totherwise the average ABF over SNPs is used (more Bayesian)" << endl
+       << "      --thread\tnumber of threads for the permutations (default=1)" << endl
        << "      --snp\tfile with a list of SNPs to analyze" << endl
        << "\t\tone SNP name per line, useful when launched in parallel" << endl
        << "\t\tprogram exits if an empty file is given" << endl
@@ -224,6 +225,7 @@ parseCmdLine(
   int & type_perm_sep,
   string & type_permbf,
   bool & use_max_bf,
+  int & nb_threads,
   string & file_snpstokeep,
   vector<string> & subgroups_tokeep,
   int & verbose)
@@ -259,6 +261,7 @@ parseCmdLine(
       {"permsep", required_argument, 0, 0},
       {"pbf", required_argument, 0, 0},
       {"maxbf", no_argument, 0, 0},
+      {"thread", required_argument, 0, 0},
       {"snp", required_argument, 0, 0},
       {"sbgrp", required_argument, 0, 0},
       {0, 0, 0, 0}
@@ -370,6 +373,10 @@ parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "maxbf") == 0){
 	use_max_bf = true;
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "thread") == 0){
+	nb_threads = atoi(optarg);
 	break;
       }
       if(strcmp(long_options[option_index].name, "snp") == 0){
@@ -558,6 +565,12 @@ parseCmdLine(
      type_permbf.compare("all") == 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if type join --bfs sin --nperm > 0, --pbf should be 'gen' or 'gen-sin'" << endl << endl;
+    help(argv);
+    exit(1);
+  }
+  if(nb_threads <= 0){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: --thread " << nb_threads << " is invalid" << endl << endl;
     help(argv);
     exit(1);
   }
@@ -1226,7 +1239,7 @@ void loadGenosAndSnpInfo(
 				 genoStream, line, nb_lines,
 				 nb_snps_tokeep_per_subgroup, snp2object);
     else if(line.find("chr") != string::npos
-	    && line.find("name") != string::npos
+	    && (line.find("name") != string::npos || line.find("id") != string::npos)
 	    && line.find("coord") != string::npos
 	    && line.find("a1") != string::npos
 	    && line.find("a2") != string::npos) // IMPUTE format
@@ -1662,6 +1675,7 @@ void makePermutationsSep(
   const int & trick,
   const size_t & trick_cutoff,
   const int & type_perm_sep,
+  const int & nb_threads,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
   const int & verbose,
@@ -1685,8 +1699,8 @@ void makePermutationsSep(
       itG->second.MakePermutationsSepAllSubgroups(subgroups, samples,
 						  need_qnorm, covariates,
 						  nb_permutations, trick,
-						  trick_cutoff, rngPerm,
-						  rngTrick);
+						  trick_cutoff, nb_threads,
+						  rngPerm, rngTrick);
     }
     if(verbose == 1)
       cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
@@ -1702,7 +1716,7 @@ void makePermutationsSep(
 	gsl_rng_set(rngTrick, seed);
       size_t countGenes = 0;
       ss.str("");
-      ss << "s" << (it_sbgrp - subgroups.begin());
+      ss << "sep" << (it_sbgrp - subgroups.begin()) + 1;
       for(map<string,Gene>::iterator itG = gene2object.begin();
 	  itG != gene2object.end(); ++itG){
 	++countGenes;
@@ -1715,8 +1729,8 @@ void makePermutationsSep(
 	itG->second.MakePermutationsSepPerSubgroup(*it_sbgrp, samples,
 						   need_qnorm, covariates,
 						   nb_permutations, trick,
-						   trick_cutoff, rngPerm,
-						   rngTrick);
+						   trick_cutoff, nb_threads,
+						   rngPerm, rngTrick);
       }
       if(verbose == 1)
 	cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
@@ -1740,6 +1754,7 @@ void makePermutationsJoin(
   const size_t & trick_cutoff,
   const string & type_permbf,
   const bool & use_max_bf,
+  const int & nb_threads,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
   const int & verbose,
@@ -1767,7 +1782,7 @@ void makePermutationsJoin(
 				     covariates, iGridL, iGridS, type_errors,
 				     prop_cov_errors, nb_permutations, trick,
 				     trick_cutoff, type_permbf, use_max_bf,
-				     rngPerm, rngTrick);
+				     nb_threads, rngPerm, rngTrick);
   }
   
   if(verbose == 1)
@@ -1793,19 +1808,24 @@ makePermutations(
   const int & type_perm_sep,
   const string & type_permbf,
   const bool & use_max_bf,
+  const int & nb_threads,
   const int & verbose,
   map<string, Gene> & gene2object)
 {
   if(verbose > 0){
     cout << "get gene-level p-values by permuting expression levels ..." << endl
 	 << "permutation"<< (nb_permutations > 1 ? "s=" : "=") << nb_permutations
-	 << " seed=" << seed
-	 << " trick=" << trick
-	 << " trick_cutoff=" << trick_cutoff;
+	 << " seed=" << seed;
+    if(trick != 0){
+      cout << " trick=" << trick
+	   << " trick_cutoff=" << trick_cutoff;
+    }
     if(type_analysis.compare("sep") == 0)
       cout << " perm_sep=" << type_perm_sep;
     else if(type_analysis.compare("join") == 0)
       cout << " perm_bf=" << type_permbf;
+    if(nb_threads > 1)
+      cout << " threads=" << nb_threads;
     cout << endl << flush;
   }
   
@@ -1827,13 +1847,13 @@ makePermutations(
   if(type_analysis.compare("sep") == 0 && type_perm_sep != 0)
     makePermutationsSep(subgroups, samples, need_qnorm, covariates,
 			nb_permutations, seed, trick, trick_cutoff,
-			type_perm_sep, rngPerm, rngTrick, verbose,
-			gene2object);
+			type_perm_sep, nb_threads, rngPerm, rngTrick,
+			verbose, gene2object);
   if(type_analysis.compare("join") == 0 && type_permbf.compare("none") != 0)
     makePermutationsJoin(subgroups, samples, need_qnorm, covariates, iGridL,
 			 iGridS, type_errors, prop_cov_errors, nb_permutations,
 			 seed, trick, trick_cutoff, type_permbf, use_max_bf,
-			 rngPerm, rngTrick, verbose, gene2object);
+			 nb_threads, rngPerm, rngTrick, verbose, gene2object);
   
   gsl_rng_free(rngPerm);
   if(trick != 0)
@@ -2357,6 +2377,7 @@ void run(const string & file_genopaths,
 	 const int & type_perm_sep,
 	 const string & type_permbf,
 	 const bool & use_max_bf,
+	 const int & nb_threads,
 	 const string & file_snpstokeep,
 	 const vector<string> & subgroups_tokeep,
 	 const int & verbose)
@@ -2414,7 +2435,7 @@ void run(const string & file_genopaths,
     makePermutations(subgroups, samples, type_analysis, need_qnorm, covariates,
 		     iGridL, iGridS, type_errors, prop_cov_errors, nb_permutations, seed,
 		     trick, trick_cutoff, type_perm_sep, type_permbf,
-		     use_max_bf, verbose, gene2object);
+		     use_max_bf, nb_threads, verbose, gene2object);
   
   writeRes(out_prefix, save_sstats, save_raw_abfs, subgroups, gene2object,
 	   snp2object, type_analysis, iGridL, iGridS, type_bfs, nb_permutations,
@@ -2423,7 +2444,7 @@ void run(const string & file_genopaths,
 
 int main(int argc, char ** argv)
 {
-  int verbose = 1, trick = 0, type_perm_sep = 0;
+  int verbose = 1, trick = 0, type_perm_sep = 0, nb_threads = 1;
   size_t radius = 100000, nb_permutations = 0, seed = string::npos, trick_cutoff = 10;
   float min_maf = 0.0, prop_cov_errors = 0.5;
   bool save_sstats = false, save_raw_abfs = false, need_qnorm = false,
@@ -2440,7 +2461,7 @@ int main(int argc, char ** argv)
 	       file_covarpaths, file_largegrid, file_smallgrid, type_bfs,
 	       type_errors, prop_cov_errors, nb_permutations, seed, trick,
 	       trick_cutoff, type_perm_sep, type_permbf, use_max_bf,
-	       file_snpstokeep, subgroups_tokeep, verbose);
+	       nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -2457,7 +2478,7 @@ int main(int argc, char ** argv)
       radius, out_prefix, save_sstats, save_raw_abfs, type_analysis, need_qnorm,
       min_maf, file_covarpaths, file_largegrid, file_smallgrid, type_bfs,
       type_errors, prop_cov_errors, nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
-      type_permbf, use_max_bf, file_snpstokeep, subgroups_tokeep,
+      type_permbf, use_max_bf, nb_threads, file_snpstokeep, subgroups_tokeep,
       verbose);
   
   if(verbose > 0){

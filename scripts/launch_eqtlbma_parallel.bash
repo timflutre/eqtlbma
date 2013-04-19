@@ -64,6 +64,8 @@ function help () {
     msg+="      --pbf\twhich BF to use as the test statistic for the joint-analysis permutations\n"
     msg+="\t\tdefault=none\n"
     msg+="      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations\n"
+    msg+="      --thread\tnumber of threads for the permutations\n"
+    msg+="\t\tdefault=1\n"
     msg+="      --sbgrp\tidentifier of the subgroup to analyze\n"
     msg+="\n"
     msg+="Examples:\n"
@@ -98,7 +100,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -136,6 +138,7 @@ function parseArgs () {
 	    --pbf) pbf=$2; shift 2;;
 	    --permsep) permsep=$2; shift 2;;
 	    --maxbf) maxbf=true; shift;;
+	    --thread) thread=$2; shift 2;;
 	    --sbgrp) sbgrp=$2; shift 2;;
             --) shift; break;;
             *) echo "ERROR: options parsing failed"; exit 1;;
@@ -210,6 +213,7 @@ trickCutoff=10
 permsep=0
 pbf="none"
 maxbf=false
+thread=1
 sbgrp=""
 parseArgs "$@"
 
@@ -280,6 +284,7 @@ if [ $nperm -gt "0" ]; then
 	    cmd+=" --maxbf"
 	fi
     fi
+    cmd+=" --thread ${thread}"
 fi
 if [ ! -z "${snpDir}" ]; then
     cmd+=" --snp ${snp}"

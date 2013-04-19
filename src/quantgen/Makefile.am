@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -I$(top_srcdir)/src @AM_CXXFLAGS@
+AM_CXXFLAGS = -I$(top_srcdir)/src -fopenmp @AM_CXXFLAGS@
 
 lib_LIBRARIES = libquantgen.a
 
