@@ -104,6 +104,7 @@ namespace quantgen {
     double GetExplevel(const string & subgroup, const size_t & idx) const;
     void TestForAssociations(const vector<string> & subgroups,
 			     const Samples & samples,
+			     const string & likelihood,
 			     const string & type_analysis,
 			     const bool & need_qnorm,
 			     const Covariates & covariates,
@@ -118,6 +119,7 @@ namespace quantgen {
     void MakePermutationsSepPerSubgroup(
       const string & subgroup,
       const Samples & samples,
+      const string & likelihood,
       const bool & need_qnorm,
       const Covariates & covariates,
       const size_t & nb_permutations,
@@ -133,6 +135,7 @@ namespace quantgen {
     void MakePermutationsSepAllSubgroups(
       const vector<string> & subgroups,
       const Samples & samples,
+      const string & likelihood,
       const bool & need_qnorm,
       const Covariates & covariates,
       const size_t & nb_permutations,
@@ -146,6 +149,7 @@ namespace quantgen {
     double GetTrueMinPval(void) const { return pval_true_min_allsbgrps_; };
     void MakePermutationsJoin(const vector<string> & subgroups,
 			      const Samples & samples,
+			      const string & likelihood,
 			      const bool & need_qnorm,
 			      const Covariates & covariates,
 			      const Grid & iGridL,

@@ -202,6 +202,7 @@ namespace quantgen {
   void Gene::TestForAssociations(
     const vector<string> & subgroups,
     const Samples & samples,
+    const string & likelihood,
     const string & type_analysis,
     const bool & need_qnorm,
     const Covariates & covariates,
@@ -231,8 +232,10 @@ namespace quantgen {
 	for(vector<string>::const_iterator it = subgroups.begin();
 	    it != subgroups.end(); ++it){
 	  if(HasExplevels(*it) && pt_snp->HasGenotypes(*it))
-	    gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
-					     *it, need_qnorm, perm);
+	    gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp,
+					     covariates, *it,
+					     likelihood, need_qnorm,
+					     perm);
 	}
 	if(type_analysis.compare("join") == 0)
 	  gene_snp_pair.CalcAbfsUvlr(subgroups, whichBfs, iGridL, iGridS);
@@ -307,6 +310,7 @@ namespace quantgen {
   void Gene::MakePermutationsSepPerSubgroup(
     const string & subgroup,
     const Samples & samples,
+    const string & likelihood,
     const bool & need_qnorm,
     const Covariates & covariates,
     const size_t & nb_permutations,
@@ -350,7 +354,8 @@ namespace quantgen {
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(HasExplevels(subgroup) && pt_snp->HasGenotypes(subgroup)){
 	  gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
-					   subgroup, need_qnorm, perm);
+					   subgroup, likelihood, need_qnorm,
+					   perm);
 	  pvals_perm[idx_snp] = gene_snp_pair.GetBetapvalGeno(subgroup);
 	}
       }
@@ -418,6 +423,7 @@ namespace quantgen {
   void Gene::MakePermutationsSepAllSubgroups(
     const vector<string> & subgroups,
     const Samples & samples,
+    const string & likelihood,
     const bool & need_qnorm,
     const Covariates & covariates,
     const size_t & nb_permutations,
@@ -464,7 +470,8 @@ namespace quantgen {
 	    it_sbgrp != subgroups.end(); ++it_sbgrp){
 	  if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp)){
 	    gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
-					     *it_sbgrp, need_qnorm, perm);
+					     *it_sbgrp, likelihood, need_qnorm,
+					     perm);
 	    pval_perm_sbgrp = gene_snp_pair.GetBetapvalGeno(*it_sbgrp);
 	    if(pval_perm_sbgrp < pval_perm_min_sbgrp)
 	      pval_perm_min_sbgrp = pval_perm_sbgrp;
@@ -520,6 +527,7 @@ namespace quantgen {
 
   void Gene::MakePermutationsJoin(const vector<string> & subgroups,
 				  const Samples & samples,
+				  const string & likelihood,
 				  const bool & need_qnorm,
 				  const Covariates & covariates,
 				  const Grid & iGridL,
@@ -577,8 +585,9 @@ namespace quantgen {
 	  for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
 	      it_sbgrp != subgroups.end(); ++it_sbgrp)
 	    if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp))
-	      gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
-					       *it_sbgrp, need_qnorm, perm);
+	      gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp,
+					       covariates, *it_sbgrp,
+					       likelihood, need_qnorm, perm);
 	  gene_snp_pair.CalcAbfsUvlr(subgroups, whichPermBf, iGridL, iGridS);
 	}
 	else{ // if mvlr or hybrid

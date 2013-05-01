@@ -1,6 +1,9 @@
-## `functional_tests.R' simulate a typical eQTL data set in multiple
-## tissues and analyze it with R in order to test `eqtlbma'.
+#!/usr/bin/env Rscript
+
+## `functional_tests.R' simulates a typical eQTL data set in multiple
+## tissues and analyzes it with R in order to test `bf'.
 ## Copyright (C) 2012-2013 Timothee Flutre
+## License: GPLv3+
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -19,35 +22,85 @@
 
 rm(list=ls())
 sink(file=stdout(), type="message")
+prog.name <- "functional_tests.R"
 
-parseArgs <- function(){
-  params <- list(verbose=1,
-                 dir.name=NULL,
-                 rmvGenesFromSbgrp=FALSE,
-                 withCovars=FALSE,
-                 mvlr=FALSE,
-                 rmvIndsFromSbgrp=FALSE)
-  
+help <- function(){
+  txt <- paste0("`", prog.name, "' simulates a typical eQTL data set in multiple tissues and analyzes it with R in order to test `bf'.\n")
+  txt <- paste0(txt, "\nUsage: ", prog.name, " [OPTIONS] ...\n")
+  txt <- paste0(txt, "\nOptions:\n")
+  txt <- paste0(txt, "  -h, --help\tdisplay the help and exit\n")
+  txt <- paste0(txt, "  -V, --version\toutput version information and exit\n")
+  txt <- paste0(txt, "  -v, --verbose\tverbosity level (0/default=1/2/3)\n")
+  txt <- paste0(txt, "      --dir\tpath to the working directory\n")
+  txt <- paste0(txt, "      --rgs\tremove some genes from some subgroups\n")
+  txt <- paste0(txt, "      --cvrt\tuse covariates\n")
+  txt <- paste0(txt, "      --mvlr\tuse multivariate model\n")
+  txt <- paste0(txt, "      --ris\tremove some individuals from some subgroups\n")
+  txt <- paste0(txt, "      --pois\tuse Poisson likelihood\n")
+  message(txt)
+}
+
+version <- function(){
+  txt <- paste0(prog.name, " 1.0\n")
+  txt <- paste0(txt, "\n")
+  txt <- paste0(txt, "Written by Timothee Flutre.\n")
+  txt <- paste0(txt, "\n")
+  txt <- paste0(txt, "Copyright (C) 2011-2013 Timothee Flutre.\n")
+  txt <- paste0(txt, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
+  txt <- paste0(txt, "This is free software; see the source for copying conditions.  There is NO\n")
+  txt <- paste0(txt, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n")
+  message(txt)
+}
+
+parseCmdLine <- function(params){
   args <- commandArgs(trailingOnly=TRUE)
   ## print(args)
-  stopifnot(length(args) != 0)
   
-  for(i in seq(1, length(args), 2)){
-    if(args[i] == "-v" || args[i] == "--verbose")
+  i <- 0
+  while(i < length(args)){ # use "while" loop for options with no argument
+    i <- i + 1
+    if(args[i] == "-h" || args[i] == "--help"){
+      help()
+      quit("no", status=0)
+    }
+    else if(args[i] == "-V" || args[i] == "--version"){
+      version()
+      quit("no", status=0)
+    }
+    if(args[i] == "-v" || args[i] == "--verbose"){
       params$verbose <- as.numeric(args[i+1])
-    else if(args[i] == "--dir")
+      i <- i + 1
+    }
+    else if(args[i] == "--dir"){
       params$dir.name <- args[i+1]
-    else if(args[i] == "--rgs")
+      i <- i + 1
+    }
+    else if(args[i] == "--rgs"){
       params$rmvGenesFromSbgrp <- TRUE
-    else if(args[i] == "--cvrt")
+      i <- i + 1
+    }
+    else if(args[i] == "--cvrt"){
       params$withCovars <- TRUE
-    else if(args[i] == "--mvlr")
+      i <- i + 1
+    }
+    else if(args[i] == "--mvlr"){
       params$mvlr <- TRUE
-    else if(args[i] == "--ris")
+      i <- i + 1
+    }
+    else if(args[i] == "--ris"){
       params$rmvIndsFromSbgrp <- TRUE
+      i <- i + 1
+    }
+    else if(args[i] == "--pois"){
+      params$poisson.lik <- TRUE
+      i <- i + 1
+    }
   }
-  if(params$verbose > 1)
+  
+  if(params$verbose > 1){
+    message("parameters:")
     print(params)
+  }
   
   if(params$mvlr || params$rmvIndsFromSbgrp)
     suppressPackageStartupMessages(require(MASS)) # for ginv()
@@ -55,8 +108,10 @@ parseArgs <- function(){
   return(params)
 }
 
-##-----------------------------------------------------------------------------
-## list of functions
+checkParams <- function(params){
+  stopifnot(! is.null(params$dir.name),
+            file.exists(params$dir.name))
+}
 
 print.mat2 <- function(mat, a, b){
   for(i in 1:min(a, nrow(mat))){
@@ -127,7 +182,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
 }
 
 getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
-                             verbose=0){
+                             poisson.lik=FALSE, verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
   
@@ -135,7 +190,7 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
   params$seed <- 1859
   set.seed(params$seed)
   
-  nb.inds <- 500 # don't change, see rmvIndsFromSbgrp
+  nb.inds <- 200 # don't change, see rmvIndsFromSbgrp
   inds <- data.frame(id=paste0("ind", 1:nb.inds),
                      name=paste0("individual ", 1:nb.inds),
                      stringsAsFactors=FALSE)
@@ -202,8 +257,8 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
                                    ind=inds$id))
   }
   configs <- getBinaryConfigs(nb.subgroups)
-  pves.g <- runif(n=nb.pairs, min=0.4, max=0.8) # explained by genotype
-  hets <- runif(n=nb.pairs, min=0, max=0.4)# heterogeneity
+  pves.g <- runif(n=nb.pairs, min=0.1, max=0.4) # explained by genotype
+  hets <- runif(n=nb.pairs, min=0, max=0.2)# heterogeneity
   mus <- rnorm(n=nb.subgroups, mean=4, sd=2)
   sigmas <- rep(1, nb.subgroups) # st dev of errors
   gs.pair <- 0 # index of the gene-SNP pair
@@ -256,12 +311,21 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
     }
   }
   
-  for(i in 1:nb.pairs){
+  for(gs.pair in 1:nb.pairs){
     for(s in 1:nb.subgroups){
-      phenos[[s]][truth$gene[i],] <- truth[i,paste0("mu",s)] +
-        truth[i,paste0("b",s)] * truth[i,paste0("sigma",s)] *
-          geno.counts[truth[i,"snp"],] +
-            rnorm(n=nb.inds, mean=0, sd=truth[i,paste0("sigma",s)])
+      if(! poisson.lik){
+        phenos[[s]][truth$gene[gs.pair],] <- truth[gs.pair,paste0("mu",s)] +
+          truth[gs.pair,paste0("b",s)] * truth[gs.pair,paste0("sigma",s)] *
+            geno.counts[truth[gs.pair,"snp"],] +
+              rnorm(n=nb.inds, mean=0, sd=truth[gs.pair,paste0("sigma",s)])
+      } else{
+        for(i in 1:nb.inds){
+          lambda <- exp(truth[gs.pair,paste0("mu",s)] +
+                        truth[gs.pair,paste0("b",s)] * truth[gs.pair,paste0("sigma",s)] *
+                        geno.counts[truth[gs.pair,"snp"],i])
+          phenos[[s]][truth$gene[gs.pair],i] <- rpois(n=1, lambda=lambda)
+        }
+      }
     }
   }
   
@@ -276,9 +340,9 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
     truth <- tmp
   }
   
-  ## rmv 250 inds from s3
+  ## rmv some individuals from s3
   if(rmvIndsFromSbgrp)
-    phenos[["s3"]] <- phenos[["s3"]][,1:250]
+    phenos[["s3"]] <- phenos[["s3"]][,1:100]
   
   return(list(inds=inds,
               gene.coords=gene.coords,
@@ -342,8 +406,101 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
               quote=FALSE, sep="\t", row.names=FALSE)
 }
 
+## Freely available online explanations at:
+## http://sfb649.wiwi.hu-berlin.de/fedc_homepage/xplore/ebooks/html/spm/spmhtmlnode27.html
+irls <- function(y, X, threshold, family, verbose=0){
+  stopifnot(is.matrix(X), is.vector(y), nrow(X) == length(y),
+            length(grep("poisson", family)) != 0)
+  
+  ## internal functions ---------------
+  init.mu <- function(y, family){
+    if(family != "binomial"){
+      mu <- y
+      mu[mu == 0] <- 0.01
+    } else{
+      mu <- (y + 0.5) / (k + 1) # k: nb of trials
+    }
+    return(mu)
+  }
+  compute.z <- function(y, mu, family){
+    if(length(grep("poisson", family)) != 0){
+      return(log(mu) + (y - mu) * (1/mu))
+    }
+  }
+  compute.weights <- function(mu, family){
+    if(length(grep("poisson", family)) != 0){
+      return(as.vector(mu))
+    }
+  }
+  weighted.leastsquare.fit <- function(X, w, z){
+    fit <- lm(z ~ X[,2], weights=w)
+    chisq <- sum(w * fit$residuals^2)
+    return(list(rank=fit$rank, chisq=chisq, beta.hat=as.numeric(coefficients(fit))))
+  }
+  compute.mu <- function(beta, X){
+    return(exp(X %*% beta))
+  }
+  compute.variance <- function(X, w, family, y=NULL, beta=NULL){
+    if(length(grep("poisson", family)) != 0){
+      if(family == "poisson"){
+        list(cov=solve(t(X) %*% diag(w) %*% X), sigma2=1)
+      } else if(family == "quasipoisson"){
+        mu <- as.vector(compute.mu(beta, X))
+        sigma2 <- (1/(nrow(X)-ncol(X))) * sum((y - mu)^2 / mu)
+        list(cov=sigma2 * solve(t(X) %*% diag(w) %*% X), sigma2=sigma2)
+      }
+    }
+  }
+  compute.pvalue <- function(family, beta.hat, se.beta.hat, N, rank){
+    if(family == "poisson"){
+      2 * pnorm(-abs(beta.hat / se.beta.hat))
+    } else if(family == "quasipoisson"){
+      2 * pt(-abs(beta.hat / se.beta.hat), df=N-rank)
+    }
+  }
+  ##-----------------------------------
+  
+  mu <- init.mu(y, family)
+  old.chisq <- -1
+  nb.iters <- 0
+  
+  while(TRUE){
+    if(verbose > 0)
+      message(nb.iters)
+    z <- compute.z(y, mu, family)
+    w <- compute.weights(mu, family)
+    wls.fit <- weighted.leastsquare.fit(X, w, z)
+    if(verbose > 0){
+      tmp <- paste0("chisq=", format(wls.fit$chisq, digits=10))
+      tmp <- paste0(tmp, " beta.hat=(", format(wls.fit$beta.hat[1], digits=6))
+      for(beta in wls.fit$beta.hat[-1])
+        tmp <- paste0(tmp, ",", format(beta, digits=6))
+      tmp <- paste0(tmp, ")")
+      message(tmp)
+    }
+    if(abs(wls.fit$chisq - old.chisq) < threshold){
+      var.beta.hat <- compute.variance(X, w, family, y, wls.fit$beta.hat)
+      pval.beta.hat <- compute.pvalue(family, wls.fit$beta.hat,
+                                      sqrt(diag(var.beta.hat$cov)), length(y),
+                                      wls.fit$rank)
+      break
+    }
+    old.chisq <- wls.fit$chisq
+    mu <- compute.mu(wls.fit$beta.hat, X)
+    nb.iters <- nb.iters + 1
+  }
+  
+  return(list(beta.hat=wls.fit$beta.hat,
+              se.beta.hat=sqrt(diag(var.beta.hat$cov)),
+              pval.beta.hat=pval.beta.hat,
+              sigma2=var.beta.hat$sigma2,
+              chisq=wls.fit$chisq,
+              nb.iters=nb.iters))
+}
+
 ## Calculate the summary statistics in each tissue
-calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE, verbose=0){
+calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
+                                      poisson.lik=FALSE, verbose=0){
   stopifnot(! is.null(data))
   if(verbose > 0)
     message("calculate the summary statistics in each tissue ...")
@@ -377,22 +534,36 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE, verbose=0){
         if(gene %in% rownames(data$phenos[[s]])){
           sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
           common.inds.idx <- which(data$inds$id %in% colnames(data$phenos[[s]]))
-          if(! (withCovars && "sex" %in% names(data$inds))){
-            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                              as.numeric(data$geno.counts[p,common.inds.idx])))
-          } else
-            tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                              as.numeric(data$geno.counts[p,common.inds.idx]) +
-                              as.numeric(data$inds$sex[common.inds.idx])))
-          sstats[[s]]$pve[i] <- tmp$r.squared
-          sstats[[s]]$sigmahat[i] <- tmp$sigma
-          sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
-          sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
-          sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
-          if(withCovars && "sex" %in% names(data$inds)){
-            sstats[[s]]$betahat.sex[i] <- tmp$coefficients[3,"Estimate"]
-            sstats[[s]]$sebetahat.sex[i] <- tmp$coefficients[3,"Std. Error"]
-            sstats[[s]]$betapval.sex[i] <- tmp$coefficients[3,"Pr(>|t|)"]
+          if(! poisson.lik){
+            if(! (withCovars && "sex" %in% names(data$inds))){
+              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                                as.numeric(data$geno.counts[p,common.inds.idx])))
+            } else{
+              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                                as.numeric(data$geno.counts[p,common.inds.idx]) +
+                                as.numeric(data$inds$sex[common.inds.idx])))
+            }
+            sstats[[s]]$pve[i] <- tmp$r.squared
+            sstats[[s]]$sigmahat[i] <- tmp$sigma
+            sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
+            sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
+            sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
+          } else{
+            fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                       as.numeric(data$geno.counts[p,common.inds.idx]),
+                       family=poisson(link=log))
+            tmp <- summary(fit)
+            sstats[[s]]$sigmahat[i] <- 1 # change this if quasi-likelihood
+            sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
+            sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
+            sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|z|)"]
+            ## tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
+            ##             X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
+            ##             threshold=1e-6, family="poisson")
+            ## sstats[[s]]$sigmahat[i] <- sqrt(tmp$sigma2)
+            ## sstats[[s]]$betahat.geno[i] <- tmp$beta.hat[2]
+            ## sstats[[s]]$sebetahat.geno[i] <- tmp$se.beta.hat[2]
+            ## sstats[[s]]$betapval.geno[i] <- tmp$pval.beta.hat[2]
           }
         } else # case where gene is absent in subgroup
           sstats[[s]]$n[i] <- 0
@@ -539,17 +710,6 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
   return(l10abfs)
 }
 
-print.mat <- function(mat){
-  a <- nrow(mat)
-  b <- ncol(mat)
-  for(i in 1:a){
-    for(j in 1:b){
-      cat(sprintf("%e  ", mat[i,j]))
-    }
-    cat("\n")
-  }
-}
-
 ## Return the log10(ABF) from Wen (arXiv 2012)
 ## using raw data or summary statistics
 ##
@@ -568,11 +728,11 @@ calcL10AbfMvlr <- function(Y=NULL, Xg=NULL, Xc=NULL,
   
   S <- ifelse(!is.null(Y), ncol(Y), ncol(Vg)) # nb of subgroups
   W <- matrix(rep(oma2,S*S),S,S) + diag(rep(phi2,S),S,S)
-  if(debug){message("W="); print.mat2(W, 4, 4)}
+  ## if(debug){message("W="); print.mat2(W, 4, 4)}
   P <- ifelse(!is.null(Xg), ncol(Xg), length(betag.hat)/S) # nb of snps
   Wg <- diag(rep(1,P)) %x% W
   Wg <- Wg * (gamma %*% t(gamma))
-  if(debug){message("W="); print.mat2(W, 4, 4)}
+  ## if(debug){message("W="); print.mat2(W, 4, 4)}
   
   # inputs are raw data
   if(! is.null(Y) && ! is.null(Xg) && ! is.null(Xc)){
@@ -586,16 +746,16 @@ calcL10AbfMvlr <- function(Y=NULL, Xg=NULL, Xc=NULL,
     N <- dim(Y)[1] # nb of individuals
     Q <- dim(Xc)[2] # nb of other covariates + intercept
     m <- Q+S+1 # degrees of freedom for the Wishart
-    if(debug){message(paste0("N=",N," P=",P," S=",S," Q=",Q," m=",m))}
+    ## if(debug){message(paste0("N=",N," P=",P," S=",S," Q=",Q," m=",m))}
     
     Sigma.hat.full <- (t(Y)%*%(diag(rep(1,N)) - X%*%ginv(t(X)%*%X)%*%t(X))%*%Y + diag(rep(1e-8,S),S,S)) / (N+m-Q-S-1)
     Sigma.hat.null <- (t(Y)%*%(diag(rep(1,N)) - Xc%*%solve(t(Xc)%*%Xc)%*%t(Xc))%*%Y + diag(rep(1e-8,S),S,S)) / (N+m-Q-S-1)
-    if(debug){message("Sigma.hat.full="); print.mat(Sigma.hat.full)}
-    if(debug){message("Sigma.hat.null="); print.mat(Sigma.hat.null)}
+    ## if(debug){message("Sigma.hat.full="); print.mat2(Sigma.hat.full)}
+    ## if(debug){message("Sigma.hat.null="); print.mat2(Sigma.hat.null)}
     
     Sigma.hat <- alpha*Sigma.hat.full + (1-alpha)*Sigma.hat.null
     Sigma.hat.inv <- solve(Sigma.hat)
-    if(debug){message("Sigma.hat="); print.mat(Sigma.hat)}
+    ## if(debug){message("Sigma.hat="); print.mat2(Sigma.hat)}
     
     Vg.inv <- (t(Xg)%*%Xg - t(Xg)%*%Xc%*%solve(t(Xc)%*%Xc)%*%t(Xc)%*%Xg) %x% Sigma.hat.inv
     
@@ -604,9 +764,9 @@ calcL10AbfMvlr <- function(Y=NULL, Xg=NULL, Xc=NULL,
     bVi <- t(vec) %*% (Xg %x% Sigma.hat.inv)
   } else{ # inputs are summary stats
     Vg.inv <- solve(Vg)
-    if(debug){message("Vg.inv="); print.mat(Vg.inv)}
+    ## if(debug){message("Vg.inv="); print.mat2(Vg.inv)}
     bVi <- t(betag.hat) %*% Vg.inv
-    if(debug){message("bVi="); print.mat(bVi)}
+    ## if(debug){message("bVi="); print.mat2(bVi)}
   }
   
   if(model == "ES"){
@@ -615,17 +775,17 @@ calcL10AbfMvlr <- function(Y=NULL, Xg=NULL, Xc=NULL,
     } else
       Wg <- diag(diag(Sigma.hat))^.5 %*% Wg %*% diag(diag(Sigma.hat))^.5
   }
-  if(debug){message("Wg="); print.mat(Wg)}
+  ## if(debug){message("Wg="); print.mat2(Wg)}
   
   ivw <- diag(rep(1,P*S)) + Vg.inv %*% Wg
-  if(debug){message("ivw="); print.mat(ivw)}
+  ## if(debug){message("ivw="); print.mat2(ivw)}
   
-  if(debug){message(paste0("det=",determinant(ivw)$modulus[[1]]))}
+  ## if(debug){message(paste0("det=",determinant(ivw)$modulus[[1]]))}
   
   l10abf <- (- 0.5 * determinant(ivw)$modulus[[1]] +
              0.5 * bVi %*% Wg %*% solve(ivw) %*% t(bVi)) /
                log(10)
-  if(debug){message(paste0("l10abf=",l10abf))}
+  ## if(debug){message(paste0("l10abf=",l10abf))}
   
   return(l10abf)
 }
@@ -697,7 +857,7 @@ calcBetahatsAndDiagsPerSubgroup <- function(y, Xg, Xc, alpha=0.0, verbose=0){
     X <- cbind(Xc[[s]], Xg[[s]]) # N x (Q+P) where P=1 (single SNP)
     idx.geno <- ncol(X) # index of column corresponding to genotype
     
-    if(verbose > 0){message("MLE of full model")}
+    ## if(verbose > 0){message("MLE of full model")}
     X.svd <- svd(X) # X = U D V'
     if(length(X.svd$d) > 1){
       D.inv <- diag(1/X.svd$d)
@@ -707,9 +867,9 @@ calcBetahatsAndDiagsPerSubgroup <- function(y, Xg, Xc, alpha=0.0, verbose=0){
     B.hat.full <- X.ps %*% Y
     E.hat <- Y - X %*% B.hat.full # residuals
     sigma2.hat.full <- ((1/N) * t(E.hat) %*% E.hat)[1,1]
-    if(verbose > 0){message(paste0("sigma2.hat.full=",sigma2.hat.full))}
+    ## if(verbose > 0){message(paste0("sigma2.hat.full=",sigma2.hat.full))}
     
-    if(verbose > 0){message("MLE of null model")}
+    ## if(verbose > 0){message("MLE of null model")}
     Xc.svd <- svd(Xc[[s]])
     if(length(Xc.svd$d) > 1){
       Dc.inv <- diag(1/Xc.svd$d)
@@ -719,7 +879,7 @@ calcBetahatsAndDiagsPerSubgroup <- function(y, Xg, Xc, alpha=0.0, verbose=0){
     B.hat.null <- Xc.ps %*% Y
     E.hat <- Y - Xc[[s]] %*% B.hat.null
     sigma2.hat.null <- ((1/N) * t(E.hat) %*% E.hat)[1,1]
-    if(verbose > 0){message(paste0("sigma2.hat.null=",sigma2.hat.null))}
+    ## if(verbose > 0){message(paste0("sigma2.hat.null=",sigma2.hat.null))}
     
     ## final estimates
     betag.hat <- B.hat.full[idx.geno,1]
@@ -815,30 +975,16 @@ calcOffDiagCovarsFromPairsOfSubgroups <- function(y, Xg, Xc, sigma2.hat,
   ## and between genotype betahats
   for(s1 in 1:(S-1)){
     for(s2 in (s1+1):S){
-      ## message(paste0("s1=",s1," s2=",s2))
       A <- getMatricesA(inds, X, s1, s2)
-      ## message("A_s1=")
-      ## print.mat(A[["s1"]][,1:4])
-      ## message("A_s2=")
-      ## print.mat(A[["s2"]][,1:4])
       
       Sigmas.s1s2.hat <- getErrCovSigmaBtwPairSubgroups(inds, X, y, s1, s2)
-      ## message("Sigma_full")
-      ## print.mat(Sigmas.s1s2.hat[["full"]])
-      ## message("Sigma_null")
-      ## print.mat(Sigmas.s1s2.hat[["null"]])
       
       Sigma.s1s2.hat <- alpha * Sigmas.s1s2.hat[["full"]] +
         (1-alpha) * Sigmas.s1s2.hat[["null"]]
       Sigma.hat[s1,s2] <- Sigma.s1s2.hat[1,2]
       
       cov.betahat1.betahat2 <- Sigma.hat[s1,s2] * A[["s1"]] %*% t(A[["s2"]])
-      ## message("cov.betahat1.betahat2")
-      ## print.mat2(cov.betahat1.betahat2, 4, 4)
       Vg[s1,s2] <- cov.betahat1.betahat2[2,2]
-      
-      ## message("Sigma.hat="); print(Sigma.hat)
-      ## message("Vg="); print(Vg)
     }
   }
   
@@ -871,31 +1017,12 @@ calcSstatsBoth <- function(data, g, p, prop.fit.sigma){
   ## and diags of Sigma.hat.full and Sigma.hat.null
   sstats.uvlr <- calcBetahatsAndDiagsPerSubgroup(
     y=y, Xg=Xg, Xc=Xc, alpha=prop.fit.sigma, verbose=0)
-  if(data$gene.coords$id[g] == "gene1" && data$snp.coords$id[p] == "snp1"){
-    message(paste0("gene1-snp1:",
-                   " sigma2hat.s1=", sprintf("%.6e", sstats.uvlr$sigma2.hat[1]),
-                   " betag.hat.s1=", sprintf("%.6e", sstats.uvlr$betag.hat[1]),
-                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[1]), ")",
-                   " sigma2hat.s2=", sprintf("%.6e", sstats.uvlr$sigma2.hat[2]),
-                   " betag.hat.s2=", sprintf("%.6e", sstats.uvlr$betag.hat[2]),
-                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[2]), ")",
-                   " sigma2hat.s3=", sprintf("%.6e", sstats.uvlr$sigma2.hat[3]),
-                   " betag.hat.s3=", sprintf("%.6e", sstats.uvlr$betag.hat[3]),
-                   " (", sprintf("%.6e", sstats.uvlr$varbetag.hat[3]), ")"))
-  }
   
   ## for common individuals between each pair of subgroups,
   ## calc each off-diagonal element of Vg as well as both Sigma's
   sstats.mvlr <- calcOffDiagCovarsFromPairsOfSubgroups(
     y=y, Xg=Xg, Xc=Xc, sigma2.hat=sstats.uvlr$sigma2.hat,
     varbetag.hat=sstats.uvlr$varbetag.hat, alpha=prop.fit.sigma, verbose=0)
-  if(data$gene.coords$id[g] == "gene1" && data$snp.coords$id[p] == "snp1"){
-    message("gene1-snp1:")
-    message("Sigma.hat=")
-    print.mat(sstats.mvlr$Sigma.hat)
-    message("Vg=")
-    print.mat(sstats.mvlr$Vg)
-  }
   
   return(list(betag.hat=sstats.uvlr$betag.hat,
               Sigma.hat=sstats.mvlr$Sigma.hat,
@@ -974,7 +1101,8 @@ calcL10AbfsRawAllGridSFromSstats <- function(sstats.both, gridS, configs,
 
 calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
                                        withCovars=FALSE, mvlr=FALSE,
-                                       rmvIndsFromSbgrp=FALSE, verbose=0){
+                                       rmvIndsFromSbgrp=FALSE,
+                                       poisson.lik=FALSE, verbose=0){
   stopifnot(! is.null(data), ! is.null(sstats), ! is.null(grids))
   if(verbose > 0)
     message("calculate raw ABFs ...")
@@ -999,7 +1127,8 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
       if(withCovars && "sex" %in% names(data$inds))
         nbCovars <-  1
       if(! mvlr && ! rmvIndsFromSbgrp){
-        std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats, g, p,
+        std.sstats.corr <- getStdSstatsAndCorrSmallSampleSize(data, sstats,
+                                                              g, p,
                                                               nbCovars)
         l10abfs.raw.const.gridL <- calcL10AbfsRawConstGridL(std.sstats.corr,
                                                             grids$gridL)
@@ -1153,18 +1282,23 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
 
 getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
                                       mvlr=FALSE, rmvIndsFromSbgrp=FALSE,
-                                      verbose=0){
+                                      poisson.lik=FALSE, verbose=0){
   stopifnot(! is.null(data), ! is.null(grids))
   if(verbose > 0)
     message("get results on simulated data with R ...")
   
-  sstats <- calcSstatsOnSimulatedData(data, withCovars, verbose-1)
+  sstats <- calcSstatsOnSimulatedData(data, withCovars, poisson.lik, verbose-1)
   
-  l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars,
-                                            mvlr, rmvIndsFromSbgrp, verbose-1)
-  
-  l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw, mvlr,
-                                            rmvIndsFromSbgrp, verbose-1)
+  if(! poisson.lik){
+    l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars,
+                                              mvlr, rmvIndsFromSbgrp, poisson.lik,
+                                              verbose-1)
+    l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw, mvlr,
+                                              rmvIndsFromSbgrp, verbose-1)
+  } else{
+    l10abfs.raw <- NA
+    l10abfs.avg <- NA
+  }
   
   return(list(sstats=sstats,
               l10abfs.raw=l10abfs.raw,
@@ -1185,44 +1319,59 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     for(j in 5:9) #ncol(res$sstats[[s]])) <- don't save covariates results
       tmp <- cbind(tmp, sprintf(fmt="%.06e", res$sstats[[s]][row.ids,j]))
     colnames(tmp) <- colnames(res$sstats[[s]])[1:9]
-    write.table(x=tmp, file=gzfile(paste0("exp_eqtlbma_sumstats_",s,".txt.gz")),
+    if(tmp[1,"pve"] == "NA") # this means "poisson.lik" is true
+      tmp[,"pve"] <- NA
+    write.table(x=tmp, file=gzfile(paste0("exp_bf_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep="\t", na="nan")
   }
   
-  tmp <- res$l10abfs.raw[,1:3]
-  for(j in 4:ncol(res$l10abfs.raw))
-    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.raw[,j])))
-  colnames(tmp) <- colnames(res$l10abfs.raw)
-  write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_raw.txt.gz"),
-              quote=FALSE, row.names=FALSE, sep="\t", na="nan")
-  
-  tmp <- res$l10abfs.avg[,1:3]
-  for(j in 4:ncol(res$l10abfs.avg))
-    tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.avg[,j])))
-  colnames(tmp) <- colnames(res$l10abfs.avg)
-  write.table(x=tmp, file=gzfile("exp_eqtlbma_l10abfs_avg-grids.txt.gz"),
-              quote=FALSE, row.names=FALSE, sep="\t", na="nan")
+  if(! is.na(res$l10abfs.raw)){
+    tmp <- res$l10abfs.raw[,1:3]
+    for(j in 4:ncol(res$l10abfs.raw))
+      tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.raw[,j])))
+    colnames(tmp) <- colnames(res$l10abfs.raw)
+    write.table(x=tmp, file=gzfile("exp_bf_l10abfs_raw.txt.gz"),
+                quote=FALSE, row.names=FALSE, sep="\t", na="nan")
+    
+    tmp <- res$l10abfs.avg[,1:3]
+    for(j in 4:ncol(res$l10abfs.avg))
+      tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.avg[,j])))
+    colnames(tmp) <- colnames(res$l10abfs.avg)
+    write.table(x=tmp, file=gzfile("exp_bf_l10abfs_avg-grids.txt.gz"),
+                quote=FALSE, row.names=FALSE, sep="\t", na="nan")
+  }
 }
 
-run <- function(){
-  params <- parseArgs()
-  if(params$verbose > 0)
-    message(paste0("START functional_tests.R (", date(), ")"))
+run <- function(params){
   setwd(params$dir.name)
   data <- getSimulatedData(params$rmvGenesFromSbgrp, params$rmvIndsFromSbgrp,
-                           params$verbose)
+                           params$poisson.lik, params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$withCovars,
                                    params$mvlr, params$rmvIndsFromSbgrp,
-                                   params$verbose)
+                                   params$poisson.lik, params$verbose)
   writeResultsOnSimulatedData(res, params$verbose)
-  if(params$verbose > 0)
-    message(paste0("END functional_tests.R (", date(), ")"))
 }
 
-##-----------------------------------------------------------------------------
-## Run the program
+main <- function(){
+  params <- list(verbose=1,
+                 dir.name=NULL,
+                 rmvGenesFromSbgrp=FALSE,
+                 withCovars=FALSE,
+                 mvlr=FALSE,
+                 rmvIndsFromSbgrp=FALSE,
+                 poisson.lik=FALSE)
+  params <- parseCmdLine(params)
+  checkParams(params)
+  if(params$verbose > 0)
+    message(paste0("START ", prog.name, " (", date(), ")"))
+  
+  run(params)
+  
+  if(params$verbose > 0)
+    message(paste0("END ", prog.name, " (", date(), ")"))
+}
 
-run()
+main()

@@ -1,1 +1,1 @@
-SUBDIRS = src/quantgen src doc tests scripts
+SUBDIRS = src/eqtlbma src doc tests scripts

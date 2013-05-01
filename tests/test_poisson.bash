@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch a functional test for bf with mvlr
+# Aim: launch a functional test for bf with Poisson likelihood
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`${0##*/}' launches a functional test for bf with mvlr.\n"
+    msg="\`${0##*/}' launches a functional test for bf with Poisson likelihood.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -82,7 +82,7 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    ${pathToRscript} --verbose 1 --dir $(pwd) --mvlr >& stdout_simul_exp
+    ${pathToRscript} --verbose 1 --dir $(pwd) --pois >& stdout_simul_exp
 }
 
 function calc_obs_res () {
@@ -91,10 +91,9 @@ function calc_obs_res () {
     fi
     $pathToBf --geno list_genotypes.txt --scoord snp_coords.bed.gz \
 	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
-	--out obs_bf --outss --outraw --type join --bfs all \
+	--out obs_bf --outss --outraw --lik poisson --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	--error mvlr --fiterr 0.0 \
 	-v 1 >& stdout_bf
 }
 
@@ -103,15 +102,24 @@ function comp_obs_vs_exp () {
 	echo "compare obs vs exp results ..."
     fi
     
-    if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
-		exit 1
-    fi
+    tol="1e-5" # hard to have exact same results between C++ and R for IRLS
+    for i in {1..3}; do
+	# if ! zcmp -s obs_bf_sumstats_s${i}.txt.gz exp_bf_sumstats_s${i}.txt.gz; then
+	if ! $(echo "exp <- read.table(\"exp_bf_sumstats_s${i}.txt.gz\", header=TRUE); obs <- read.table(\"obs_bf_sumstats_s${i}.txt.gz\", header=TRUE); if(isTRUE(all.equal(target=exp, current=obs, tolerance=${tol}))){quit(\"no\",0,FALSE)}else{quit(\"no\",1,FALSE)}" | R --vanilla --quiet --slave); then
+	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
+	    exit 1
+	fi
+    done
     
-    if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
-		exit 1
-    fi
+    # if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
+    # 	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
+    # 		exit 1
+    # fi
+    
+    # if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
+    # 	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
+    # 		exit 1
+    # fi
     
     if [ $verbose -gt "0" ]; then
 	echo "all tests passed successfully!"

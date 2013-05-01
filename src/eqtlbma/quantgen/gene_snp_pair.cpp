@@ -135,6 +135,7 @@ namespace quantgen {
 				       const Snp & snp,
 				       const Covariates & covariates,
 				       const string & subgroup,
+				       const string & likelihood,
 				       const bool & need_qnorm,
 				       const gsl_permutation * perm)
   {
@@ -144,23 +145,43 @@ namespace quantgen {
     FillStlContainers(samples, gene, snp, covariates, vector<string>(1, subgroup),
 		      false, need_qnorm, perm, Y, Xg, Xc, subgroups_with_data);
   
-    size_t N = Xg[0].size(); // nb of individuals
-    gsl_matrix * X = gsl_matrix_alloc(N, 1 + 1 + Xc[0].size());
-    gsl_vector * y = gsl_vector_alloc(N);
-    for(size_t i = 0; i < N; ++i) {
-      gsl_vector_set(y, i, Y[0][i]);
-      gsl_matrix_set(X, i, 0, 1.0); // intercept
-      gsl_matrix_set(X, i, 1, Xg[0][i]);
-      for(size_t j = 0; j < Xc[0].size(); ++j)
-	gsl_matrix_set(X, i, j+2, Xc[0][j][i]);
+    if(likelihood.compare("normal") == 0){
+      size_t N = Xg[0].size(); // nb of individuals
+      gsl_matrix * X = gsl_matrix_alloc(N, 1 + 1 + Xc[0].size());
+      gsl_vector * y = gsl_vector_alloc(N);
+      for(size_t i = 0; i < N; ++i){
+	gsl_vector_set(y, i, Y[0][i]);
+	gsl_matrix_set(X, i, 0, 1.0); // intercept
+	gsl_matrix_set(X, i, 1, Xg[0][i]);
+	for(size_t j = 0; j < Xc[0].size(); ++j)
+	  gsl_matrix_set(X, i, j+2, Xc[0][j][i]);
+      }
+      FitSingleGeneWithSingleSnp(X, y, subgroup2pve_[subgroup],
+				 subgroup2sigmahat_[subgroup],
+				 subgroup2sstats_[subgroup][0],
+				 subgroup2sstats_[subgroup][1],
+				 subgroup2sstats_[subgroup][2]);
+      gsl_matrix_free(X);
+      gsl_vector_free(y);
     }
-    FitSingleGeneWithSingleSnp(X, y, subgroup2pve_[subgroup],
-			       subgroup2sigmahat_[subgroup],
-			       subgroup2sstats_[subgroup][0],
-			       subgroup2sstats_[subgroup][1],
-			       subgroup2sstats_[subgroup][2]);
-    gsl_matrix_free(X);
-    gsl_vector_free(y);
+    else if(likelihood.compare("poisson") == 0){
+      vector<vector<double> > X(1 + Xc[0].size(), Xg[0].size()); // P x N
+      for(size_t i = 0; i < X[0].size(); ++i) // fill genotypes
+	X[0][i] = Xg[0][i];
+      for(size_t j = 1; j < X.size(); ++j) // fill other covariates
+	for(size_t i = 0; i < X[0].size(); ++i)
+	  X[j][i] = Xc[0][j-1][i];
+      IRLS irls("log-link");
+      irls.load_data(Y[0], X);
+      irls.fit_model();
+      vector<double> coef = irls.get_fit_coef(),
+	se_coef = irls.get_stderr();
+      subgroup2sigmahat_[subgroup] = 1.0;
+      subgroup2sstats_[subgroup][0] = coef[1];
+      subgroup2sstats_[subgroup][1] = se_coef[1];
+      subgroup2sstats_[subgroup][2] = 2 * gsl_cdf_gaussian_P(
+	-fabs(coef[1] / se_coef[1]), 1.0);
+    }
   }
 
   void GeneSnpPair::StandardizeSstatsAndCorrectSmallSampleSize(

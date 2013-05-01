@@ -40,6 +40,8 @@
 #include "quantgen/grid.hpp"
 #include "quantgen/MVLR.hpp"
 
+#include "irls/IRLS.h"
+
 namespace quantgen {
   
   // forward declaration, e.g. in GetSstatsOneSbgrp()
@@ -142,6 +144,7 @@ namespace quantgen {
       const Snp & snp,
       const Covariates & covariates,
       const string & subgroup,
+      const string & likelihood,
       const bool & needQnorm,
       const gsl_permutation * perm);
     void StandardizeSstatsAndCorrectSmallSampleSize(

@@ -2,14 +2,14 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch a basic functional test for eqtlbma
+# Aim: launch a basic functional test for bf
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`${0##*/}' launches a basic functional test for eqtlbma.\n"
+    msg="\`${0##*/}' launches a basic functional test for bf.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -17,7 +17,7 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2e\tabsolute path to the 'eqtlbma' binary\n"
+    msg+="      --p2e\tabsolute path to the 'bf' binary\n"
     msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
     msg+="      --noclean\tkeep temporary directory with all files\n"
     echo -e "$msg"
@@ -59,15 +59,15 @@ function parseArgs () {
             -h|--help) help; exit 0; shift;;
             -V|--version) version; exit 0; shift;;
             -v|--verbose) verbose=$2; shift 2;;
-            --p2e) pathToEqtlBma=$2; shift 2;;
+            --p2e) pathToBf=$2; shift 2;;
 	    --p2R) pathToRscript=$2; shift 2;;
 	    --noclean) clean=false; shift;;
             --) shift; break;;
             *) echo "ERROR: options parsing failed"; exit 1;;
         esac
     done
-    if [[ ! -f $pathToEqtlBma ]]; then
-	echo "ERROR: can't find path to 'eqtlbma' -> '${pathToEqtlBma}'"
+    if [[ ! -f $pathToBf ]]; then
+	echo "ERROR: can't find path to 'bf' -> '${pathToBf}'"
 	exit 1
     fi
     if [[ ! -f $pathToRscript ]]; then
@@ -82,20 +82,19 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    R --no-restore --no-save --slave --vanilla --file=${pathToRscript} \
-	--args --verbose 1 --dir $(pwd) >& stdout_simul_exp
+    ${pathToRscript} --verbose 1 --dir $(pwd) >& stdout_simul_exp
 }
 
 function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToEqtlBma --geno list_genotypes.txt --scoord snp_coords.bed.gz \
+    $pathToBf --geno list_genotypes.txt --scoord snp_coords.bed.gz \
 	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
-	--out obs_eqtlbma --outss --outraw --type join --bfs all \
+	--out obs_bf --outss --outraw --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	-v 1 >& stdout_eqtlbma
+	-v 1 >& stdout_bf
 }
 
 function comp_obs_vs_exp () {
@@ -104,21 +103,21 @@ function comp_obs_vs_exp () {
     fi
     
     for i in {1..3}; do
-    # nbDiffs=$(diff <(zcat obs_eqtlbma_sumstats_s${i}.txt.gz) <(zcat exp_eqtlbma_sumstats_s${i}.txt.gz) | wc -l)
+    # nbDiffs=$(diff <(zcat obs_bf_sumstats_s${i}.txt.gz) <(zcat exp_bf_sumstats_s${i}.txt.gz) | wc -l)
     # if [ ! $nbDiffs -eq 0 ]; then
-	if ! zcmp -s obs_eqtlbma_sumstats_s${i}.txt.gz exp_eqtlbma_sumstats_s${i}.txt.gz; then
-	    echo "file 'obs_eqtlbma_sumstats_s${i}.txt.gz' has differences with exp"
+	if ! zcmp -s obs_bf_sumstats_s${i}.txt.gz exp_bf_sumstats_s${i}.txt.gz; then
+	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
 	    exit 1
 	fi
     done
     
-    if ! zcmp -s obs_eqtlbma_l10abfs_raw.txt.gz exp_eqtlbma_l10abfs_raw.txt.gz; then
-    	echo "file 'obs_eqtlbma_l10abfs_raw.txt.gz' has differences with exp"
+    if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
+    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
 		exit 1
     fi
     
-    if ! zcmp -s obs_eqtlbma_l10abfs_avg-grids.txt.gz exp_eqtlbma_l10abfs_avg-grids.txt.gz; then
-    	echo "file 'obs_eqtlbma_l10abfs_avg-grids.txt.gz' has differences with exp"
+    if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
 		exit 1
     fi
     
@@ -130,7 +129,7 @@ function comp_obs_vs_exp () {
 #------------------------------------------------------------------------------
 
 verbose=1
-pathToEqtlBma=$eqtlbma_abspath
+pathToBf=$bf_abspath
 pathToRscript=$Rscript_abspath
 clean=true
 parseArgs "$@"

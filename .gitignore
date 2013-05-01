@@ -1,6 +1,9 @@
 *.[oa]
+*.lo
+*.la
 *~
 Makefile
+.libs
 .deps
 *.log
 *.trs
@@ -13,7 +16,7 @@ doc/manual_eqtlbma.pdf
 doc/stamp-vti
 doc/version.texi
 eqtlbma-*.tar.gz
-src/eqtlbma
+src/bf
 src/hm
 src/simul_flutre_et_al
 .Rhistory
