@@ -25,62 +25,62 @@
 #include <string>
 #include <iostream>
 
-#include "quantgen/utils_io.hpp"
-#include "quantgen/utils_math.hpp"
+#include "utils/utils_io.hpp"
+#include "utils/utils_math.hpp"
 
 namespace quantgen {
   
   struct Genotypes {
-    vector<double> values;
+    std::vector<double> values;
     double maf; // minor allele frequency
   };
   
   class Snp {
   private:
-    string name_;
-    string chromosome_;
+    std::string name_;
+    std::string chromosome_;
     size_t pos_; // 1-based
     
-    map<string,Genotypes> subgroup2genotypes_;
+    std::map<std::string,Genotypes> subgroup2genotypes_;
     
   public:
     Snp(void);
-    Snp(const string & name, const string & chr, const string & coord);
-    string GetName(void) const { return name_; };
-    string GetChromosome(void) const { return chromosome_; };
+    Snp(const std::string & name, const std::string & chr, const std::string & coord);
+    std::string GetName(void) const { return name_; };
+    std::string GetChromosome(void) const { return chromosome_; };
     size_t GetPosition(void) const { return pos_; };
     size_t GetNbSubgroups(void) const { return subgroup2genotypes_.size(); };
-    size_t GetNbSamples(const string & subgroup) const;
-    double GetMinorAlleleFreq(const string & subgroup) const;
+    size_t GetNbSamples(const std::string & subgroup) const;
+    double GetMinorAlleleFreq(const std::string & subgroup) const;
     bool HasGenotypesInAtLeastOneSubgroup(void) const;
-    bool HasGenotypes(const string & subgroup) const;
-    bool HasGenotypesInAllSubgroups(const vector<string> & subgroups) const;
-    void Show(ostream & os);
-    void AddSubgroupFromImputeLine(const string & subgroup,
-				   const vector<string>::const_iterator & begin,
-				   const vector<string>::const_iterator & end,
-				   vector<double> & genotypes,
+    bool HasGenotypes(const std::string & subgroup) const;
+    bool HasGenotypesInAllSubgroups(const std::vector<std::string> & subgroups) const;
+    void Show(std::ostream & os);
+    void AddSubgroupFromImputeLine(const std::string & subgroup,
+				   const std::vector<std::string>::const_iterator & begin,
+				   const std::vector<std::string>::const_iterator & end,
+				   std::vector<double> & genotypes,
 				   double & minor_allele_freq);
-    void AddSubgroupFromVcfLine(const string & subgroup,
-				const vector<string>::const_iterator & begin,
-				const vector<string>::const_iterator & end,
-				vector<double> & genotypes,
+    void AddSubgroupFromVcfLine(const std::string & subgroup,
+				const std::vector<std::string>::const_iterator & begin,
+				const std::vector<std::string>::const_iterator & end,
+				std::vector<double> & genotypes,
 				double & minor_allele_freq);
-    void AddSubgroupFromDoseLine(const string & subgroup,
-				 const vector<string>::const_iterator & begin,
-				 const vector<string>::const_iterator & end,
-				 vector<double> & genotypes,
+    void AddSubgroupFromDoseLine(const std::string & subgroup,
+				 const std::vector<std::string>::const_iterator & begin,
+				 const std::vector<std::string>::const_iterator & end,
+				 std::vector<double> & genotypes,
 				 double & minor_allele_freq);
-    void AddSubgroup(const string & subgroup,
-		     const vector<string>::const_iterator & begin,
-		     const vector<string>::const_iterator & end,
-		     const string & format);
+    void AddSubgroup(const std::string & subgroup,
+		     const std::vector<std::string>::const_iterator & begin,
+		     const std::vector<std::string>::const_iterator & end,
+		     const std::string & format);
     void EraseIfLowMafPerSubgroup(const double & min_maf);
-    void DuplicateGenotypesFromFirstSubgroup(const string & subgroup_old,
-					     const string & subgroup_new);
-    int IsInCis(const size_t & start, const size_t & end, const string & anchor,
+    void DuplicateGenotypesFromFirstSubgroup(const std::string & subgroup_old,
+					     const std::string & subgroup_new);
+    int IsInCis(const size_t & start, const size_t & end, const std::string & anchor,
 		const size_t & radius) const;
-    double GetGenotype(const string & subgroup, const size_t & idx) const;
+    double GetGenotype(const std::string & subgroup, const size_t & idx) const;
     friend class Gene;
   };
 

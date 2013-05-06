@@ -25,27 +25,27 @@
 #include <string>
 #include <iostream>
 
+#include "utils/utils_math.hpp"
+
 #include "quantgen/samples.hpp"
-#include "quantgen/utils_io.hpp"
-#include "quantgen/utils_math.hpp"
 
 namespace quantgen {
   
   class Covariates {
   private:
-    map<string,map<string,vector<double> > > subgroup2covariates_;
+    std::map<std::string,std::map<std::string,std::vector<double> > > subgroup2covariates_;
     
   public:
     size_t GetNbSubgroups(void) const { return subgroup2covariates_.size(); };
-    bool HasCovariates(const string & subgroup) const;
-    size_t GetNbCovariates(const string & subgroup) const;
-    map<string,vector<double> >::const_iterator begin(
-      const string & subgroup) const;
-    map<string,vector<double> >::const_iterator end(
-      const string & subgroup) const;
-    void AddSubgroup(const string & subgroup,
-		     const map<string,vector<string> > & covariate2values);
-    double GetCovariate(const string & subgroup, const string & covariate,
+    bool HasCovariates(const std::string & subgroup) const;
+    size_t GetNbCovariates(const std::string & subgroup) const;
+    std::map<std::string,std::vector<double> >::const_iterator begin(
+      const std::string & subgroup) const;
+    std::map<std::string,std::vector<double> >::const_iterator end(
+      const std::string & subgroup) const;
+    void AddSubgroup(const std::string & subgroup,
+		     const std::map<std::string,std::vector<std::string> > & covariate2values);
+    double GetCovariate(const std::string & subgroup, const std::string & covariate,
 			const size_t & idx) const;
   };
   

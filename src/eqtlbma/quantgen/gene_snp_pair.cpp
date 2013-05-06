@@ -17,9 +17,19 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using namespace std;
+#include <numeric>
+
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_combination.h>
+#include <gsl/gsl_sf_gamma.h>
+#include <gsl/gsl_machine.h> // GSL_DBL_EPSILON
+#include <gsl/gsl_statistics_double.h>
 
 #include "quantgen/gene_snp_pair.hpp"
+
+using namespace std;
+
+using namespace utils;
 
 namespace quantgen {
 

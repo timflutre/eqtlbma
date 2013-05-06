@@ -17,9 +17,11 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "quantgen/grid.hpp"
+
 using namespace std;
 
-#include "quantgen/grid.hpp"
+using namespace utils;
 
 namespace quantgen {
 

@@ -28,8 +28,8 @@ using namespace std;
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
-#include "quantgen/utils_io.hpp"
-using namespace quantgen;
+#include "utils/utils_io.hpp"
+using namespace utils;
 
 #include "hm_classes.h"
 

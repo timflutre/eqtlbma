@@ -68,8 +68,8 @@ namespace quantgen {
     gsl_matrix *Sigma_inv; // Sigma^{-1}
  
   
-    vector<double> omg2_vec; //effect size grid
-    vector<double> phi2_vec; //effect size grid
+    std::vector<double> omg2_vec; //effect size grid
+    std::vector<double> phi2_vec; //effect size grid
 
 
   private:
@@ -83,23 +83,23 @@ namespace quantgen {
     void compute_common();
   
     // utilites for computing residual error cov
-    void compute_Sigma(vector<vector<int> >& config);
+    void compute_Sigma(std::vector<std::vector<int> >& config);
     void compute_Sigma_null();
-    void compute_Sigma_mle(vector<vector<int> >& config);
+    void compute_Sigma_mle(std::vector<std::vector<int> >& config);
     void invert_Sigma();
     gsl_matrix *compute_residual(gsl_matrix *y, gsl_matrix *X, int size, double &factor);
 
   
     // utilites for configuration specific computation
   
-    void construct_Gamma(vector<vector<int> >& config, vector<int> &noz_vec);
-    void construct_meta_Gamma(vector<vector<int> >& config, vector<int> &noz_vec);
-    void construct_diag_Gamma(vector<vector<int> >& config, vector<int> &noz_vec);
+    void construct_Gamma(std::vector<std::vector<int> >& config, std::vector<int> &noz_vec);
+    void construct_meta_Gamma(std::vector<std::vector<int> >& config, std::vector<int> &noz_vec);
+    void construct_diag_Gamma(std::vector<std::vector<int> >& config, std::vector<int> &noz_vec);
   
     void set_Wg(double phi2, double omg2);
   
     // compute stats common for a configuration
-    void compute_stats(vector<int> &noz_vec);
+    void compute_stats(std::vector<int> &noz_vec);
   
     // evaluating ABF
     double compute_log10_ABF(gsl_matrix *Wg);
@@ -107,7 +107,7 @@ namespace quantgen {
     gsl_matrix *vec(gsl_matrix *M, int a, int b);
     gsl_matrix *kron (gsl_matrix *M, gsl_matrix *L, int a, int b);
     gsl_matrix *kron2 (gsl_matrix *M, int mr, int mc, gsl_matrix *L, int lr, int lc);
-    double log10_weighted_sum(vector<double> &vec, vector<double> &wts);
+    double log10_weighted_sum(std::vector<double> &vec, std::vector<double> &wts);
     void print_matrix(gsl_matrix *M, int a, int b);
   
   
@@ -122,11 +122,11 @@ namespace quantgen {
 
 
     // init
-    void init(vector<vector<double> > & Y_in, vector<vector<double> > & Xg_in, vector<vector<double> > & Xc_in);
+    void init(std::vector<std::vector<double> > & Y_in, std::vector<std::vector<double> > & Xg_in, std::vector<std::vector<double> > & Xc_in);
   
     // options
     void set_IW_prior(gsl_matrix *H_in, int m_in);
-    void set_effect_vec(const vector<double> &phi2,const vector<double>& omg2_vec);
+    void set_effect_vec(const std::vector<double> &phi2,const std::vector<double>& omg2_vec);
     void set_sigma_option(double option){
       sigma_option = option;
     }
@@ -136,11 +136,11 @@ namespace quantgen {
   
 
 
-    double compute_log10_ABF(vector<vector<int> > &indicator);
+    double compute_log10_ABF(std::vector<std::vector<int> > &indicator);
   
-    double compute_log10_ABF(vector<vector<int> >& indicator, double phi2, double omg2);
+    double compute_log10_ABF(std::vector<std::vector<int> >& indicator, double phi2, double omg2);
  
-    vector<double> compute_log10_ABF_vec(vector<vector<int> >& indicator);
+    std::vector<double> compute_log10_ABF_vec(std::vector<std::vector<int> >& indicator);
 
     ~MVLR();
   

@@ -23,49 +23,45 @@
 #include <vector>
 #include <map>
 #include <string>
-#include <algorithm>
 #include <iostream>
-
-#include "quantgen/utils_math.hpp"
-#include "quantgen/utils_io.hpp"
 
 namespace quantgen {
 
   class Samples {
   private:
-    vector<string> all_;
-    map<string,vector<bool> > subgroup2present_;
-    map<string,vector<size_t> > subgroup2genotypes_;
-    map<string,vector<size_t> > subgroup2explevels_;
-    map<string,vector<size_t> > subgroup2covariates_;
-    const vector<size_t> MapAllSamplesToTheGivenSubgroup(
-      const vector<string> * pt_samples) const;
-    void AddSubgroup(const string & subgroup,
-		     const vector<size_t> & indices_of_all_in_subgroup);
+    std::vector<std::string> all_;
+    std::map<std::string,std::vector<bool> > subgroup2present_;
+    std::map<std::string,std::vector<size_t> > subgroup2genotypes_;
+    std::map<std::string,std::vector<size_t> > subgroup2explevels_;
+    std::map<std::string,std::vector<size_t> > subgroup2covariates_;
+    const std::vector<size_t> MapAllSamplesToTheGivenSubgroup(
+      const std::vector<std::string> * pt_samples) const;
+    void AddSubgroup(const std::string & subgroup,
+		     const std::vector<size_t> & indices_of_all_in_subgroup);
   public:
     Samples(void);
-    string GetSample(const size_t & idx) const;
+    std::string GetSample(const size_t & idx) const;
     size_t GetTotalNbSamples(void) const { return all_.size(); };
     size_t GetTotalNbSubgroups(void) const { return subgroup2present_.size(); };
-    bool IsPresent(const string & sample) const;
-    bool IsAbsent(const string & sample) const;
-    void AddSamplesIfNew(const vector<string> & samples);
+    bool IsPresent(const std::string & sample) const;
+    bool IsAbsent(const std::string & sample) const;
+    void AddSamplesIfNew(const std::vector<std::string> & samples);
     void AddSamplesFromData(
-      const map<string,vector<string> > & subgroup2samples,
-      const string & type_data);
-    vector<string>::const_iterator begin(void) const { return all_.begin(); };
-    vector<string>::const_iterator end(void) const { return all_.end(); };
-    size_t GetIndexExplevel(const size_t & idx, const string & subgroup) const;
-    size_t GetIndexGenotype(const size_t & idx, const string & subgroup) const;
-    size_t GetIndexCovariate(const size_t & idx, const string & subgroup) const;
+      const std::map<std::string,std::vector<std::string> > & subgroup2samples,
+      const std::string & type_data);
+    std::vector<std::string>::const_iterator begin(void) const { return all_.begin(); };
+    std::vector<std::string>::const_iterator end(void) const { return all_.end(); };
+    size_t GetIndexExplevel(const size_t & idx, const std::string & subgroup) const;
+    size_t GetIndexGenotype(const size_t & idx, const std::string & subgroup) const;
+    size_t GetIndexCovariate(const size_t & idx, const std::string & subgroup) const;
     void GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
-      const string & subgroup1,
-      const string & subgroup2,
-      vector<size_t> & inds_s1s2,
-      vector<size_t> & inds_s1,
-      vector<size_t> & inds_s2) const;
-    void ShowPairs(ostream & os) const;
-    void ShowAllMappings(ostream & os) const;
+      const std::string & subgroup1,
+      const std::string & subgroup2,
+      std::vector<size_t> & inds_s1s2,
+      std::vector<size_t> & inds_s1,
+      std::vector<size_t> & inds_s2) const;
+    void ShowPairs(std::ostream & os) const;
+    void ShowAllMappings(std::ostream & os) const;
   };
 
 } // namespace quantgen

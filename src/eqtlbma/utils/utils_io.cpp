@@ -17,11 +17,22 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdlib>
+#include <cmath>
+#include <cerrno>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <dirent.h>
+
+#include <iomanip>
+#include <algorithm>
+#include <sstream>
+
+#include "utils/utils_io.hpp"
+
 using namespace std;
 
-#include "quantgen/utils_io.hpp"
-
-namespace quantgen {
+namespace utils {
 
 // http://stackoverflow.com/questions/1644868/c-define-macro-for-debug-printing/1644898#1644898
 #ifdef DEBUG
@@ -692,4 +703,4 @@ namespace quantgen {
     return (oss.str());
   }
 
-} // namespace quantgen
+} // namespace utils

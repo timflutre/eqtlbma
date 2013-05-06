@@ -8,6 +8,4 @@ libquantgen_la_SOURCES = covariates.cpp \
 	grid.cpp \
 	MVLR.cpp \
 	samples.cpp \
-	snp.cpp \
-	utils_io.cpp \
-	utils_math.cpp
+	snp.cpp

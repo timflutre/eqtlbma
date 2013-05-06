@@ -15123,7 +15123,7 @@ AM_LDFLAGS=-lm
 
 
 
-ac_config_files="$ac_config_files Makefile src/Makefile src/eqtlbma/Makefile src/eqtlbma/quantgen/Makefile src/eqtlbma/irls/Makefile doc/Makefile tests/Makefile scripts/Makefile"
+ac_config_files="$ac_config_files Makefile src/Makefile src/eqtlbma/Makefile src/eqtlbma/utils/Makefile src/eqtlbma/quantgen/Makefile src/eqtlbma/irls/Makefile doc/Makefile tests/Makefile scripts/Makefile"
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for deflatePending in -lz" >&5
 $as_echo_n "checking for deflatePending in -lz... " >&6; }
@@ -16498,6 +16498,7 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "src/eqtlbma/Makefile") CONFIG_FILES="$CONFIG_FILES src/eqtlbma/Makefile" ;;
+    "src/eqtlbma/utils/Makefile") CONFIG_FILES="$CONFIG_FILES src/eqtlbma/utils/Makefile" ;;
     "src/eqtlbma/quantgen/Makefile") CONFIG_FILES="$CONFIG_FILES src/eqtlbma/quantgen/Makefile" ;;
     "src/eqtlbma/irls/Makefile") CONFIG_FILES="$CONFIG_FILES src/eqtlbma/irls/Makefile" ;;
     "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;

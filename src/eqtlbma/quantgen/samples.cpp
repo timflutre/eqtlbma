@@ -17,9 +17,16 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using namespace std;
+#include <algorithm>
+
+#include "utils/utils_math.hpp"
+#include "utils/utils_io.hpp"
 
 #include "quantgen/samples.hpp"
+
+using namespace std;
+
+using namespace utils;
 
 namespace quantgen {
 

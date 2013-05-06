@@ -17,18 +17,18 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-using namespace std;
+#include <cstring>
 
-#include "LogLink.h"
-#include "string.h"
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_linalg.h>
-#include <vector>
-#include "IRLS.h"
 
+#include "IRLS.h"
+#include "LogLink.h"
+
+using namespace std;
 
 
 IRLS::IRLS(const char * link_type){

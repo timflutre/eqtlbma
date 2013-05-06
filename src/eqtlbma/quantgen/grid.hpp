@@ -26,20 +26,20 @@
 #include <string>
 #include <iostream>
 
-#include "quantgen/utils_io.hpp"
+#include "utils/utils_io.hpp"
 
 namespace quantgen {
 
   class Grid {
   public:
-    vector<double> phi2s;
-    vector<double> oma2s;
-    vector<double> phi2s_fix;
-    vector<double> oma2s_fix;
-    vector<double> phi2s_maxh;
-    vector<double> oma2s_maxh;
+    std::vector<double> phi2s;
+    std::vector<double> oma2s;
+    std::vector<double> phi2s_fix;
+    std::vector<double> oma2s_fix;
+    std::vector<double> phi2s_maxh;
+    std::vector<double> oma2s_maxh;
     Grid();
-    Grid(const string & gridFile, const bool & makeFixMaxh, const int & verbose);
+    Grid(const std::string & gridFile, const bool & makeFixMaxh, const int & verbose);
     size_t size (void) const { return phi2s.size(); }
   };
 

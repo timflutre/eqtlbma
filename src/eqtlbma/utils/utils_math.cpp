@@ -17,11 +17,22 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cmath>
+#include <sys/time.h>
+
+#include <gsl/gsl_sort.h>
+#include <gsl/gsl_sort_vector.h>
+#include <gsl/gsl_cdf.h>
+#include <gsl/gsl_multifit.h>
+#include <gsl/gsl_statistics_double.h>
+#include <gsl/gsl_blas.h>
+#include <gsl/gsl_linalg.h>
+
+#include "utils/utils_math.hpp"
+
 using namespace std;
 
-#include "quantgen/utils_math.hpp"
-
-namespace quantgen {
+namespace utils {
 
   bool isNonZero(size_t i) { return (i != 0); };
 
@@ -329,4 +340,4 @@ namespace quantgen {
 		       gsl_vector_get(vec2, j));
   }
 
-} // namespace quantgen
+} // namespace utils

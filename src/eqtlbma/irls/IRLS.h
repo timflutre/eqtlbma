@@ -20,8 +20,11 @@
 #ifndef _IRLS_H_
 #define _IRLS_H_
 
+#include <vector>
+
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
+
 #include "LinkFunc.h"
 
 class IRLS {
@@ -45,10 +48,10 @@ class IRLS {
 
   IRLS(const char * link_type);
   ~IRLS();
-  void load_data(vector<double> & yv, vector<vector<double> > &Xv);
+  void load_data(std::vector<double> & yv, std::vector<std::vector<double> > &Xv);
   void fit_model();
-  vector<double> get_fit_coef();
-  vector<double> get_stderr();
+  std::vector<double> get_fit_coef();
+  std::vector<double> get_stderr();
   size_t get_rank_X() { return rank; };
 
  private:

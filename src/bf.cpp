@@ -50,8 +50,10 @@ using namespace std;
 #include <gsl/gsl_statistics_double.h>
 #include <gsl/gsl_sf_gamma.h>
 
-#include "quantgen/utils_io.hpp"
-#include "quantgen/utils_math.hpp"
+#include "utils/utils_io.hpp"
+#include "utils/utils_math.hpp"
+using namespace utils;
+
 #include "quantgen/gene.hpp"
 #include "quantgen/snp.hpp"
 #include "quantgen/gene_snp_pair.hpp"

@@ -63,7 +63,7 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libquantgen_la_LIBADD =
 am_libquantgen_la_OBJECTS = covariates.lo gene.lo gene_snp_pair.lo \
-	grid.lo MVLR.lo samples.lo snp.lo utils_io.lo utils_math.lo
+	grid.lo MVLR.lo samples.lo snp.lo
 libquantgen_la_OBJECTS = $(am_libquantgen_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -259,9 +259,7 @@ libquantgen_la_SOURCES = covariates.cpp \
 	grid.cpp \
 	MVLR.cpp \
 	samples.cpp \
-	snp.cpp \
-	utils_io.cpp \
-	utils_math.cpp
+	snp.cpp
 
 all: all-am
 
@@ -324,8 +322,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/grid.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/samples.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/snp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils_io.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utils_math.Plo@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

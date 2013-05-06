@@ -17,11 +17,13 @@
 * along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-using namespace std;
+#include <cmath>
+
+#include <gsl/gsl_blas.h>
 
 #include "LogLink.h"
-#include <gsl/gsl_blas.h>
-#include <math.h>
+
+using namespace std;
 
 gsl_vector * LogLink::init_mv(gsl_vector *Y, int n){
   

@@ -17,12 +17,10 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef QUANTGEN_UTILS_MATH_HPP
-#define QUANTGEN_UTILS_MATH_HPP
+#ifndef UTILS_UTILS_MATH_HPP
+#define UTILS_UTILS_MATH_HPP
 
 #include <cstdlib>
-#include <cmath>
-#include <sys/time.h>
 
 #include <string>
 #include <limits>
@@ -31,17 +29,10 @@
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
-#include <gsl/gsl_sort.h>
-#include <gsl/gsl_sort_vector.h>
-#include <gsl/gsl_cdf.h>
-#include <gsl/gsl_multifit.h>
-#include <gsl/gsl_statistics_double.h>
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_linalg.h>
 
-namespace quantgen {
+namespace utils {
 
-  const double NaN = numeric_limits<double>::quiet_NaN();
+  const double NaN = std::numeric_limits<double>::quiet_NaN();
 
   bool isNonZero(size_t i);
 
@@ -53,7 +44,7 @@ namespace quantgen {
 
   double round(double x);
   
-  size_t sum_bool(const vector<bool> & vec);
+  size_t sum_bool(const std::vector<bool> & vec);
   
   void qqnorm(double * ptData, const size_t n);
 
@@ -96,6 +87,6 @@ namespace quantgen {
   void mygsl_linalg_outer(const gsl_vector * vec1, const gsl_vector * vec2,
 			  gsl_matrix * mat);
 
-} // namespace quantgen
+} // namespace utils
 
-#endif // QUANTGEN_UTILS_MATH_HPP
+#endif // UTILS_UTILS_MATH_HPP
