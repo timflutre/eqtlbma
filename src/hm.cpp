@@ -34,6 +34,78 @@ using namespace utils;
 #include "hm_classes.h"
 
 
+
+class eQTL_controller {
+
+ public:
+  // storage
+  vector<gene_eQTL> geqVec;
+  
+  double fixed_pi0_;
+      
+  // parameters need to be estimated
+  double * pi0; // non-eqtl prob
+  double new_pi0;
+
+  double *grid_wts;
+  double *new_grid_wts;
+
+  double *config_prior;
+  double *new_config_prior; 
+
+  double *param_est;
+  size_t     param_size;
+
+  size_t types;
+  size_t grid_size;
+  size_t config_size;
+ 
+  int output_option;
+
+  vector<string> type_vec;
+
+  void load_data(char *filename, size_t csize, size_t gsize);
+  ~eQTL_controller();
+  
+  
+  void init_params(int option=0);
+  void init_params(char * init_file);
+  void fix_pi0(const double & fixed_pi0) { fixed_pi0_ = fixed_pi0; };
+  
+  void randomize_parameter_sp();
+  
+  double compute_log10_lik();
+
+  void print_estimate();
+  void print_estimate(size_t index);
+
+  void em_update_pi0();
+  void em_update_config();
+  void em_update_grid();
+  void em_update_snp_prior();
+
+  void update_params();
+  
+  void update_param_est(size_t index, double val);
+  
+  
+  void estimate_profile_ci(const bool & skip_ci);
+  
+  void run_EM(double thresh);
+  void compute_posterior();
+  void print_result();
+};
+
+eQTL_controller::~eQTL_controller(){
+  delete pi0;
+  delete grid_wts;
+  delete new_grid_wts;
+  if(config_prior != NULL){
+    delete config_prior;
+    delete new_config_prior;
+  }
+}
+
 void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
   
   // initialization of class parameters
@@ -56,19 +128,17 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
   // reading data file
   gene_eQTL geq;
     
-  string sid;
   string stype;
   
   string curr_sid;   // current gene-snp 
   string curr_gene;  // current gene
   string curr_snp;
   
-  char id_str[128];
-
   ifstream infile(filename);
   string line;
   char delim[] = " ";
-  char *snp_id;
+  char *gene_id, *snp_id;
+  char sid[128];
   
   vector<vector<double> > sbf_vec;
 
@@ -84,16 +154,12 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
   
     
     // parse the line
-    char *sid = strtok(c_line,delim);
+    gene_id = strtok(c_line, delim);
+    snp_id = strtok(NULL, delim);
+    memset(sid, 0, 128);
+    snprintf(sid, 128, "%s_|_%s", snp_id, gene_id);
     
     if(strcmp(sid, curr_sid.c_str())!=0){
-      
-      memset(id_str,0,128);
-      memcpy(id_str,sid,strlen(sid));
-      char *p = strchr(id_str,'_');
-      *p = 0;
-      snp_id = id_str;
-      char *gene_id = p+1;
       
       // if gene changes
       if(strcmp(gene_id,curr_gene.c_str())!=0){
@@ -134,7 +200,7 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
 
 
 
-    char *mtype = strtok(0,delim);  
+    char *mtype = strtok(NULL, delim);  
     if(type_vec.size() < csize){
       
       string ts(mtype);
@@ -682,9 +748,9 @@ void eQTL_controller::compute_posterior(){
 
 
 void eQTL_controller::print_result(){
-  printf("gene\tgene_posterior_prob\tgene_log10_bf\t\tsnp\tsnp_log10_bf\t\t");
+  printf("gene\tgene.posterior.prob\tgene.log10.bf\t\tsnp\tsnp.log10.bf\t\t");
   for(size_t i=0;i<type_vec.size();i++){
-    printf("log10_bf_%s\t",type_vec[i].c_str());
+    printf("log10.bf.%s\t",type_vec[i].c_str());
   }
   printf("\n");
   

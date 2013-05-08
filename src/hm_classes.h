@@ -129,67 +129,6 @@ class gene_eQTL {
 };
 
 
-class eQTL_controller {
-
- public:
-  // storage
-  vector<gene_eQTL> geqVec;
-  
-  double fixed_pi0_;
-      
-  // parameters need to be estimated
-  double * pi0; // non-eqtl prob
-  double new_pi0;
-
-  double *grid_wts;
-  double *new_grid_wts;
-
-  double *config_prior;
-  double *new_config_prior; 
-
-  double *param_est;
-  size_t     param_size;
-
-  size_t types;
-  size_t grid_size;
-  size_t config_size;
- 
-  int output_option;
-
-  vector<string> type_vec;
-
-  void load_data(char *filename, size_t csize, size_t gsize);
-  
-  
-  void init_params(int option=0);
-  void init_params(char * init_file);
-  void fix_pi0(const double & fixed_pi0) { fixed_pi0_ = fixed_pi0; };
-  
-  void randomize_parameter_sp();
-  
-  double compute_log10_lik();
-
-  void print_estimate();
-  void print_estimate(size_t index);
-
-  void em_update_pi0();
-  void em_update_config();
-  void em_update_grid();
-  void em_update_snp_prior();
-
-  void update_params();
-  
-  void update_param_est(size_t index, double val);
-  
-  
-  void estimate_profile_ci(const bool & skip_ci);
-  
-  void run_EM(double thresh);
-  void compute_posterior();
-  void print_result();
-};
-
-
 bool operator< (const config_prob& a, const config_prob& b);
 
 
