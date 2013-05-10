@@ -12,7 +12,7 @@ EXTRA_DIST = functional_tests.R \
 	test_common-uniq-inds.bash \
 	test_poisson.bash
 AM_TESTS_ENVIRONMENT = \
-	bf_abspath='$(abs_top_builddir)'/src/bf; \
+	bf_abspath='$(abs_top_builddir)'/src/eqtlbma_bf; \
 	export bf_abspath; \
 	Rscript_abspath='$(abs_top_srcdir)'/tests/functional_tests.R; \
 	export Rscript_abspath;

@@ -16,7 +16,7 @@ doc/manual_eqtlbma.pdf
 doc/stamp-vti
 doc/version.texi
 eqtlbma-*.tar.gz
-src/bf
-src/hm
+src/eqtlbma_bf
+src/eqtlbma_hm
 src/simul_flutre_et_al
 .Rhistory

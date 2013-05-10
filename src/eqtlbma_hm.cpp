@@ -31,9 +31,11 @@ using namespace std;
 #include "utils/utils_io.hpp"
 using namespace utils;
 
+#include <omp.h>
+
 #include "hm_classes.h"
 
-
+//-----------------------------------------------------------------------------
 
 class eQTL_controller {
 
@@ -55,6 +57,8 @@ class eQTL_controller {
 
   double *param_est;
   size_t     param_size;
+
+  int nthread; 
 
   size_t types;
   size_t grid_size;
@@ -281,7 +285,6 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
 	right_pi0 -= tick;
 	break;
       }
-      
     }
   }
   fprintf(stderr,"\nProfile-likelihood Confidence Intervals\n");
@@ -312,7 +315,6 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
 	  config_prior[j] = config_mle[j] + diff*config_mle[j]/st;
 	}
 	config_prior[i] = left_cp;
-	
 	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
 	  left_cp += tick;
 	  break;
@@ -440,7 +442,8 @@ void eQTL_controller::init_params(char *init_file){
     
   }
 
-  for(size_t i=0;i<geqVec.size();i++)
+#pragma omp parallel for num_threads(nthread)
+  for(int i=0;i<geqVec.size();i++)
     geqVec[i].set_snp_prior();
 
   //printf("%f %f %f\n",pi0[0],config_prior[0],grid_wts[0]);
@@ -453,7 +456,8 @@ void eQTL_controller::init_params(char *init_file){
 
 void eQTL_controller::init_params(int option){
 
-  for(size_t i=0;i<geqVec.size();i++)
+#pragma omp parallel for num_threads(nthread)
+  for(int i=0;i<geqVec.size();i++)
     geqVec[i].set_snp_prior();
   
   if(option==1){
@@ -536,7 +540,9 @@ void eQTL_controller::randomize_parameter_sp(){
 double eQTL_controller::compute_log10_lik(){
   
   double sum = 0;
-  for (size_t i=0;i<geqVec.size();i++){
+
+#pragma omp parallel for num_threads(nthread) reduction(+:sum)
+  for (int i=0;i<geqVec.size();i++){
     sum += geqVec[i].compute_log10_lik();
   }
   
@@ -546,7 +552,8 @@ double eQTL_controller::compute_log10_lik(){
 
 void eQTL_controller::em_update_snp_prior(){
   
-  for (size_t i=0;i<geqVec.size();i++){
+#pragma omp parallel for num_threads(nthread)
+  for (int i=0;i<geqVec.size();i++){
      geqVec[i].em_update_snp_prior();
   }
 
@@ -557,7 +564,8 @@ void eQTL_controller::em_update_pi0(){
   
   if (fixed_pi0_ == -1.0) {
     double sum = 0;
-    for(size_t i=0;i<geqVec.size();i++){
+#pragma omp parallel for num_threads(nthread) reduction(+:sum)
+    for(int i=0;i<geqVec.size();i++){
       //geqVec[i].update_snp_prior();
       sum += geqVec[i].em_update_pi0();
     }
@@ -584,7 +592,8 @@ void eQTL_controller::em_update_grid(){
   double *new_grid = new double[grid_size];
   memset(new_grid,0,sizeof(double)*grid_size);
 
-  for(size_t i=0;i<geqVec.size();i++){
+#pragma omp parallel for num_threads(nthread)
+  for(int i=0;i<geqVec.size();i++){
     gene_wts[i] = 1.0;
     double *rst = geqVec[i].em_update_grid(grid_size);
     for(size_t j=0;j<grid_size;j++)
@@ -637,7 +646,8 @@ void eQTL_controller::em_update_config(){
   double *new_config = new double[config_size];
   memset(new_config,0,sizeof(double)*config_size);
   
-  for(size_t i=0;i<geqVec.size();i++){
+#pragma omp parallel for num_threads(nthread)
+  for(int i=0;i<geqVec.size();i++){
     gene_wts[i] = 1.0;   
     double *rst = geqVec[i].em_update_config(config_size);
     for(size_t j=0;j<config_size;j++)
@@ -740,11 +750,10 @@ void eQTL_controller::run_EM(double thresh){
 }
 
 void eQTL_controller::compute_posterior(){       
-  for(size_t i=0;i<geqVec.size();i++)
+#pragma omp parallel for num_threads(nthread)
+  for(int i=0;i<geqVec.size();i++)
     geqVec[i].compute_posterior(config_prior, config_size);
 }
-    
-
 
 
 void eQTL_controller::print_result(){
@@ -758,7 +767,7 @@ void eQTL_controller::print_result(){
     geqVec[i].print_result();
 }
 
-
+//-----------------------------------------------------------------------------
 
 int main(int argc, char **argv)
 {
@@ -768,6 +777,7 @@ int main(int argc, char **argv)
   char data_file[128];
   size_t csize = string::npos;
   size_t gsize = string::npos;
+  int nthread = 1;
   memset(data_file,0,128);
   
   char init_file[128];
@@ -811,6 +821,10 @@ int main(int argc, char **argv)
       thresh = atof(argv[++i]);
       continue;
     }
+    if(strcmp(argv[i], "-thread") == 0){
+      nthread = atoi(argv[++i]);
+      continue;
+    }
     if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"-ci")==0){
       strcpy(ci_file, argv[++i]);
       continue;
@@ -841,9 +855,13 @@ int main(int argc, char **argv)
   
   // a global variable 
   eQTL_controller controller;
+  controller.nthread = nthread;
   controller.output_option = 1;
+  
+  clock_t startTime = clock();
+  fprintf(stderr, "Start loading ...\n");
   controller.load_data(data_file,csize,gsize);
-  fprintf(stderr,"Finish loading ... \n");
+  fprintf(stderr, "Finish loading (%f sec)\n", getElapsedTime(startTime));
   
   if(strlen(ci_file)>0){
     controller.init_params(ci_file);

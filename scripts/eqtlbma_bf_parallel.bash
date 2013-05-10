@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-# Aim: used to launch eqtlbma in parallel
+# Aim: used to launch eqtlbma_bf in parallel
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
 function help () {
-    msg="\`${0##*/}' is used to launch eqtlbma in parallel.\n"
+    msg="\`${0##*/}' is used to launch eqtlbma_bf in parallel.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -13,7 +13,7 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2b\tpath to the binary 'eqtlbma'\n"
+    msg+="      --p2b\tpath to the binary 'eqtlbma_bf'\n"
     msg+="      --geneD\tdirectory with lists of features to analyze (BED files)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="      --snpD\tdirectory with lists of SNPs to analyze (optional)\n"
@@ -23,7 +23,7 @@ function help () {
     msg+="\t\toptional, default=list_seeds.txt.gz (should be gzipped)\n"
     msg+="      --task\ttask identifier (not for SGE, for SLURM only)\n"
     msg+="\n"
-    msg+="Options from 'eqtlbma' (run 'eqtlbma -h | less' for more details):\n"
+    msg+="Options from 'eqtlbma_bf' (run 'eqtlbma_bf -h | less' for more details):\n"
     msg+="      --geno\tfile with absolute paths to genotype files\n"
     msg+="\t\tdefault=list_genotypes.txt\n"
     msg+="      --scoord\tfile with the SNP coordinates\n"
@@ -69,7 +69,7 @@ function help () {
     msg+="      --sbgrp\tidentifier of the subgroup to analyze\n"
     msg+="\n"
     msg+="Examples:\n"
-    msg+="  ${0##*/} --p2b ~/bin/eqtlbma --geneD ./lists_genes/\n"
+    msg+="  ${0##*/} --p2b ~/bin/eqtlbma_bf --geneD ./lists_genes/\n"
     echo -e "$msg"
 }
 
@@ -298,7 +298,7 @@ cmd+=" -v ${verbose}"
 # run the program
 eval $cmd
 if [ $? != 0 ]; then
-    echo "ERROR: eqtlbma didn't finished successfully" >&2
+    echo "ERROR: eqtlbma_bf didn't finished successfully" >&2
     exit 1
 fi
 

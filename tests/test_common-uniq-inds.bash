@@ -2,7 +2,8 @@
 
 set -o errexit -o pipefail
 
-# Aim: launch a functional test for bf when some individuals are unique
+# Aim: launch a functional test for eqtlbma_bf when some individuals 
+#      are unique
 #      to each subgroup
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
@@ -10,7 +11,7 @@ set -o errexit -o pipefail
 #------------------------------------------------------------------------------
 
 function help () {
-    msg="\`${0##*/}' launches a functional test for bf when some individuals are unique to each subgroup.\n"
+    msg="\`${0##*/}' launches a functional test for eqtlbma_bf when some individuals are unique to each subgroup.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -18,7 +19,7 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2e\tabsolute path to the 'bf' binary\n"
+    msg+="      --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
     msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
     msg+="      --noclean\tkeep temporary directory with all files\n"
     echo -e "$msg"
@@ -68,7 +69,7 @@ function parseArgs () {
         esac
     done
     if [[ ! -f $pathToBf ]]; then
-	echo "ERROR: can't find path to 'bf' -> '${pathToBf}'"
+	echo "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'"
 	exit 1
     fi
     if [[ ! -f $pathToRscript ]]; then
