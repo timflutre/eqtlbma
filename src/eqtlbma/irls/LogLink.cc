@@ -25,7 +25,8 @@
 
 using namespace std;
 
-gsl_vector * LogLink::init_mv(gsl_vector *Y, int n){
+gsl_vector * LogLink::init_mv(gsl_vector *Y){
+  size_t n = Y->size;
   
   gsl_vector *mv = gsl_vector_calloc(n);
   
@@ -44,8 +45,9 @@ gsl_vector * LogLink::init_mv(gsl_vector *Y, int n){
 
 
 
-gsl_vector *LogLink::compute_Z(gsl_vector *Y, gsl_vector *mv, int n){
+gsl_vector *LogLink::compute_Z(gsl_vector *Y, gsl_vector *mv){
   
+  size_t n = Y->size;
   gsl_vector *Z = gsl_vector_calloc(n);
   for(int i=0;i<n;i++){
     double mu = gsl_vector_get(mv,i);
@@ -57,8 +59,9 @@ gsl_vector *LogLink::compute_Z(gsl_vector *Y, gsl_vector *mv, int n){
   return Z;
 }
 
-gsl_vector *LogLink::compute_weights(gsl_vector *mv, int n){
+gsl_vector *LogLink::compute_weights(gsl_vector *mv){
   
+  size_t n = mv->size;
   gsl_vector *w = gsl_vector_calloc(n);
   for(int i=0;i<n;i++){
     double val = gsl_vector_get(mv,i);
@@ -70,7 +73,8 @@ gsl_vector *LogLink::compute_weights(gsl_vector *mv, int n){
 
 
 
-gsl_vector *LogLink::compute_mv(gsl_vector *bv, gsl_matrix *Xv,int n, int p){
+gsl_vector *LogLink::compute_mv(gsl_vector *bv, gsl_matrix *Xv){
+  size_t n = Xv->size1, p = Xv->size2;
   
   gsl_matrix *beta = gsl_matrix_calloc(p,1);
   
@@ -92,4 +96,25 @@ gsl_vector *LogLink::compute_mv(gsl_vector *bv, gsl_matrix *Xv,int n, int p){
   gsl_matrix_free(beta);
 
   return mv;
+}
+
+
+
+
+double LogLink::compute_dispersion(gsl_vector *Y, gsl_matrix *Xv, gsl_vector *bv, double rank, bool quasi_lik)
+{
+  double psi;
+  if(! quasi_lik){
+    psi = 1.0;
+  }
+  else{
+    gsl_vector *mv = compute_mv(bv, Xv);
+    double wtss = 0.0;
+    for(size_t i = 0; i < Y->size; ++i)
+      wtss += pow(gsl_vector_get(Y,i) - gsl_vector_get(mv,i), 2) / 
+	gsl_vector_get(mv,i);
+    psi = (1/(Y->size-rank)) * wtss;
+    gsl_vector_free(mv);
+  }
+  return psi;
 }

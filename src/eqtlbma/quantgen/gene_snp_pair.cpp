@@ -174,7 +174,7 @@ namespace quantgen {
       gsl_matrix_free(X);
       gsl_vector_free(y);
     }
-    else if(likelihood.compare("poisson") == 0){
+    else if(likelihood.find("poisson") != string::npos){
       vector<vector<double> > X(1 + Xc[0].size(), Xg[0].size()); // P x N
       for(size_t i = 0; i < X[0].size(); ++i) // fill genotypes
 	X[0][i] = Xg[0][i];
@@ -182,15 +182,26 @@ namespace quantgen {
 	for(size_t i = 0; i < X[0].size(); ++i)
 	  X[j][i] = Xc[0][j-1][i];
       IRLS irls("log-link");
+      if(likelihood.compare("quasipoisson") == 0){
+	irls.link->quasi = true;
+      }
+      else{
+	irls.link->quasi = false;
+      }
       irls.load_data(Y[0], X);
       irls.fit_model();
       vector<double> coef = irls.get_fit_coef(),
 	se_coef = irls.get_stderr();
-      subgroup2sigmahat_[subgroup] = 1.0;
+      subgroup2sigmahat_[subgroup] = sqrt(irls.get_dispersion());
       subgroup2sstats_[subgroup][0] = coef[1];
       subgroup2sstats_[subgroup][1] = se_coef[1];
-      subgroup2sstats_[subgroup][2] = 2 * gsl_cdf_gaussian_P(
-	-fabs(coef[1] / se_coef[1]), 1.0);
+      if(likelihood.compare("quasipoisson") == 0){
+	subgroup2sstats_[subgroup][2] = 2 * gsl_cdf_tdist_P(
+	  -fabs(coef[1] / se_coef[1]), Xg[0].size() - irls.get_rank_X());
+      } else{
+	subgroup2sstats_[subgroup][2] = 2 * gsl_cdf_gaussian_P(
+	  -fabs(coef[1] / se_coef[1]), 1.0);
+      }
     }
   }
 

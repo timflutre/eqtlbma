@@ -1,2 +1,2 @@
 * create a data/ directory with example files
-* add more tests, e.g. 'eqtlbma' with option --mvlr and for program 'hm'
+* add tests for the hierarchical model

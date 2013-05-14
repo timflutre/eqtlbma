@@ -7,6 +7,7 @@ are missing in some subgroups
 * major refactoring of 'eqtlbma' (use a static library), which causes some 
 options to change, see the manual
 * add tests for the multivariate Bayes Factor
+* use OpenMP tp speed-up the EM algorithm fitting the hierarchical model
 
 
 2013-03-28 v1.2

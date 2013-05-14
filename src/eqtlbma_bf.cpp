@@ -103,7 +103,7 @@ void help(char ** argv)
        << "\t\tall output files are gzipped and have a header line" << endl
        << "      --lik\tlikelihood to use" << endl
        << "\t\t'normal' (default)" << endl
-       << "\t\t'poisson'" << endl
+       << "\t\t'poisson' or 'quasipoisson'" << endl
        << "      --type\ttype of analysis to perform" << endl
        << "\t\t'sep': separate analysis of each subgroup" << endl
        << "\t\t'join': joint analysis of all subgroups" << endl
@@ -488,7 +488,8 @@ parseCmdLine(
     help(argv);
     exit(1);
   }
-  if(likelihood.compare("normal") != 0 && likelihood.compare("poisson") != 0){
+  if(likelihood.compare("normal") != 0 && likelihood.compare("poisson") != 0
+     && likelihood.compare("quasipoisson") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --lik " << likelihood << " is not valid" << endl << endl;
     help(argv);

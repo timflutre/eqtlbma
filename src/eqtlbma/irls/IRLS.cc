@@ -35,6 +35,7 @@ IRLS::IRLS(const char * link_type){
   if(strcmp(link_type,"log-link")==0){
     link = new LogLink();
   }
+  link->quasi = false;
   fit_coef = 0;
   VB = 0;
 }
@@ -64,13 +65,13 @@ void IRLS::load_data(vector<double> & yv, vector<vector<double> > &Xv){
 
 void IRLS::fit_model(){
   
-  gsl_vector *mv = link->init_mv(Y,n);
+  gsl_vector *mv = link->init_mv(Y);
   
   double old_chisq = -1;
   while(1){
     
-    gsl_vector *z = link->compute_Z(Y,mv,n);
-    gsl_vector *w = link->compute_weights(mv,n);
+    gsl_vector *z = link->compute_Z(Y,mv);
+    gsl_vector *w = link->compute_weights(mv);
   
     // weighted least square fitting
     gsl_vector *bv = gsl_vector_alloc(p);
@@ -93,6 +94,7 @@ void IRLS::fit_model(){
 	gsl_vector_free(fit_coef);
       }
       
+      psi = link->compute_dispersion(Y, X, bv, rank, link->quasi);
       compute_variance(w);
       fit_coef = bv;
       gsl_vector_free (w);
@@ -100,7 +102,7 @@ void IRLS::fit_model(){
     }
     
     old_chisq = chisq;
-    mv = link->compute_mv(bv,X,n,p);
+    mv = link->compute_mv(bv,X);
     gsl_vector_free(bv);
     gsl_vector_free (w);
   }
@@ -130,7 +132,7 @@ void IRLS::compute_variance(gsl_vector *w){
   gsl_permutation * pp = gsl_permutation_alloc(p);
   gsl_linalg_LU_decomp (t2, pp, &ss);
   gsl_linalg_LU_invert (t2, pp, VB);
-  
+ 
   gsl_permutation_free(pp);
  
   gsl_matrix_free(t1);
@@ -154,7 +156,7 @@ vector<double> IRLS::get_stderr(){
   
   vector<double> sev;
   for(int i=0;i<p;i++){
-    sev.push_back(sqrt(gsl_matrix_get(VB,i,i)));
+    sev.push_back(sqrt(psi * gsl_matrix_get(VB,i,i)));
   }
   return sev;
 }

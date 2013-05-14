@@ -20,6 +20,7 @@ function help () {
     msg+="      --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
     msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
     msg+="      --noclean\tkeep temporary directory with all files\n"
+    msg+="      --quasi\tuse quasi-likelihood\n"
     echo -e "$msg"
 }
 
@@ -50,7 +51,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2e:,p2R:,noclean \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2e:,p2R:,noclean,quasi \
         -n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -62,6 +63,7 @@ function parseArgs () {
             --p2e) pathToBf=$2; shift 2;;
 	    --p2R) pathToRscript=$2; shift 2;;
 	    --noclean) clean=false; shift;;
+	    --quasi) quasi=true; shift;;
             --) shift; break;;
             *) echo "ERROR: options parsing failed"; exit 1;;
         esac
@@ -82,19 +84,28 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    ${pathToRscript} --verbose 1 --dir $(pwd) --pois >& stdout_simul_exp
+    if ! $quasi; then
+	${pathToRscript} --verbose 1 --dir $(pwd) --lik pois >& stdout_simul_exp
+    else
+	${pathToRscript} --verbose 1 --dir $(pwd) --lik qpois >& stdout_simul_exp
+    fi
 }
 
 function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToBf --geno list_genotypes.txt --scoord snp_coords.bed.gz \
-	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
-	--out obs_bf --outss --outraw --lik poisson --type join --bfs all \
-	--gridL grid_phi2_oma2_general.txt.gz \
-	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	-v 1 >& stdout_bf
+    cmd="${pathToBf} --geno list_genotypes.txt --scoord snp_coords.bed.gz"
+    cmd+=" --exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5"
+    cmd+=" --out obs_bf --outss --outraw --type join --bfs all"
+    cmd+=" --gridL grid_phi2_oma2_general.txt.gz"
+    cmd+=" --gridS grid_phi2_oma2_with-configs.txt.gz"
+    if ! $quasi; then
+	cmd+=" -v 1 --lik poisson >& stdout_bf"
+    else
+	cmd+=" -v 1 --lik quasipoisson >& stdout_bf"
+    fi
+    eval $cmd
 }
 
 function comp_obs_vs_exp () {
@@ -102,9 +113,8 @@ function comp_obs_vs_exp () {
 	echo "compare obs vs exp results ..."
     fi
     
-    tol="1e-5" # hard to have exact same results between C++ and R for IRLS
+    tol="1e-5" # hard to have exact same results between C++ and R "glm"
     for i in {1..3}; do
-	# if ! zcmp -s obs_bf_sumstats_s${i}.txt.gz exp_bf_sumstats_s${i}.txt.gz; then
 	if ! $(echo "exp <- read.table(\"exp_bf_sumstats_s${i}.txt.gz\", header=TRUE); obs <- read.table(\"obs_bf_sumstats_s${i}.txt.gz\", header=TRUE); if(isTRUE(all.equal(target=exp, current=obs, tolerance=${tol}))){quit(\"no\",0,FALSE)}else{quit(\"no\",1,FALSE)}" | R --vanilla --quiet --slave); then
 	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
 	    exit 1
@@ -132,6 +142,7 @@ verbose=1
 pathToBf=$bf_abspath
 pathToRscript=$Rscript_abspath
 clean=true
+quasi=false
 parseArgs "$@"
 
 if [ $verbose -gt "0" ]; then

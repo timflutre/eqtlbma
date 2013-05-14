@@ -54,9 +54,9 @@ This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}).
 @menu
 * Overview::
 * Inputs and options::
-* Running the program::
+* Computing Bayes factors::
 * Reading the outputs::
-* Running the hierarchical model::
+* Fitting the hierarchical model::
 * Frequently asked questions::
 * GNU Free Documentation License::
 * Index::
@@ -84,13 +84,13 @@ Here subgroups can be different tissues, cell types, populations, platforms, etc
 Currently two tools are available:
 @itemize
 @item
-@command{eqtlbma} can compute summary statistics in each subgroup, 
+@command{eqtlbma_bf} can compute summary statistics in each subgroup, 
 Bayes Factors for the joint analysis using default hyperparameters, 
 as well as perform permutations;
 @item
-@command{hm} can fit the hierarchical model via an EM algorithm,
-provide Empirical Bayes estimates of hyperparameters 
-and thus uses such estimates to re-compute Bayes Factors and provide posterior probabilities.
+@command{eqtlbma_hm} can fit the hierarchical model via an EM algorithm,
+provide empirical Bayes estimates of hyperparameters 
+and thus uses such estimates to re-compute Bayes factors and provide posterior probabilities.
 @end itemize
 
 More details are available in a preprint on @url{http://arxiv.org/abs/1212.4786,,arXiv}.
@@ -103,8 +103,8 @@ More details are available in a preprint on @url{http://arxiv.org/abs/1212.4786,
 @cindex inputs
 @cindex options
 
-Typing @command{eqtlbma --help} or @command{eqtlbma -h} gives the list of options.
-As the help message is long, we may prefer to type @command{eqtlbma -h | less} instead.
+Typing @command{eqtlbma_bf --help} or @command{eqtlbma_bf -h} gives the list of options.
+As the help message is long, we may prefer to type @command{eqtlbma_bf -h | less} instead.
 
 @section Genotypes
 
@@ -136,10 +136,10 @@ and they need to be the same as in the files containing the gene expression leve
 Missing genotypes are not allowed.
 It is therefore required to impute them first with packages such as @url{http://mathgen.stats.ox.ac.uk/impute/impute_v2.html,IMPUTE2} or @url{http://stephenslab.uchicago.edu/blimp/index.html,BLIMP}.
 
-The program @command{eqtlbma} recognizes the original VCF format.
+The program @command{eqtlbma_bf} recognizes the original VCF format.
 See the specificiations on the website of the 1000 Genomes project @url{http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41,here}.
 
-The program @command{eqtlbma} can also handle a format very similar to the genotype format used by the IMPUTE program.
+The program @command{eqtlbma_bf} can also handle a format very similar to the genotype format used by the IMPUTE program.
 The exact specification of this format is described @url{http://www.stats.ox.ac.uk/~marchini/software/gwas/file_format.html,here}.
 The only difference is that we require a header line.
 Here is an example:
@@ -148,7 +148,7 @@ chr name coord a1 a2 <ind1>_a1a1 <ind1>_a1a2 <ind1>_a2a2 <ind2>_a1a1 ...
 @end verbatim
 where the ``<ind1>'''s have to be replaced by the name of the individuals in the given data set.
 
-Finally, the program @command{eqtlbma} also reads genotypes as allele dose, that is 0, 1, 2 or NA.
+Finally, the program @command{eqtlbma_bf} also reads genotypes as allele dose, that is 0, 1, 2 or NA.
 This format is also read by the R package MatrixEQTL.
 Here is an example:
 @verbatim
@@ -196,7 +196,7 @@ LCLs /data/phenotypes_LCLs.txt.gz
 T-cells /data/phenotypes_T-cells.txt.gz
 @end verbatim
 
-The program @command{eqtlbma} uses the term ``gene'' as the generic term for
+The program @command{eqtlbma_bf} uses the term ``gene'' as the generic term for
 the entities for which we have measurements.
 Besides genes, they could be exons, transcripts, proteins, metabolites, etc, 
 but we stick to genes in this manual.
@@ -223,7 +223,7 @@ Otherwise, an FAQ entry at the end of this document indicates how to do this bef
 
 @section @emph{Cis} region
 
-The @command{eqtlbma} program focuses on detecting associations between SNPs and genes,
+The @command{eqtlbma_bf} program focuses on detecting associations between SNPs and genes,
 restricting itself to SNPs in a @emph{cis} candidate region of each gene.
 The option @option{--anchor} allows to specify the boundary(ies) of this region,
 with ``TSS'' for ``transcription start site'', ``TES'' for ``transcriptioneature end site'' and
@@ -244,7 +244,7 @@ The option @option{--out} requires a character string and will use it
 as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
 
-The program @command{eqtlbma} can perform several types of analysis.
+The program @command{eqtlbma_bf} can perform several types of analysis.
 The option @option{--type sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (separate analysis).
 The option @option{--type join} means that the gene-SNP pairs will be tested for association using all subgroups jointly, which is more powerful in the context of eQTL studies, as shown in Flutre @emph{et al}.
 
@@ -308,7 +308,7 @@ Also, with @option{--error mvlr}, the summary statistics per subgroup are not ex
 @section Permutations
 
 Genes having different number of SNPs in cis and different patterns of linkage disequilibrium,
-we implemented a permutation procedure at the gene level (see Flutre @emph{et al}).
+we implemented a permutation procedure at the gene level (see Flutre @emph{et al}, 2013).
 
 The option @option{--nperm} allows to specify how many permutations will be performed.
 We recommend 10000.
@@ -339,14 +339,14 @@ and the BF called ``BMAlite'' corresponds to @option{--pbf gen-sin}.
 
 @c=============================================================================
 
-@node Running the program
-@chapter Running the program
+@node Computing Bayes factors
+@chapter Computing Bayes factors
 
 @cindex analysis
 
 For a quick and simple analysis, the command line can look like this:
 @verbatim
-eqtlbma \
+eqtlbma_bf \
 --geno list_genotypes.txt \
 --scoord snp_coords.bed.gz \
 --exp list_explevels.txt \
@@ -367,14 +367,14 @@ we can have several BED files with different subsets of genes.
 Let's say that we want 100 batches, we only need to split all the genes into 100 lists.
 An FAQ entry indicates how to do this easily.
 
-Then, we can use the script @command{launch_eqtlbma_parallel.bash} present 
+Then, we can use the script @command{eqtlbma_bf_parallel.bash} present 
 in the directory @command{scripts/} of the package.
 
 A typical command-line looks like this (works with Sun Grid Engine):
 @verbatim
 qsub -cwd -j y -V -l h_vmem=2g -N job_eqtlbma -t 1-100 \
-launch_eqtlbma_parallel.bash \
---p2b ~/bin/eqtlbma \
+eqtlbma_bf_parallel.bash \
+--p2b ~/bin/eqtlbma_bf \
 --geneD lists_genes \
 --snpD lists_snps \
 --seedF list_seeds.txt.gz \
@@ -404,7 +404,7 @@ An FAQ entry shows how to find SNPs in cis for each gene.
 
 @cindex outputs
 
-The program @command{eqtlbma} creates several output files, all starting with 
+The program @command{eqtlbma_bf} creates several output files, all starting with 
 the character string given to option @option{--out}, e.g. ``out_eqtlbma''
 (remember to include the batch number when you parallelize).
 All output files contain a header line, which should make it easy to understand
@@ -428,12 +428,12 @@ An FAQ entry describes how to concatenate the output files from all batches, for
 
 @c=============================================================================
 
-@node Running the hierarchical model
-@chapter Running the hierarchical model
+@node Fitting the hierarchical model
+@chapter Fitting the hierarchical model
 
 @cindex hierarchical model
 
-The @command{hm} program can take four options.
+The @command{eqtlbma_hm} program can take four options.
 
 The option @option{-d} requires the input file (not compressed, no header line) with the Bayes Factors.
 The format is the following:
@@ -452,26 +452,26 @@ The option @option{-t} can be given the threshold increase to terminate the EM a
 That is, if the log10-likelihood increases less than this threshold, the iterations stop.
 The default value is set at 0.05.
 
-The @command{hm} program writes information on stderr and stdout.
+The @command{eqtlbma_hm} program writes information on stderr and stdout.
 On stderr, it outputs at each EM iteration the current parameter values and log10-likelihood of the model.
 At the end of the run, it also outputs the profile likelihood 95% confidence interval and the point estimates of pi0,
 configuration probabilities and grid probabilities.
 On stdout, it writes one line per gene-SNP pair with the gene-level log10(BF) and posterior probability, 
 the snp-level log10(BF) and the log10(BF) for each configuration.
 
-Importantly, if you want to launch the @command{hm} program with the output files from the @command{eqtlbma} program, 
-you can use the script @command{launch_hm.bash}.
+Importantly, if you want to launch the @command{eqtlbma_hm} program with the output files from the @command{eqtlbma_bf} program, 
+you can use the script @command{eqtlbma_hm.bash}.
 It will automatically decompress the output file(s) with suffix ``_l10abfs_raw.txt.gz'' 
-(one per job if @command{eqtlbma} was run in parallel),
+(one per job if @command{eqtlbma_bf} was run in parallel),
 filter them to only keep the log10(BFs) corresponding to the configurations,
 and concatenate them into a single file in the proper format.
-The stdout and stderr of @command{hm} will be available as gzip files with a common prefix.
+The stdout and stderr of @command{eqtlbma_hm} will be available as gzip files with a common prefix.
 
-Launch @command{launch_hm.bash -h} to get the help.
+Launch @command{eqtlbma_hm.bash -h} to get the help.
 The command-line will typically look like this:
 @verbatim
-launch_hm.bash \
---p2b ~/bin/hm \
+eqtlbma_hm.bash \
+--p2b ~/bin/eqtlbma_hm \
 --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
 --nbC 7 \
 --nbG 10 \
@@ -483,7 +483,7 @@ This can be done easily with the option @option{--reconf}.
 You only need to follow it with a regular expression able to catch the configurations you are interested in.
 For instance, if you are interested in configurations @command{1} and @command{3}, you will run:
 @verbatim
-launch_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
+eqtlbma_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
 --nbG 10 --outp out_hm --nbC 3 --reconf ``^1$|^3$|^1-3$"
 @end verbatim
 
@@ -505,7 +505,7 @@ As a result, only maximum-likelihood estimates of the hyper-parameters will be r
 @item
 @strong{How do I cite this package?}
 
-For the moment, you can cite the preprint available on @url{http://arxiv.org/abs/1212.4786, arXiv}: ``A statistical framework for joint eQTL analysis in multiple tissues'' by T.Flutre, X.Wen, J.Pritchard and M.Stephens (arXiv:1212.4786).
+Flutre T, Wen X, Pritchard J, Stephens M (2013) A Statistical Framework for Joint eQTL Analysis in Multiple Tissues. PLoS Genet 9(5): e1003486. doi:10.1371/journal.pgen.1003486
 
 @sp 1
 
@@ -629,11 +629,11 @@ gzip out_eqtlbma_sumstats_${sbgrp}.txt
 @item
 @strong{Is this packaged tested?}
 
-We implemented some R code in order to perform functional tests on @command{eqtlbma}.
+We implemented some R code in order to perform functional tests on @command{eqtlbma_bf}.
 Launching them is automatized via @option{make check}.
 
 You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
-It can thus be used to test the @command{hm} program.
+It can thus be used to test the @command{eqtlbma_hm} program.
 To compile it, enter into the @command{src/} directory and run:
 @verbatim
 g++ -Wall -Wextra -g utils.cpp simul_flutre_et_al.cpp -lgsl -lgslcblas -lz

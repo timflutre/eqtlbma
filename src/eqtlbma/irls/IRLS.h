@@ -39,12 +39,13 @@ class IRLS {
   int p; // number of parameters (including intercept)
   size_t rank; // of X (useful for p-values)
 
-  LinkFunc *link;
-  
+  double psi; // dispersion
   gsl_matrix *VB;
 
   
  public:
+
+  LinkFunc *link;
 
   IRLS(const char * link_type);
   ~IRLS();
@@ -53,6 +54,7 @@ class IRLS {
   std::vector<double> get_fit_coef();
   std::vector<double> get_stderr();
   size_t get_rank_X() { return rank; };
+  double get_dispersion() { return psi; };
 
  private:
   void compute_variance(gsl_vector *w);

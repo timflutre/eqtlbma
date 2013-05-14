@@ -36,7 +36,7 @@ help <- function(){
   txt <- paste0(txt, "      --cvrt\tuse covariates\n")
   txt <- paste0(txt, "      --mvlr\tuse multivariate model\n")
   txt <- paste0(txt, "      --ris\tremove some individuals from some subgroups\n")
-  txt <- paste0(txt, "      --pois\tuse Poisson likelihood\n")
+  txt <- paste0(txt, "      --lik\tlikelihood (default=norm/pois/qpois)\n")
   message(txt)
 }
 
@@ -91,8 +91,8 @@ parseCmdLine <- function(params){
       params$rmvIndsFromSbgrp <- TRUE
       i <- i + 1
     }
-    else if(args[i] == "--pois"){
-      params$poisson.lik <- TRUE
+    else if(args[i] == "--lik"){
+      params$lik <- args[i+1]
       i <- i + 1
     }
   }
@@ -110,7 +110,8 @@ parseCmdLine <- function(params){
 
 checkParams <- function(params){
   stopifnot(! is.null(params$dir.name),
-            file.exists(params$dir.name))
+            file.exists(params$dir.name),
+            params$lik %in% c("norm","pois","qpois"))
 }
 
 print.mat2 <- function(mat, a, b){
@@ -182,7 +183,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
 }
 
 getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
-                             poisson.lik=FALSE, verbose=0){
+                             lik="norm", verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
   
@@ -313,12 +314,12 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
   
   for(gs.pair in 1:nb.pairs){
     for(s in 1:nb.subgroups){
-      if(! poisson.lik){
+      if(length(grep("pois", lik)) == 0){ # Normal likelihood
         phenos[[s]][truth$gene[gs.pair],] <- truth[gs.pair,paste0("mu",s)] +
           truth[gs.pair,paste0("b",s)] * truth[gs.pair,paste0("sigma",s)] *
             geno.counts[truth[gs.pair,"snp"],] +
               rnorm(n=nb.inds, mean=0, sd=truth[gs.pair,paste0("sigma",s)])
-      } else{
+      } else{ # Poisson likelihood
         for(i in 1:nb.inds){
           lambda <- exp(truth[gs.pair,paste0("mu",s)] +
                         truth[gs.pair,paste0("b",s)] * truth[gs.pair,paste0("sigma",s)] *
@@ -440,22 +441,22 @@ irls <- function(y, X, threshold, family, verbose=0){
   compute.mu <- function(beta, X){
     return(exp(X %*% beta))
   }
-  compute.variance <- function(X, w, family, y=NULL, beta=NULL){
+  compute.variance <- function(X, w, family, y=NULL, beta=NULL, rank=NULL){
     if(length(grep("poisson", family)) != 0){
       if(family == "poisson"){
-        list(cov=solve(t(X) %*% diag(w) %*% X), sigma2=1)
+        return(list(cov=solve(t(X) %*% diag(w) %*% X), sigma2=1))
       } else if(family == "quasipoisson"){
         mu <- as.vector(compute.mu(beta, X))
-        sigma2 <- (1/(nrow(X)-ncol(X))) * sum((y - mu)^2 / mu)
-        list(cov=sigma2 * solve(t(X) %*% diag(w) %*% X), sigma2=sigma2)
+        sigma2 <- (1/(nrow(X) - rank)) * sum((y - mu)^2 / mu)
+        return(list(cov=sigma2 * solve(t(X) %*% diag(w) %*% X), sigma2=sigma2))
       }
     }
   }
   compute.pvalue <- function(family, beta.hat, se.beta.hat, N, rank){
     if(family == "poisson"){
-      2 * pnorm(-abs(beta.hat / se.beta.hat))
+      return(2 * pnorm(-abs(beta.hat / se.beta.hat)))
     } else if(family == "quasipoisson"){
-      2 * pt(-abs(beta.hat / se.beta.hat), df=N-rank)
+      return(2 * pt(-abs(beta.hat / se.beta.hat), df=N-rank))
     }
   }
   ##-----------------------------------
@@ -479,7 +480,8 @@ irls <- function(y, X, threshold, family, verbose=0){
       message(tmp)
     }
     if(abs(wls.fit$chisq - old.chisq) < threshold){
-      var.beta.hat <- compute.variance(X, w, family, y, wls.fit$beta.hat)
+      var.beta.hat <- compute.variance(X, w, family, y, wls.fit$beta.hat,
+                                       wls.fit$rank)
       pval.beta.hat <- compute.pvalue(family, wls.fit$beta.hat,
                                       sqrt(diag(var.beta.hat$cov)), length(y),
                                       wls.fit$rank)
@@ -500,7 +502,7 @@ irls <- function(y, X, threshold, family, verbose=0){
 
 ## Calculate the summary statistics in each tissue
 calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
-                                      poisson.lik=FALSE, verbose=0){
+                                      lik="norm", verbose=0){
   stopifnot(! is.null(data))
   if(verbose > 0)
     message("calculate the summary statistics in each tissue ...")
@@ -527,14 +529,15 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
       i <- i + 1
       gene <- data$gene.coords$id[g]
       for(s in 1:length(data$phenos)){
+        snp <- data$snp.coords$id[p]
         sstats[[s]]$gene[i] <- gene
-        sstats[[s]]$snp[i] <- data$snp.coords$id[p]
+        sstats[[s]]$snp[i] <- snp
         sstats[[s]]$maf[i] <- sum(as.numeric(data$geno.counts[p,])) /
           (2 * length(as.numeric(data$geno.counts[p,])))
         if(gene %in% rownames(data$phenos[[s]])){
           sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
           common.inds.idx <- which(data$inds$id %in% colnames(data$phenos[[s]]))
-          if(! poisson.lik){
+          if(length(grep("pois", lik)) == 0){
             if(! (withCovars && "sex" %in% names(data$inds))){
               tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
                                 as.numeric(data$geno.counts[p,common.inds.idx])))
@@ -549,21 +552,38 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
             sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
             sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
           } else{
-            fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                       as.numeric(data$geno.counts[p,common.inds.idx]),
-                       family=poisson(link=log))
+            
+            if(lik == "pois"){
+              fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                         as.numeric(data$geno.counts[p,common.inds.idx]),
+                         family=poisson(link="log"))
+            } else # lik == "qpois"
+              fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
+                         as.numeric(data$geno.counts[p,common.inds.idx]),
+                         family=quasipoisson(link="log"))
             tmp <- summary(fit)
-            sstats[[s]]$sigmahat[i] <- 1 # change this if quasi-likelihood
+            sstats[[s]]$sigmahat[i] <- sqrt(tmp$dispersion) # diff than 1 if qpois
             sstats[[s]]$betahat.geno[i] <- tmp$coefficients[2,"Estimate"]
             sstats[[s]]$sebetahat.geno[i] <- tmp$coefficients[2,"Std. Error"]
-            sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|z|)"]
-            ## tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
-            ##             X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
-            ##             threshold=1e-6, family="poisson")
+            if(lik == "pois"){
+              sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|z|)"]
+            } else
+              sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
+            
+            ## if(lik == "pois"){
+            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
+            ##               X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
+            ##               threshold=1e-6, family="poisson")
+            ## } else
+            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
+            ##               X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
+            ##               threshold=1e-6, family="quasipoisson",
+            ##               verbose=ifelse(gene == "gene1" & snp == "snp1" & s == 1, 1, 0))
             ## sstats[[s]]$sigmahat[i] <- sqrt(tmp$sigma2)
             ## sstats[[s]]$betahat.geno[i] <- tmp$beta.hat[2]
             ## sstats[[s]]$sebetahat.geno[i] <- tmp$se.beta.hat[2]
             ## sstats[[s]]$betapval.geno[i] <- tmp$pval.beta.hat[2]
+            
           }
         } else # case where gene is absent in subgroup
           sstats[[s]]$n[i] <- 0
@@ -1102,7 +1122,7 @@ calcL10AbfsRawAllGridSFromSstats <- function(sstats.both, gridS, configs,
 calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
                                        withCovars=FALSE, mvlr=FALSE,
                                        rmvIndsFromSbgrp=FALSE,
-                                       poisson.lik=FALSE, verbose=0){
+                                       lik="norm", verbose=0){
   stopifnot(! is.null(data), ! is.null(sstats), ! is.null(grids))
   if(verbose > 0)
     message("calculate raw ABFs ...")
@@ -1282,16 +1302,16 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
 
 getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
                                       mvlr=FALSE, rmvIndsFromSbgrp=FALSE,
-                                      poisson.lik=FALSE, verbose=0){
+                                      lik="norm", verbose=0){
   stopifnot(! is.null(data), ! is.null(grids))
   if(verbose > 0)
     message("get results on simulated data with R ...")
   
-  sstats <- calcSstatsOnSimulatedData(data, withCovars, poisson.lik, verbose-1)
+  sstats <- calcSstatsOnSimulatedData(data, withCovars, lik, verbose-1)
   
-  if(! poisson.lik){
+  if(length(grep("pois", lik)) == 0){
     l10abfs.raw <- calcRawAbfsOnSimulatedData(data, sstats, grids, withCovars,
-                                              mvlr, rmvIndsFromSbgrp, poisson.lik,
+                                              mvlr, rmvIndsFromSbgrp, lik,
                                               verbose-1)
     l10abfs.avg <- calcAvgAbfsOnSimulatedData(data, l10abfs.raw, mvlr,
                                               rmvIndsFromSbgrp, verbose-1)
@@ -1319,7 +1339,7 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     for(j in 5:9) #ncol(res$sstats[[s]])) <- don't save covariates results
       tmp <- cbind(tmp, sprintf(fmt="%.06e", res$sstats[[s]][row.ids,j]))
     colnames(tmp) <- colnames(res$sstats[[s]])[1:9]
-    if(tmp[1,"pve"] == "NA") # this means "poisson.lik" is true
+    if(tmp[1,"pve"] == "NA") # this means "lik=norm" is false
       tmp[,"pve"] <- NA
     write.table(x=tmp, file=gzfile(paste0("exp_bf_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep="\t", na="nan")
@@ -1345,13 +1365,13 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
 run <- function(params){
   setwd(params$dir.name)
   data <- getSimulatedData(params$rmvGenesFromSbgrp, params$rmvIndsFromSbgrp,
-                           params$poisson.lik, params$verbose)
+                           params$lik, params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$withCovars,
                                    params$mvlr, params$rmvIndsFromSbgrp,
-                                   params$poisson.lik, params$verbose)
+                                   params$lik, params$verbose)
   writeResultsOnSimulatedData(res, params$verbose)
 }
 
@@ -1362,7 +1382,7 @@ main <- function(){
                  withCovars=FALSE,
                  mvlr=FALSE,
                  rmvIndsFromSbgrp=FALSE,
-                 poisson.lik=FALSE)
+                 lik="norm")
   params <- parseCmdLine(params)
   checkParams(params)
   if(params$verbose > 0)
