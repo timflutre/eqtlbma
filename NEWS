@@ -8,6 +8,7 @@ are missing in some subgroups
 options to change, see the manual
 * add tests for the multivariate Bayes Factor
 * use OpenMP tp speed-up the EM algorithm fitting the hierarchical model
+* implement Poisson likelihood and quasi-likelihood
 
 
 2013-03-28 v1.2

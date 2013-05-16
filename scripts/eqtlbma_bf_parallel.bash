@@ -232,6 +232,7 @@ snp=""
 if [ ! -z "${snpDir}" ]; then
     snp=$(ls ${snpDir}/* | awk -v i=${task} 'NR==i{print;exit}');
 fi
+seed=""
 if [ ! -z "${seedFile}" ]; then
     seed=$(zcat ${seedFile} | sed -n ${task}p)
 fi
@@ -270,7 +271,7 @@ if [ "x${type}" == "xjoin" ]; then
 fi
 if [ $nperm -gt "0" ]; then
     cmd+=" --nperm ${nperm}"
-    if [ ! -z "${seed}$" ]; then
+    if [ ! -z "${seed}" ]; then
 	cmd+=" --seed ${seed}"
     fi
     cmd+=" --trick ${trick}"
