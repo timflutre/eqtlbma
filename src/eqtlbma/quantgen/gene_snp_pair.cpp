@@ -937,23 +937,17 @@ namespace quantgen {
     int signum;
   
     if(X_us == NULL){ // if subgroup has no unique individuals
-      gsl_matrix * tmp_lu = gsl_matrix_alloc(tXs1s2Xs1s2->size1,
-					     tXs1s2Xs1s2->size2);
-      gsl_matrix_memcpy(tmp_lu, tXs1s2Xs1s2);
-      gsl_linalg_LU_decomp(tmp_lu, perm, &signum);
-      gsl_linalg_LU_invert(tmp_lu, perm, tmp_inv);
-      gsl_matrix_free(tmp_lu);
+      mygsl_linalg_pseudoinverse(tXs1s2Xs1s2, tmp_inv);
     }
     else{
       gsl_matrix * tXusXus = gsl_matrix_alloc(X_us->size2, X_us->size2);
       gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1.0, X_us, X_us, 0.0, tXusXus);
-      gsl_matrix * tmp_lu = gsl_matrix_alloc(tXs1s2Xs1s2->size1, X_us->size2);
-      gsl_matrix_memcpy(tmp_lu, tXs1s2Xs1s2);
-      gsl_matrix_add(tmp_lu, tXusXus);
-      gsl_linalg_LU_decomp(tmp_lu, perm, &signum);
-      gsl_linalg_LU_invert(tmp_lu, perm, tmp_inv);
+      gsl_matrix * tmp = gsl_matrix_alloc(tXs1s2Xs1s2->size1, X_us->size2);
+      gsl_matrix_memcpy(tmp, tXs1s2Xs1s2);
+      gsl_matrix_add(tmp, tXusXus);
+      mygsl_linalg_pseudoinverse(tmp, tmp_inv);
       gsl_matrix_free(tXusXus);
-      gsl_matrix_free(tmp_lu);
+      gsl_matrix_free(tmp);
     }
   
     gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1.0, tmp_inv, X_s1s2, 0.0, A_s);
