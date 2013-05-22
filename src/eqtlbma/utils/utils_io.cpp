@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <dirent.h>
+#include <glob.h>
 
 #include <iomanip>
 #include <algorithm>
@@ -643,6 +644,20 @@ namespace utils {
 	exit (1);
       }
     }
+  }
+
+  // http://stackoverflow.com/a/8615450/597069
+  vector<string>
+  glob (
+    const string & pattern)
+  {
+    glob_t glob_result;
+    glob(pattern.c_str(), GLOB_TILDE, NULL, &glob_result);
+    vector<string> res;
+    for(size_t i = 0; i < glob_result.gl_pathc; ++i)
+      res.push_back(string(glob_result.gl_pathv[i]));
+    globfree(&glob_result);
+    return res;
   }
 
   double

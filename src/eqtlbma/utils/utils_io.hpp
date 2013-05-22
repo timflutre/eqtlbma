@@ -97,6 +97,8 @@ namespace utils {
   int removeDir (std::string path);
 
   void removeFiles (const std::vector<std::string> & vFileNames);
+  
+  std::vector<std::string> glob (const std::string & pattern);
 
   double getMaxMemUsedByProcess (void);
 
