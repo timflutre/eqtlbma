@@ -1,7 +1,7 @@
-/** \file hm.cpp
+/** \file eqtlbma_hm.cpp
  *
- *  `hm' implements the EM algorithm to learn the hierarchical model from eQtlBma.
- *  Copyright (C) 2012-2013 Xiaoquan Wen
+ *  `eqtlbma_hm' implements the EM algorithm to fit the hierarchical model from eQtlBma.
+ *  Copyright (C) 2012-2013 Xiaoquan Wen, Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #include <cstring>
 
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 using namespace std;
@@ -29,6 +30,7 @@ using namespace std;
 #include <gsl/gsl_randist.h>
 
 #include "utils/utils_io.hpp"
+#include "utils/utils_math.hpp"
 using namespace utils;
 
 #include <omp.h>
@@ -39,6 +41,12 @@ using namespace utils;
 
 class eQTL_controller {
 
+  void load_data_init_format(char *filename, size_t csize, size_t gsize);
+  void load_data_new_format_one_file(string & file, size_t csize, size_t gsize,
+				     vector<string> & configs_tokeep);
+  void load_data_new_format(string & file_pattern, size_t csize, size_t gsize,
+			    vector<string> & configs_tokeep);
+
  public:
   // storage
   vector<gene_eQTL> geqVec;
@@ -46,7 +54,7 @@ class eQTL_controller {
   double fixed_pi0_;
       
   // parameters need to be estimated
-  double * pi0; // non-eqtl prob
+  double *pi0; // non-eqtl prob
   double new_pi0;
 
   double *grid_wts;
@@ -56,7 +64,12 @@ class eQTL_controller {
   double *new_config_prior; 
 
   double *param_est;
-  size_t     param_size;
+  size_t param_size;
+
+  // confidence intervals
+  double left_pi0, right_pi0;
+  vector<double> left_configs, right_configs;
+  vector<double> left_grids, right_grids;
 
   int nthread; 
 
@@ -65,10 +78,13 @@ class eQTL_controller {
   size_t config_size;
  
   int output_option;
+  
+  int verbose;
 
   vector<string> type_vec;
 
-  void load_data(char *filename, size_t csize, size_t gsize);
+  void load_data(char *filename, size_t csize, size_t gsize,
+		 vector<string> & configs_tokeep);
   ~eQTL_controller();
   
   
@@ -97,7 +113,9 @@ class eQTL_controller {
   
   void run_EM(double thresh);
   void compute_posterior();
+  
   void print_result();
+  void save_result(const string & out_file);
 };
 
 eQTL_controller::~eQTL_controller(){
@@ -110,26 +128,9 @@ eQTL_controller::~eQTL_controller(){
   }
 }
 
-void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
+void eQTL_controller::load_data_init_format(char *filename, size_t csize,
+					    size_t gsize){
   
-  // initialization of class parameters
-
-  pi0 = new double[1];
-  
-  grid_size = gsize;
-  // grid prior starts w/ equal weights
-  grid_wts = new double[gsize];
-  new_grid_wts = new double[gsize];
-      
-  config_size = csize;
-  
-  if(config_size>0){
-    config_prior = new double[config_size];
-    new_config_prior = new double[config_size];
-  } 
-  
-  
-  // reading data file
   gene_eQTL geq;
     
   string stype;
@@ -252,6 +253,138 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize){
   
 }
 
+
+
+void eQTL_controller::load_data_new_format_one_file(
+  string & file,
+  size_t csize,
+  size_t gsize,
+  vector<string> & configs_tokeep)
+{
+  string line, gene_id, snp_id, config, curr_gene, curr_snp;
+  gzFile stream;
+  vector<string> tokens;
+  size_t nb_lines = 0;
+  gene_eQTL geq;
+  vector<vector<double> > sbf_vec; // dim1 is config, dim2 is grid
+  
+  openFile(file, stream, "rb");
+  getline(stream, line);
+  nb_lines++;
+  split(line, " \t,", tokens);
+  if(tokens[0].compare("gene") != 0 
+     || tokens[1].compare("snp") != 0
+     || tokens[2].compare("config") != 0){
+    cerr << "ERROR: file " << file << " has wrong header line" << endl;
+    exit(1);
+  }
+  
+  while(getline(stream, line)){
+    nb_lines++;
+    split(line, " \t,", tokens);
+    gene_id = tokens[0];
+    snp_id = tokens[1];
+    config = tokens[2];
+    
+    if(config.find("gen") != string::npos
+       || (! configs_tokeep.empty()
+	   && find(configs_tokeep.begin(), configs_tokeep.end(), config)
+	   == configs_tokeep.end()))
+      continue;
+    
+    if(type_vec.size() < csize) // keep config names
+      type_vec.push_back(config);
+    
+    if(gene_id.compare(curr_gene) != 0){ // new gene
+      if(! geq.gene.empty()){
+	geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts));
+	geqVec.push_back(geq);
+      }
+      curr_gene = gene_id;
+      geq = gene_eQTL(curr_gene, pi0);
+      sbf_vec.clear();
+    }
+    
+    if(snp_id.compare(curr_snp) != 0){ // new snp
+      if(! sbf_vec.empty())
+	geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts));
+      curr_snp = snp_id;
+      sbf_vec.clear();
+    }
+    size_t config_idx = sbf_vec.size();
+    sbf_vec.push_back(vector<double> (gsize, NaN));
+    for(size_t i = 3; i < 3+gsize; ++i)
+      sbf_vec[config_idx][i-3] = atof(tokens[i].c_str());
+  }
+  
+  if(! gzeof(stream)){
+    cerr << "ERROR: can't read successfully file "
+	 << file << " up to the end" << endl;
+    exit (1);
+  }
+  closeFile(file, stream);
+  
+  geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts)); // last snp
+  geqVec.push_back(geq); // last gene
+}
+
+
+void eQTL_controller::load_data_new_format(
+  string & file_pattern, 
+  size_t csize,
+  size_t gsize,
+  vector<string> & configs_tokeep)
+{
+  vector<string> files = glob(file_pattern);
+  if(verbose > 0)
+    cerr << "nb of input files: " << files.size() << endl;
+  for(size_t i = 0; i < files.size(); ++i)
+    load_data_new_format_one_file(files[i], csize, gsize, configs_tokeep);
+}
+
+
+void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize,
+				vector<string> & configs_tokeep)
+{
+  if(verbose > 0)
+    fprintf(stderr, "load data ...\n");
+  clock_t startTime = clock();
+  
+  // initialization of class parameters
+  pi0 = new double[1];
+  grid_size = gsize;
+  grid_wts = new double[gsize]; // grid prior starts w/ equal weights
+  new_grid_wts = new double[gsize];
+  config_size = csize;
+  if(config_size > 0){
+    config_prior = new double[config_size];
+    new_config_prior = new double[config_size];
+  }
+  
+  if(configs_tokeep.empty() && false)
+    load_data_init_format(filename, csize, gsize);
+  else{
+    if(! configs_tokeep.empty()){
+      fprintf(stderr, "configurations to keep: %s", configs_tokeep[0].c_str());
+      for(size_t i = 1; i < configs_tokeep.size(); ++i)
+	fprintf(stderr, " %s", configs_tokeep[i].c_str());
+      fprintf(stderr, "\n");
+    }
+    string file = string(filename);
+    load_data_new_format(file, csize, gsize, configs_tokeep);
+  }
+  
+  // for(size_t g = 0; g < geqVec.size(); ++g){
+  //   cerr << g+1 << "/" << geqVec.size() << " " << geqVec[g].gene << ": " << geqVec[g].snpVec.size() << " snps" << endl;
+  //   for(size_t v = 0; v < geqVec[g].snpVec.size(); ++v)
+  //     cerr << v+1 << "/" << geqVec[g].snpVec.size() << " " << geqVec[g].snpVec[v].snp << endl;
+  // }
+  
+  if(verbose > 0)
+    fprintf(stderr, "finish loading %zu genes (%f sec)\n", geqVec.size(), getElapsedTime(startTime));
+}
+
+
 void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
 {
   double tick = 0.001;
@@ -259,8 +392,8 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
   
   // estimate CI for pi0
   double pi0_mle = pi0[0];
-  double left_pi0 = pi0[0];
-  double right_pi0 = pi0[0];
+  left_pi0 = pi0[0];
+  right_pi0 = pi0[0];
   if (! skip_ci) {
     while(left_pi0>=0){
       left_pi0 -= tick;
@@ -287,118 +420,123 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
       }
     }
   }
-  fprintf(stderr,"\nProfile-likelihood Confidence Intervals\n");
-  fprintf(stderr,"pi0: %7.3e [%7.3e, %7.3e]\n",pi0_mle,left_pi0,right_pi0);
-  fprintf(stderr,"config: ");
+  // fprintf(stderr,"\nProfile-likelihood Confidence Intervals\n");
+  // fprintf(stderr,"pi0: %7.3e [%7.3e, %7.3e]\n",pi0_mle,left_pi0,right_pi0);
+  // fprintf(stderr,"config: ");
   
   pi0[0] = pi0_mle;
   
   // estimate CI for config
   double *config_mle = new double[config_size];
   memcpy(config_mle, config_prior, config_size*sizeof(double));
+  left_configs.resize(config_size);
+  right_configs.resize(config_size);
   for (size_t i=0;i<config_size;i++){
-    double right_cp = config_mle[i];
-    double left_cp = config_mle[i];
+    right_configs[i] = config_mle[i];
+    left_configs[i] = config_mle[i];
     double cp_mle = config_mle[i];
     double st = 1 - cp_mle;
     if (! skip_ci) {
-      while(left_cp>=0){
-	left_cp -= tick;
-	if(left_cp<0){
-	  left_cp = 0;
+      while(left_configs[i]>=0){
+	left_configs[i] -= tick;
+	if(left_configs[i]<0){
+	  left_configs[i] = 0;
 	  break;
 	}
-	double diff = cp_mle - left_cp;
+	double diff = cp_mle - left_configs[i];
 	for(size_t j=0;j<config_size;j++){
 	  if(j==i)
 	    continue;
 	  config_prior[j] = config_mle[j] + diff*config_mle[j]/st;
 	}
-	config_prior[i] = left_cp;
+	config_prior[i] = left_configs[i];
 	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-	  left_cp += tick;
+	  left_configs[i] += tick;
 	  break;
 	}
       }
-      while(right_cp<=1){
-	right_cp += tick;
-	if(right_cp>1){
-	  right_cp = 1;
+      while(right_configs[i]<=1){
+	right_configs[i] += tick;
+	if(right_configs[i]>1){
+	  right_configs[i] = 1;
 	  break;
 	}
-	double diff = cp_mle - right_cp;
+	double diff = cp_mle - right_configs[i];
 	for(size_t j=0;j<config_size;j++){
 	  if(j==i)
 	    continue;
 	  config_prior[j] = config_mle[j]+ diff*config_mle[j]/st;
 	}
-	config_prior[i] = right_cp;
+	config_prior[i] = right_configs[i];
 	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-	  right_cp -= tick;
+	  right_configs[i] -= tick;
 	  break;
 	}
       }
     }
-    fprintf(stderr,"%s  %.3f [%.3f, %.3f]  ",type_vec[i].c_str(), config_mle[i],left_cp, right_cp);
-    fflush(stdout);
+    // fprintf(stderr,"%s  %.3f [%.3f, %.3f]  ",type_vec[i].c_str(), config_mle[i],left_configs[i], right_configs[i]);
+    // fflush(stdout);
   }
   memcpy(config_prior, config_mle,config_size*sizeof(double));
-  fprintf(stderr,"\n");
+  // fprintf(stderr,"\n");
   delete[] config_mle;
   
   // estimate CI for grid
-  fprintf(stderr,"grid:  ");
+  // fprintf(stderr,"grid:  ");
   double *grid_mle = new double[grid_size];
   memcpy(grid_mle, grid_wts, grid_size*sizeof(double));
+  left_grids.resize(grid_size);
+  right_grids.resize(grid_size);
   for (size_t i=0;i<grid_size;i++){
-    double right_cp = grid_mle[i];
-    double left_cp = grid_mle[i];
+    right_grids[i] = grid_mle[i];
+    left_grids[i] = grid_mle[i];
     double cp_mle = grid_mle[i];
     double st = 1 - cp_mle;
     if (! skip_ci) {
-      while(left_cp>=0){
-	left_cp -= tick;
-	if(left_cp<0){
-	  left_cp = 0;
+      while(left_grids[i]>=0){
+	left_grids[i] -= tick;
+	if(left_grids[i]<0){
+	  left_grids[i] = 0;
 	  break;
 	}
-	double diff = cp_mle - left_cp;
+	double diff = cp_mle - left_grids[i];
 	for(size_t j=0;j<grid_size;j++){
 	  if(j==i)
 	    continue;
 	  grid_wts[j] = grid_mle[j] + diff*grid_mle[j]/st;
 	}
-	grid_wts[i] = left_cp;
+	grid_wts[i] = left_grids[i];
 	
 	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-	  left_cp += tick;
+	  left_grids[i] += tick;
 	  break;
 	}
       }
-      while(right_cp<=1){
-	right_cp += tick;
-	if(right_cp>1){
-	  right_cp = 1;
+      while(right_grids[i]<=1){
+	right_grids[i] += tick;
+	if(right_grids[i]>1){
+	  right_grids[i] = 1;
 	  break;
 	}
-	double diff = cp_mle - right_cp;
+	double diff = cp_mle - right_grids[i];
 	for(size_t j=0;j<grid_size;j++){
 	  if(j==i)
 	    continue;
 	  grid_wts[j] = grid_mle[j]+ diff*grid_mle[j]/st;
 	}
-	grid_wts[i] = right_cp;
+	grid_wts[i] = right_grids[i];
 	if(compute_log10_lik()/log10(exp(1))<max/log10(exp(1))-2.0){
-	  right_cp -= tick;
+	  right_grids[i] -= tick;
 	  break;
 	  
 	}
       }
     }
-    fprintf(stderr,"%.3f [%.3f, %.3f]  ",grid_mle[i],left_cp, right_cp);
-    fflush(stdout);
+    // fprintf(stderr,"%.3f [%.3f, %.3f]  ",grid_mle[i],left_grids[i], right_grids[i]);
+    // fflush(stdout);
   }
-  fprintf(stderr,"\n");
+  memcpy(grid_wts, grid_mle, grid_size*sizeof(double));
+  // fprintf(stderr,"\n");
   delete[] grid_mle;
 }
 
@@ -704,6 +842,9 @@ void eQTL_controller::update_params(){
 
 void eQTL_controller::run_EM(double thresh){  
 
+  if(verbose > 0)
+    cerr << "run EM algorithm ..." << endl;
+
   // start iteration
   time_t startRawTime, endRawTime;
   time (&startRawTime);
@@ -767,18 +908,97 @@ void eQTL_controller::print_result(){
     geqVec[i].print_result();
 }
 
+
+void eQTL_controller::save_result(const string & out_file)
+{
+  gzFile stream;
+  openFile(out_file, stream, "wb");
+  
+  stringstream txt;
+  size_t nb_lines = 0;
+  
+  if(verbose > 0)
+    cerr << "compute profile-likelihood confidence intervals ..." << endl;
+  txt << "#param\tmle\tleft.ci\tright.ci" << endl;
+  ++nb_lines;
+  gzwriteLine(stream, txt.str(), out_file, nb_lines);
+  txt.str("");
+  txt << setprecision(4);
+  txt << "#pi0\t" << scientific << pi0[0] << "\t" << left_pi0 << "\t" << right_pi0 << endl;
+  ++nb_lines;
+  gzwriteLine(stream, txt.str(), out_file, nb_lines);
+  txt.unsetf(ios_base::floatfield);
+  for(size_t i = 0; i < type_vec.size(); ++i){
+    txt.str("");
+    txt << "#config." << type_vec[i].c_str()
+	<< "\t" << config_prior[i]
+	<< "\t" << left_configs[i]
+	<< "\t" << right_configs[i]
+	<< endl;
+    ++nb_lines;
+    gzwriteLine(stream, txt.str(), out_file, nb_lines);
+  }
+  for(size_t i = 0; i < grid_size; ++i){
+    txt.str("");
+    txt << "#grid." << i+1
+	<< "\t" << grid_wts[i]
+	<< "\t" << left_grids[i]
+	<< "\t" << right_grids[i]
+	<< endl;
+    ++nb_lines;
+    gzwriteLine(stream, txt.str(), out_file, nb_lines);
+  }
+  
+  if(verbose > 0)
+    cerr << "save the Bayes factors and posterior probabilities ..." << endl;
+  txt.str("");
+  txt << "gene\tgene.posterior.prob\tgene.log10.bf\t\tsnp\tsnp.log10.bf\t\t";
+  for(size_t i = 0; i < type_vec.size(); ++i)
+    txt << "log10.bf." << type_vec[i].c_str() << "\t";
+  txt << "\n";
+  ++nb_lines;
+  gzwriteLine(stream, txt.str(), out_file, nb_lines);
+  
+  for(size_t i = 0; i < geqVec.size(); ++i){
+    for(size_t j = 0; j < geqVec[i].snpVec.size(); ++j){
+      txt.str("");
+      txt << setprecision(4)
+	  << geqVec[i].gene
+	  << "\t"
+	  << geqVec[i].post_prob_gene
+	  << "\t"
+	  << geqVec[i].log10_BF
+	  << "\t"
+	  << geqVec[i].snpVec[j].snp
+	  << "\t"
+	  << geqVec[i].snpVec[j].log10_BF;
+      for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k)
+	txt << "\t"
+	    << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
+				  geqVec[i].snpVec[j].grid_wts,
+				  geqVec[i].snpVec[j].grid_size);
+      txt << endl;
+      ++nb_lines;
+      gzwriteLine(stream, txt.str(), out_file, nb_lines);
+    }
+  }
+  
+  closeFile(out_file, stream);
+}
+
 //-----------------------------------------------------------------------------
 
 int main(int argc, char **argv)
 {
-  time_t startRawTime, endRawTime;
-  time (&startRawTime);
+  int verbose = 1;
   
   char data_file[128];
+  memset(data_file,0,128);
   size_t csize = string::npos;
   size_t gsize = string::npos;
+  string out_file;
+  
   int nthread = 1;
-  memset(data_file,0,128);
   
   char init_file[128];
   int option = 0;
@@ -790,11 +1010,17 @@ int main(int argc, char **argv)
   
   double thresh = 0.05;
   
+  vector<string> configs_tokeep;
+  
   bool skip_ci = false;
   
   double fixed_pi0 = -1.0;
   
   for(int i=1;i<argc;i++){
+    if(strcmp(argv[i], "-v")==0 || strcmp(argv[i], "-verbose")==0){
+      verbose = atoi(argv[++i]);
+      continue;
+    }
     if(strcmp(argv[i], "-d")==0 || strcmp(argv[i], "-data")==0){
       strcpy(data_file,argv[++i]);
       continue;
@@ -805,6 +1031,10 @@ int main(int argc, char **argv)
     }
     if(strcmp(argv[i], "-g")==0 || strcmp(argv[i], "-grid")==0){
       gsize = atoi(argv[++i]);
+      continue;
+    }
+    if(strcmp(argv[i], "-o")==0 || strcmp(argv[i], "-out")==0){
+      out_file = string(argv[++i]);
       continue;
     }
     
@@ -827,6 +1057,10 @@ int main(int argc, char **argv)
     }
     if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"-ci")==0){
       strcpy(ci_file, argv[++i]);
+      continue;
+    }
+    if(strcmp(argv[i], "-reconf")==0){
+      split(argv[++i], "|", configs_tokeep);
       continue;
     }
     if(strcmp(argv[i],"-skipci")==0){
@@ -852,16 +1086,27 @@ int main(int argc, char **argv)
     fprintf(stderr,"Error: number of model grids unspecified\n");
     exit(1);
   }
+  if(out_file.empty()){
+    fprintf(stderr,"Error: output file unspecified\n");
+    exit(1);
+  }
   
-  // a global variable 
+  time_t startRawTime, endRawTime;
+  time (&startRawTime);
+  if(verbose > 0)
+    cout << "START " << basename(argv[0])
+	 << " " << getDateTime(startRawTime) << endl
+	 << "version " << VERSION << " compiled " << __DATE__
+	 << " " << __TIME__ << endl
+	 << "cmd-line: " << getCmdLine(argc, argv) << endl
+	 << "cwd: " << getCurrentDirectory() << endl << flush;
+  
   eQTL_controller controller;
   controller.nthread = nthread;
   controller.output_option = 1;
+  controller.verbose = verbose;
   
-  clock_t startTime = clock();
-  fprintf(stderr, "Start loading ...\n");
-  controller.load_data(data_file,csize,gsize);
-  fprintf(stderr, "Finish loading (%f sec)\n", getElapsedTime(startTime));
+  controller.load_data(data_file,csize,gsize,configs_tokeep);
   
   if(strlen(ci_file)>0){
     controller.init_params(ci_file);
@@ -878,11 +1123,11 @@ int main(int argc, char **argv)
   
   controller.run_EM(thresh);
   controller.compute_posterior();
-  controller.print_result();
   controller.estimate_profile_ci(skip_ci);
+  controller.save_result(out_file);
   
   time (&endRawTime);
-  cerr << endl
+  cerr << "END " << basename(argv[0]) << " " << getDateTime(endRawTime) << endl
        << "elapsed -> " << getElapsedTime(startRawTime, endRawTime) << endl
        << "max.mem -> " << getMaxMemUsedByProcess2Str () << endl;
 }
