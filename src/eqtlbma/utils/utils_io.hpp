@@ -65,6 +65,8 @@ namespace utils {
 
   int getline (gzFile & fileStream, std::string & line);
 
+  int readFile (const std::string & pathToFile, std::vector<std::string> & lines);
+
   void gzwriteLine (gzFile & fileStream, const std::string & line,
 		    const std::string & pathToFile, const size_t & lineId);
 

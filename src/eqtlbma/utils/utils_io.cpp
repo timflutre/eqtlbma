@@ -294,6 +294,47 @@ namespace utils {
     return res;
   }
 
+/** \brief Read the whole file in a vector of lines
+ *  \note could be speed-up by reading blocks rather than lines
+ */
+  int
+  readFile (
+    const string & pathToFile,
+    vector<string> & lines)
+  {
+    gzFile stream;
+    string line;
+    size_t nb_lines = 0, line_id = 0;
+    
+    openFile(pathToFile, stream, "rb");
+    
+    // while(getline(stream, line))
+    //   ++nb_lines;
+    
+    // if(! gzeof(stream)){
+    //   cerr << "ERROR: can't read successfully file "
+    // 	   << pathToFile << " up to the end" << endl;
+    //   exit (1);
+    // }
+    
+    // lines.reserve(nb_lines);
+    
+    // gzrewind(stream); // go back to beginning of file
+    
+    while(getline(stream, line)){
+      lines.push_back(line);
+      ++line_id;
+    }
+    
+    if(! gzeof(stream)){
+      cerr << "ERROR: can't read successfully file "
+	   << pathToFile << " up to the end" << endl;
+      exit (1);
+    }
+    
+    closeFile(pathToFile, stream);
+  }
+
   void
   gzwriteLine (
     gzFile & fileStream,
