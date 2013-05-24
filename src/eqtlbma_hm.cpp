@@ -42,9 +42,12 @@ using namespace utils;
 class eQTL_controller
 {
   void load_data_init_format(char *filename, size_t csize, size_t gsize);
-  void load_data_new_format_one_file(string & file, size_t csize, size_t gsize,
+  void load_data_new_format_one_file(const string & file,
+				     size_t csize, size_t gsize,
+				     vector<string> & lines,
 				     vector<string> & configs_tokeep);
-  void load_data_new_format(string & file_pattern, size_t csize, size_t gsize,
+  void load_data_new_format(const string & file_pattern, 
+			    size_t csize, size_t gsize,
 			    vector<string> & configs_tokeep);
   
 public:
@@ -242,13 +245,13 @@ void eQTL_controller::load_data_init_format(
 }
 
 void eQTL_controller::load_data_new_format_one_file(
-  string & file,
+  const string & file,
   size_t csize,
   size_t gsize,
+  vector<string> & lines,
   vector<string> & configs_tokeep)
 {
   // load the whole file at once
-  vector<string> lines;
   readFile(file, lines);
   
   // check the header
@@ -318,7 +321,7 @@ void eQTL_controller::load_data_new_format_one_file(
 }
 
 void eQTL_controller::load_data_new_format(
-  string & file_pattern, 
+  const string & file_pattern, 
   size_t csize,
   size_t gsize,
   vector<string> & configs_tokeep)
@@ -326,10 +329,13 @@ void eQTL_controller::load_data_new_format(
   vector<string> files = glob(file_pattern);
   if(verbose > 0)
     cerr << "nb of input files: " << files.size() << endl << flush;
+  
+  vector<string> lines;
   for(size_t i = 0; i < files.size(); ++i){
     if(verbose > 0)
       progressBar("", i+1, files.size());
-    load_data_new_format_one_file(files[i], csize, gsize, configs_tokeep);
+    load_data_new_format_one_file(files[i], csize, gsize, lines, configs_tokeep);
+    lines.clear();
   }
   if(verbose > 0)
     cerr << endl << flush;
@@ -369,14 +375,19 @@ void eQTL_controller::load_data(
     load_data_new_format(file, csize, gsize, configs_tokeep);
   }
   
-  // for(size_t g = 0; g < geqVec.size(); ++g){
-  //   cerr << g+1 << "/" << geqVec.size() << " " << geqVec[g].gene << ": " << geqVec[g].snpVec.size() << " snps" << endl;
-  //   for(size_t v = 0; v < geqVec[g].snpVec.size(); ++v)
-  //     cerr << v+1 << "/" << geqVec[g].snpVec.size() << " " << geqVec[g].snpVec[v].snp << endl;
-  // }
+  size_t nb_pairs = 0;
+  for(size_t g = 0; g < geqVec.size(); ++g){
+    nb_pairs += geqVec[g].snpVec.size();
+    // cerr << g+1 << "/" << geqVec.size() << " " << geqVec[g].gene << ": " << geqVec[g].snpVec.size() << " snps" << endl;
+    // for(size_t v = 0; v < geqVec[g].snpVec.size(); ++v)
+    //   cerr << v+1 << "/" << geqVec[g].snpVec.size() << " " << geqVec[g].snpVec[v].snp << endl;
+  }
   
   if(verbose > 0)
-    fprintf(stderr, "finish loading %zu genes (%f sec)\n", geqVec.size(), getElapsedTime(startTime));
+    fprintf(stderr, "finish loading %zu genes and %zu gene-snp pairs (%f sec)\n",
+	    geqVec.size(),
+	    nb_pairs,
+	    getElapsedTime(startTime));
 }
 
 void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
