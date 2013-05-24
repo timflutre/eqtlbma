@@ -40,7 +40,10 @@ IRLS::IRLS(const char * link_type){
   VB = 0;
 }
 
+// Xv should not contain the intercept
 void IRLS::load_data(vector<double> & yv, vector<vector<double> > &Xv){
+  
+  free_data = true;
   
   n = yv.size();
   p = Xv.size()+1;
@@ -60,6 +63,18 @@ void IRLS::load_data(vector<double> & yv, vector<vector<double> > &Xv){
   }
   
   return;
+}
+
+// Xv should contain the intercept
+void IRLS::set_data(gsl_vector * yv, gsl_matrix * Xv){
+
+  free_data = false;
+  
+  n = yv->size;
+  p = Xv->size2;
+  
+  Y = yv;
+  X = Xv;
 }
  
 
@@ -135,6 +150,7 @@ void IRLS::compute_variance(gsl_vector *w){
  
   gsl_permutation_free(pp);
  
+  gsl_matrix_free(W);
   gsl_matrix_free(t1);
   gsl_matrix_free(t2);
  
@@ -165,8 +181,17 @@ vector<double> IRLS::get_stderr(){
 
 IRLS::~IRLS(){
   
+  delete link;
+  
+  if(free_data){
+    gsl_vector_free(Y);
+    gsl_matrix_free(X);
+  }
+  
   if(fit_coef !=0){
     gsl_vector_free(fit_coef);
   }
-
+  
+  if(VB != 0)
+    gsl_matrix_free(VB);
 }

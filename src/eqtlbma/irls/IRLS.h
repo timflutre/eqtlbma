@@ -31,36 +31,34 @@ class IRLS {
   
  private:
   gsl_vector *Y;  // response vector
-  gsl_matrix *X; // design matrix
-
+  gsl_matrix *X;  // design matrix
+  bool free_data; // depends on load_data() or set_data()
+  
   gsl_vector *fit_coef;
   
   int n; // sample size;
   int p; // number of parameters (including intercept)
   size_t rank; // of X (useful for p-values)
-
+  
   double psi; // dispersion
   gsl_matrix *VB;
-
   
  public:
-
+  
   LinkFunc *link;
-
+  
   IRLS(const char * link_type);
   ~IRLS();
   void load_data(std::vector<double> & yv, std::vector<std::vector<double> > &Xv);
+  void set_data(gsl_vector * yv, gsl_matrix * Xv);
   void fit_model();
   std::vector<double> get_fit_coef();
   std::vector<double> get_stderr();
   size_t get_rank_X() { return rank; };
   double get_dispersion() { return psi; };
-
+  
  private:
   void compute_variance(gsl_vector *w);
-
-
-
 };
 
 #endif
