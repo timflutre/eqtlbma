@@ -39,54 +39,53 @@ using namespace utils;
 
 //-----------------------------------------------------------------------------
 
-class eQTL_controller {
-
+class eQTL_controller
+{
   void load_data_init_format(char *filename, size_t csize, size_t gsize);
   void load_data_new_format_one_file(string & file, size_t csize, size_t gsize,
 				     vector<string> & configs_tokeep);
   void load_data_new_format(string & file_pattern, size_t csize, size_t gsize,
 			    vector<string> & configs_tokeep);
-
- public:
+  
+public:
   // storage
   vector<gene_eQTL> geqVec;
   
   double fixed_pi0_;
-      
+  
   // parameters need to be estimated
   double *pi0; // non-eqtl prob
   double new_pi0;
-
+  
   double *grid_wts;
   double *new_grid_wts;
-
+  
   double *config_prior;
   double *new_config_prior; 
-
+  
   double *param_est;
   size_t param_size;
-
+  
   // confidence intervals
   double left_pi0, right_pi0;
   vector<double> left_configs, right_configs;
   vector<double> left_grids, right_grids;
-
+  
   int nthread; 
-
+  
   size_t types;
   size_t grid_size;
   size_t config_size;
- 
+  
   int output_option;
   
   int verbose;
-
+  
   vector<string> type_vec;
-
+  
   void load_data(char *filename, size_t csize, size_t gsize,
 		 vector<string> & configs_tokeep);
   ~eQTL_controller();
-  
   
   void init_params(int option=0);
   void init_params(char * init_file);
@@ -95,15 +94,15 @@ class eQTL_controller {
   void randomize_parameter_sp();
   
   double compute_log10_lik();
-
+  
   void print_estimate();
   void print_estimate(size_t index);
-
+  
   void em_update_pi0();
   void em_update_config();
   void em_update_grid();
   void em_update_snp_prior();
-
+  
   void update_params();
   
   void update_param_est(size_t index, double val);
@@ -118,7 +117,8 @@ class eQTL_controller {
   void save_result(const string & out_file);
 };
 
-eQTL_controller::~eQTL_controller(){
+eQTL_controller::~eQTL_controller()
+{
   delete pi0;
   delete grid_wts;
   delete new_grid_wts;
@@ -128,11 +128,13 @@ eQTL_controller::~eQTL_controller(){
   }
 }
 
-void eQTL_controller::load_data_init_format(char *filename, size_t csize,
-					    size_t gsize){
-  
+void eQTL_controller::load_data_init_format(
+  char *filename, 
+  size_t csize,
+  size_t gsize)
+{
   gene_eQTL geq;
-    
+  
   string stype;
   
   string curr_sid;   // current gene-snp 
@@ -146,8 +148,7 @@ void eQTL_controller::load_data_init_format(char *filename, size_t csize,
   char sid[128];
   
   vector<vector<double> > sbf_vec;
-
-
+  
   while(getline(infile,line)){
      
     const char *cline = line.c_str();
@@ -203,8 +204,6 @@ void eQTL_controller::load_data_init_format(char *filename, size_t csize,
       
     }
 
-
-
     char *mtype = strtok(NULL, delim);  
     if(type_vec.size() < csize){
       
@@ -228,7 +227,6 @@ void eQTL_controller::load_data_init_format(char *filename, size_t csize,
     
     delete[] c_line; 
   }
-  
 
   // last gene
   if(sbf_vec.size()!=0){  
@@ -241,19 +239,7 @@ void eQTL_controller::load_data_init_format(char *filename, size_t csize,
     geqVec.push_back(geq);
   
   }
-  
-  /*
-  for(size_t i=0;i<csize;i++){
-    printf("%s\n",type_vec[i].c_str());
-  }
-  
-  exit(0);
-
-  */
-  
 }
-
-
 
 void eQTL_controller::load_data_new_format_one_file(
   string & file,
@@ -261,17 +247,13 @@ void eQTL_controller::load_data_new_format_one_file(
   size_t gsize,
   vector<string> & configs_tokeep)
 {
-  string line, gene_id, snp_id, config, curr_gene, curr_snp;
-  gzFile stream;
-  vector<string> tokens;
-  size_t nb_lines = 0;
-  gene_eQTL geq;
-  vector<vector<double> > sbf_vec; // dim1 is config, dim2 is grid
+  // load the whole file at once
+  vector<string> lines;
+  readFile(file, lines);
   
-  openFile(file, stream, "rb");
-  getline(stream, line);
-  nb_lines++;
-  split(line, " \t,", tokens);
+  // check the header
+  vector<string> tokens;
+  split(lines[0], " \t,", tokens);
   if(tokens[0].compare("gene") != 0 
      || tokens[1].compare("snp") != 0
      || tokens[2].compare("config") != 0){
@@ -279,23 +261,30 @@ void eQTL_controller::load_data_new_format_one_file(
     exit(1);
   }
   
-  while(getline(stream, line)){
-    nb_lines++;
-    split(line, " \t,", tokens);
-    gene_id = tokens[0];
-    snp_id = tokens[1];
-    config = tokens[2];
+  // parse the lines
+  char * pch;
+  string gene_id, snp_id, config, curr_gene, curr_snp;
+  gene_eQTL geq;
+  vector<vector<double> > sbf_vec; // dim1 is config, dim2 is grid
+  for(size_t i = 1; i < lines.size(); ++i){
     
+    // skip line based on config if needed
+    pch = strtok((char *) lines[i].c_str(), " \t,");
+    gene_id = string(pch);
+    pch = strtok(NULL, " \t,");
+    snp_id = string(pch);
+    pch = strtok(NULL, " \t,");
+    config = string(pch);
     if(config.find("gen") != string::npos
        || (! configs_tokeep.empty()
 	   && find(configs_tokeep.begin(), configs_tokeep.end(), config)
 	   == configs_tokeep.end()))
       continue;
     
-    if(type_vec.size() < csize) // keep config names
+    if(type_vec.size() < csize) // record config names once (for output)
       type_vec.push_back(config);
     
-    if(gene_id.compare(curr_gene) != 0){ // new gene
+    if(gene_id.compare(curr_gene) != 0){ // if new gene
       if(! geq.gene.empty()){
 	geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts));
 	geqVec.push_back(geq);
@@ -305,29 +294,28 @@ void eQTL_controller::load_data_new_format_one_file(
       sbf_vec.clear();
     }
     
-    if(snp_id.compare(curr_snp) != 0){ // new snp
+    if(snp_id.compare(curr_snp) != 0){ // if same gene but new snp
       if(! sbf_vec.empty())
 	geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts));
       curr_snp = snp_id;
       sbf_vec.clear();
     }
+    
+    // if same gene and snp but new config
     size_t config_idx = sbf_vec.size();
     sbf_vec.push_back(vector<double> (gsize, NaN));
-    for(size_t i = 3; i < 3+gsize; ++i)
-      sbf_vec[config_idx][i-3] = atof(tokens[i].c_str());
+    size_t j = 0;
+    pch = strtok(NULL, " \t,");
+    while(j < gsize && pch != NULL){
+      sbf_vec[config_idx][j] = atof(pch);
+      ++j;
+      pch = strtok(NULL, " \t,");
+    }
   }
-  
-  if(! gzeof(stream)){
-    cerr << "ERROR: can't read successfully file "
-	 << file << " up to the end" << endl;
-    exit (1);
-  }
-  closeFile(file, stream);
   
   geq.snpVec.push_back(snp_eQTL(curr_snp, sbf_vec, config_prior, grid_wts)); // last snp
   geqVec.push_back(geq); // last gene
 }
-
 
 void eQTL_controller::load_data_new_format(
   string & file_pattern, 
@@ -337,14 +325,21 @@ void eQTL_controller::load_data_new_format(
 {
   vector<string> files = glob(file_pattern);
   if(verbose > 0)
-    cerr << "nb of input files: " << files.size() << endl;
-  for(size_t i = 0; i < files.size(); ++i)
+    cerr << "nb of input files: " << files.size() << endl << flush;
+  for(size_t i = 0; i < files.size(); ++i){
+    if(verbose > 0)
+      progressBar("", i+1, files.size());
     load_data_new_format_one_file(files[i], csize, gsize, configs_tokeep);
+  }
+  if(verbose > 0)
+    cerr << endl << flush;
 }
 
-
-void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize,
-				vector<string> & configs_tokeep)
+void eQTL_controller::load_data(
+  char *filename,
+  size_t csize,
+  size_t gsize,
+  vector<string> & configs_tokeep)
 {
   if(verbose > 0)
     fprintf(stderr, "load data ...\n");
@@ -384,9 +379,12 @@ void eQTL_controller::load_data(char *filename, size_t csize, size_t gsize,
     fprintf(stderr, "finish loading %zu genes (%f sec)\n", geqVec.size(), getElapsedTime(startTime));
 }
 
-
 void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
 {
+  if(verbose > 0)
+    cerr << "compute profile-likelihood confidence intervals ..." << flush;
+  clock_t startTime = clock();
+  
   double tick = 0.001;
   double max = compute_log10_lik();
   
@@ -538,12 +536,13 @@ void eQTL_controller::estimate_profile_ci(const bool & skip_ci)
   memcpy(grid_wts, grid_mle, grid_size*sizeof(double));
   // fprintf(stderr,"\n");
   delete[] grid_mle;
+  
+  if(verbose > 0)
+    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
 }
 
-
-
-void eQTL_controller::init_params(char *init_file){
-  
+void eQTL_controller::init_params(char *init_file)
+{
   ifstream ifile(init_file);
   string line;
   istringstream ins;
@@ -577,7 +576,6 @@ void eQTL_controller::init_params(char *init_file){
       }
       continue;
     }
-    
   }
 
 #pragma omp parallel for num_threads(nthread)
@@ -589,11 +587,8 @@ void eQTL_controller::init_params(char *init_file){
   ifile.close();
 }
 
-
- 
-
-void eQTL_controller::init_params(int option){
-
+void eQTL_controller::init_params(int option)
+{
 #pragma omp parallel for num_threads(nthread)
   for(int i=0;i<geqVec.size();i++)
     geqVec[i].set_snp_prior();
@@ -618,13 +613,10 @@ void eQTL_controller::init_params(int option){
   for(size_t i=0;i<grid_size;i++){
     grid_wts[i] = 1.0/grid_size;
   }
-  
-
 }
 
- 
-void eQTL_controller::randomize_parameter_sp(){
-  
+void eQTL_controller::randomize_parameter_sp()
+{
   const gsl_rng_type * T;
   gsl_rng * r;
        
@@ -635,13 +627,11 @@ void eQTL_controller::randomize_parameter_sp(){
   long seed = time (NULL);    
   gsl_rng_set (r, seed); 
   
-  
   //double x1 = gsl_ran_exponential(r,1.0);
   //double x2 = gsl_ran_exponential(r,1.0);
   //pi0[0] = .90 + .1*x1/(x1 + x2);
   //pi0[0] = x1/(x1 + x2);
   pi0[0] = gsl_rng_uniform (r);
-  
   
   double sum = 0;
   for(size_t i=0;i<grid_size;i++){
@@ -670,15 +660,12 @@ void eQTL_controller::randomize_parameter_sp(){
   gsl_rng_free (r);
 
   return;
-
 }
 
-
-
-double eQTL_controller::compute_log10_lik(){
-  
+double eQTL_controller::compute_log10_lik()
+{
   double sum = 0;
-
+  
 #pragma omp parallel for num_threads(nthread) reduction(+:sum)
   for (int i=0;i<geqVec.size();i++){
     sum += geqVec[i].compute_log10_lik();
@@ -687,20 +674,17 @@ double eQTL_controller::compute_log10_lik(){
   return sum;
 }
 
-
-void eQTL_controller::em_update_snp_prior(){
-  
+void eQTL_controller::em_update_snp_prior()
+{
 #pragma omp parallel for num_threads(nthread)
   for (int i=0;i<geqVec.size();i++){
      geqVec[i].em_update_snp_prior();
   }
-
 }
 
-
-void eQTL_controller::em_update_pi0(){
-  
-  if (fixed_pi0_ == -1.0) {
+void eQTL_controller::em_update_pi0()
+{
+  if (fixed_pi0_ == -1.0){
     double sum = 0;
 #pragma omp parallel for num_threads(nthread) reduction(+:sum)
     for(int i=0;i<geqVec.size();i++){
@@ -711,21 +695,16 @@ void eQTL_controller::em_update_pi0(){
   }
   else
     new_pi0 = fixed_pi0_;
-  
-  return;
-  
 }
 
-
-void eQTL_controller::em_update_grid(){
-
+void eQTL_controller::em_update_grid()
+{
   double **matrix = new double *[grid_size];
   double *gene_wts = new double[geqVec.size()];
   for(size_t i=0;i<grid_size;i++){
     matrix[i] = new double[geqVec.size()];
     memset(matrix[i],0,sizeof(double)*geqVec.size());
   }
-
 
   double *new_grid = new double[grid_size];
   memset(new_grid,0,sizeof(double)*grid_size);
@@ -759,17 +738,10 @@ void eQTL_controller::em_update_grid(){
     new_grid_wts[i] = pow(10, (new_grid[i] - sum));
 
   delete[] new_grid;
-
-  return;
-
-
 }
 
-
-
-void eQTL_controller::em_update_config(){
-  
-  
+void eQTL_controller::em_update_config()
+{
   if(config_size==1)
     return;
   
@@ -779,7 +751,6 @@ void eQTL_controller::em_update_config(){
     matrix[i] = new double[geqVec.size()];
     memset(matrix[i],0,sizeof(double)*geqVec.size());
   }
-
   
   double *new_config = new double[config_size];
   memset(new_config,0,sizeof(double)*config_size);
@@ -813,15 +784,10 @@ void eQTL_controller::em_update_config(){
     new_config_prior[i] = pow(10, (new_config[i] - sum));
   
   delete[] new_config;
-  
-  return;
-
-
 }
 
-void eQTL_controller::update_params(){
- 
-  
+void eQTL_controller::update_params()
+{
   *pi0 = new_pi0;
   if(config_size>1){
     for(size_t i=0;i<config_size;i++)
@@ -830,20 +796,16 @@ void eQTL_controller::update_params(){
   
   for(size_t i=0;i<grid_size;i++)
     grid_wts[i] = new_grid_wts[i];
- 
   
   //for (size_t i=0;i<geqVec.size();i++){
   //  geqVec[i].update_snp_prior();
   //}
-  
-
 }
 
-
-void eQTL_controller::run_EM(double thresh){  
-
+void eQTL_controller::run_EM(double thresh)
+{
   if(verbose > 0)
-    cerr << "run EM algorithm ..." << endl;
+    cerr << "run EM algorithm ..." << endl << flush;
 
   // start iteration
   time_t startRawTime, endRawTime;
@@ -852,7 +814,7 @@ void eQTL_controller::run_EM(double thresh){
   size_t count = 1;
   double last_log10_lik = -9999999;
   //new_pi0 = *pi0 = 0.50;
-  while(1){
+  while(true){
     
     double curr_log10_lik = compute_log10_lik();
     em_update_pi0();    
@@ -860,7 +822,6 @@ void eQTL_controller::run_EM(double thresh){
     em_update_grid();
    
     //em_update_snp_prior();
-      
 
     update_params();
     
@@ -887,17 +848,25 @@ void eQTL_controller::run_EM(double thresh){
   }
 
   time (&endRawTime);
-  cerr << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl;
+  cerr << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl << flush;
 }
 
-void eQTL_controller::compute_posterior(){       
+void eQTL_controller::compute_posterior()
+{
+  if(verbose > 0)
+    cerr << "compute_posteriors ..." << flush;
+  clock_t startTime = clock();
+  
 #pragma omp parallel for num_threads(nthread)
   for(int i=0;i<geqVec.size();i++)
     geqVec[i].compute_posterior(config_prior, config_size);
+  
+  if(verbose > 0)
+    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
 }
 
-
-void eQTL_controller::print_result(){
+void eQTL_controller::print_result()
+{
   printf("gene\tgene.posterior.prob\tgene.log10.bf\t\tsnp\tsnp.log10.bf\t\t");
   for(size_t i=0;i<type_vec.size();i++){
     printf("log10.bf.%s\t",type_vec[i].c_str());
@@ -908,17 +877,18 @@ void eQTL_controller::print_result(){
     geqVec[i].print_result();
 }
 
-
 void eQTL_controller::save_result(const string & out_file)
 {
+  if(verbose > 0)
+    cerr << "save the Bayes factors and posterior probabilities ..." << flush;
+  clock_t startTime = clock();
+  
   gzFile stream;
   openFile(out_file, stream, "wb");
   
   stringstream txt;
   size_t nb_lines = 0;
   
-  if(verbose > 0)
-    cerr << "compute profile-likelihood confidence intervals ..." << endl;
   txt << "#param\tmle\tleft.ci\tright.ci" << endl;
   ++nb_lines;
   gzwriteLine(stream, txt.str(), out_file, nb_lines);
@@ -949,8 +919,6 @@ void eQTL_controller::save_result(const string & out_file)
     gzwriteLine(stream, txt.str(), out_file, nb_lines);
   }
   
-  if(verbose > 0)
-    cerr << "save the Bayes factors and posterior probabilities ..." << endl;
   txt.str("");
   txt << "gene\tgene.posterior.prob\tgene.log10.bf\t\tsnp\tsnp.log10.bf\t\t";
   for(size_t i = 0; i < type_vec.size(); ++i)
@@ -959,8 +927,8 @@ void eQTL_controller::save_result(const string & out_file)
   ++nb_lines;
   gzwriteLine(stream, txt.str(), out_file, nb_lines);
   
-  for(size_t i = 0; i < geqVec.size(); ++i){
-    for(size_t j = 0; j < geqVec[i].snpVec.size(); ++j){
+  for(size_t i = 0; i < geqVec.size(); ++i){ // loop over gene
+    for(size_t j = 0; j < geqVec[i].snpVec.size(); ++j){ // loop over snp
       txt.str("");
       txt << setprecision(4)
 	  << geqVec[i].gene
@@ -972,7 +940,7 @@ void eQTL_controller::save_result(const string & out_file)
 	  << geqVec[i].snpVec[j].snp
 	  << "\t"
 	  << geqVec[i].snpVec[j].log10_BF;
-      for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k)
+      for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k) // loop over config
 	txt << "\t"
 	    << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
 				  geqVec[i].snpVec[j].grid_wts,
@@ -984,9 +952,50 @@ void eQTL_controller::save_result(const string & out_file)
   }
   
   closeFile(out_file, stream);
+  
+  if(verbose > 0)
+    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
 }
 
 //-----------------------------------------------------------------------------
+
+void help(char ** argv)
+{
+  cout << "`" << argv[0] << "'"
+       << " fits the hierarchical model of eQtlBma with an EM algorithm." << endl
+       << endl
+       << "Usage: " << argv[0] << " [OPTIONS] ..." << endl
+       << endl
+       << "Options:" << endl
+       << "  -h, --help\tdisplay the help and exit" << endl
+       << "  -V, --version\toutput version information and exit" << endl
+       << "  -v, --verbose\tverbosity level (0/default=1/2/3)" << endl
+       << "  -d, --data\tinput data" << endl
+       << "  -s\t\tnumber of subgroup configurations" << endl
+       << "  -g, --grid\tnumber of grid points" << endl
+       << "  -o, --out\toutput file (gzipped)" << endl
+       << "  -i, --init\tfile for initialization" << endl
+       << "  -r, --ran\trandom initialization" << endl
+       << "  -t, --thresh\tthreshold to stop the EM (default=0.05)" << endl
+       << "      --thread\tnumber of threads (default=1)" << endl
+       << "  -c, --ci\t" << endl
+       << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
+       << "      --skipci\tavoid computing the confidence intervals" << endl
+       << "      --pi0\tfixed value for pi0" << endl
+       << endl;
+}
+
+void version(char ** argv)
+{
+  cout << argv[0] << " " << VERSION << endl
+       << endl
+       << "Copyright (C) 2012-2013 Xiaoquan Wen and Timothee Flutre." << endl
+       << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>" << endl
+       << "This is free software; see the source for copying conditions.  There is NO" << endl
+       << "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." << endl
+       << endl
+       << "Written by Xiaoquan Wen and Timothee Flutre." << endl;
+}
 
 int main(int argc, char **argv)
 {
@@ -1017,62 +1026,70 @@ int main(int argc, char **argv)
   double fixed_pi0 = -1.0;
   
   for(int i=1;i<argc;i++){
-    if(strcmp(argv[i], "-v")==0 || strcmp(argv[i], "-verbose")==0){
+    if(strcmp(argv[i], "-h")==0 || strcmp(argv[i], "--help")==0){
+      help(argv);
+      exit(0);
+    }
+    if(strcmp(argv[i], "-V")==0 || strcmp(argv[i], "--version")==0){
+      version(argv);
+      continue;
+    }
+    if(strcmp(argv[i], "-v")==0 || strcmp(argv[i], "--verbose")==0){
       verbose = atoi(argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-d")==0 || strcmp(argv[i], "-data")==0){
-      strcpy(data_file,argv[++i]);
+    if(strcmp(argv[i], "-d")==0 || strcmp(argv[i], "--data")==0){
+      strcpy(data_file, argv[++i]);
       continue;
     }
     if(strcmp(argv[i], "-s")==0){
       csize = atoi(argv[++i]);
       continue;	
     }
-    if(strcmp(argv[i], "-g")==0 || strcmp(argv[i], "-grid")==0){
+    if(strcmp(argv[i], "-g")==0 || strcmp(argv[i], "--grid")==0){
       gsize = atoi(argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-o")==0 || strcmp(argv[i], "-out")==0){
+    if(strcmp(argv[i], "-o")==0 || strcmp(argv[i], "--out")==0){
       out_file = string(argv[++i]);
       continue;
     }
     
     ////////////////////// optional ///////////////////////////
-    if(strcmp(argv[i],"-i")==0 || strcmp(argv[i],"-init")==0){
+    if(strcmp(argv[i],"-i")==0 || strcmp(argv[i],"--init")==0){
       strcpy(init_file, argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-r")==0 || strcmp(argv[i],"-ran")==0){
+    if(strcmp(argv[i], "-r")==0 || strcmp(argv[i],"--ran")==0){
       option = 1;
       continue;
     }
-    if(strcmp(argv[i], "-t")==0 || strcmp(argv[i], "-thresh")==0){
+    if(strcmp(argv[i], "-t")==0 || strcmp(argv[i], "--thresh")==0){
       thresh = atof(argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-thread") == 0){
+    if(strcmp(argv[i], "--thread") == 0){
       nthread = atoi(argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"-ci")==0){
+    if(strcmp(argv[i], "-c")==0 || strcmp(argv[i],"--ci")==0){
       strcpy(ci_file, argv[++i]);
       continue;
     }
-    if(strcmp(argv[i], "-reconf")==0){
+    if(strcmp(argv[i], "--configs")==0){
       split(argv[++i], "|", configs_tokeep);
       continue;
     }
-    if(strcmp(argv[i],"-skipci")==0){
+    if(strcmp(argv[i],"--skipci")==0){
       skip_ci = true;
       continue;
     }
-    if(strcmp(argv[i], "-pi0")==0){
+    if(strcmp(argv[i], "--pi0")==0){
       fixed_pi0 = atof(argv[++i]);
       continue;
     }
   }
-
+  
   // checking mandatory arguments
   if(strlen(data_file)==0){
     fprintf(stderr,"Error: data file unspecified\n");
@@ -1091,10 +1108,11 @@ int main(int argc, char **argv)
     exit(1);
   }
   
+  // fit the hierarchical model via EM
   time_t startRawTime, endRawTime;
   time (&startRawTime);
   if(verbose > 0)
-    cout << "START " << basename(argv[0])
+    cerr << "START " << basename(argv[0])
 	 << " " << getDateTime(startRawTime) << endl
 	 << "version " << VERSION << " compiled " << __DATE__
 	 << " " << __TIME__ << endl
