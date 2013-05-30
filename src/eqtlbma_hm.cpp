@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 using namespace std;
 
 #include <gsl/gsl_rng.h>

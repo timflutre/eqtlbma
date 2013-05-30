@@ -18,6 +18,7 @@
  */
 
 #include <cstdlib>
+#include <cstring>
 #include <cmath>
 #include <cerrno>
 #include <sys/stat.h>

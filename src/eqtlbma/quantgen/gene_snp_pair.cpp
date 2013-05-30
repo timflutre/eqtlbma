@@ -175,7 +175,7 @@ namespace quantgen {
       gsl_vector_free(y);
     }
     else if(likelihood.find("poisson") != string::npos){
-      vector<vector<double> > X(1 + Xc[0].size(), Xg[0].size()); // P x N
+      vector<vector<double> > X(1 + Xc[0].size(), vector<double>(Xg[0].size(), NaN)); // P x N
       for(size_t i = 0; i < X[0].size(); ++i) // fill genotypes
 	X[0][i] = Xg[0][i];
       for(size_t j = 1; j < X.size(); ++j) // fill other covariates
