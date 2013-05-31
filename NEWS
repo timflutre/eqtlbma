@@ -2,13 +2,15 @@
 ===============
 
 New features
-* in 'eqtlbma', allow to account for correlated errors when some individuals
-are missing in some subgroups
-* major refactoring of 'eqtlbma' (use a static library), which causes some 
-options to change, see the manual
+* allow correlated errors when individuals are missing in some subgroups
+* major refactoring (use multiple libraries) which causes some options to
+change for eqtlbma_bf and eqtlbma_hm, see the manual
 * add tests for the multivariate Bayes Factor
 * use OpenMP tp speed-up the EM algorithm fitting the hierarchical model
-* implement Poisson likelihood and quasi-likelihood
+* implement Poisson likelihood and quasi-likelihood for single-tissue analysis
+
+Bug fixes
+* in 'eqtlbma_hm', don't use underscore to split identifiers
 
 
 2013-03-28 v1.2
