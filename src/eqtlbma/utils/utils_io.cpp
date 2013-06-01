@@ -305,7 +305,7 @@ namespace utils {
   {
     gzFile stream;
     string line;
-    size_t nb_lines = 0, line_id = 0;
+    size_t line_id = 0; //, nb_lines = 0;
     
     openFile(pathToFile, stream, "rb");
     
@@ -334,6 +334,8 @@ namespace utils {
     }
     
     closeFile(pathToFile, stream);
+    
+    return 0;
   }
 
   void
