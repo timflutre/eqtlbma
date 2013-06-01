@@ -957,7 +957,7 @@ void eQTL_controller::save_result(const string & out_file)
 	    << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
 				  geqVec[i].snpVec[j].grid_wts,
 				  geqVec[i].snpVec[j].grid_size);
-      txt << endl;
+      txt << "\n";
       ++nb_lines;
       gzwriteLine(stream, txt.str(), out_file, nb_lines);
     }

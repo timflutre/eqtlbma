@@ -1950,7 +1950,7 @@ void writeResSstats(
 	      << sep << it_pair->GetBetahatGeno(subgroup)
 	      << sep << it_pair->GetSebetahatGeno(subgroup)
 	      << sep << it_pair->GetBetapvalGeno(subgroup);
-	ssTxt << endl;
+	ssTxt << "\n";
 	gzwriteLine (outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       } // end of loop over cis snps
       
@@ -2007,7 +2007,7 @@ void writeResSepPermPval(
 	ssTxt.setf(ios::scientific);
 	ssTxt << sep << setprecision(6) << it_gene->second.GetTrueMinPval(*it_sbgrp);
 	ssTxt.unsetf(ios::scientific);
-	ssTxt << endl;
+	ssTxt << "\n";
 	gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       }
     }
@@ -2059,7 +2059,7 @@ void writeResSepPermPval(
       ssTxt.setf(ios::scientific);
       ssTxt << sep << setprecision(6) << it_gene->second.GetTrueMinPval();
       ssTxt.unsetf(ios::scientific);
-      ssTxt << endl;
+      ssTxt << "\n";
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
     }
   }
@@ -2119,7 +2119,7 @@ void writeResAbfsRaw(
 	     = it_pair->BeginUnweightedAbf("gen");
 	   it != it_pair->EndUnweightedAbf("gen"); ++it)
 	ssTxt << sep << *it;
-      ssTxt << endl;
+      ssTxt << "\n";
       ++nb_lines;
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       
@@ -2132,7 +2132,7 @@ void writeResAbfsRaw(
 	     = it_pair->BeginUnweightedAbf("gen-fix");
 	   it != it_pair->EndUnweightedAbf("gen-fix"); ++it)
 	ssTxt << sep << *it;
-      ssTxt << endl;
+      ssTxt << "\n";
       ++nb_lines;
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       
@@ -2145,7 +2145,7 @@ void writeResAbfsRaw(
 	     = it_pair->BeginUnweightedAbf("gen-maxh");
 	   it != it_pair->EndUnweightedAbf("gen-maxh"); ++it)
 	ssTxt << sep << *it;
-      ssTxt << endl;
+      ssTxt << "\n";
       ++nb_lines;
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       
@@ -2174,7 +2174,7 @@ void writeResAbfsRaw(
       	      else
       		ssTxt << sep << NaN;
       	    }
-      	    ssTxt << endl;
+      	    ssTxt << "\n";
       	    ++nb_lines;
       	    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       	    if(gsl_combination_next(comb) != GSL_SUCCESS)
@@ -2286,7 +2286,7 @@ void writeResAbfsAvgGrids(
 	    break;
 	}
       }
-      ssTxt << endl;
+      ssTxt << "\n";
       ++nb_lines;
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
     }
@@ -2338,7 +2338,7 @@ void writeResJoinPermPval(
       ssTxt.setf(ios::scientific);
       ssTxt << sep << setprecision(6) << it_gene->second.GetTrueL10Abf(use_max_bf);
       ssTxt.unsetf(ios::scientific);
-      ssTxt << endl;
+      ssTxt << "\n";
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
     }
   }
