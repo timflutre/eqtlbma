@@ -123,12 +123,12 @@ public:
 
 eQTL_controller::~eQTL_controller()
 {
-  delete pi0;
-  delete grid_wts;
-  delete new_grid_wts;
+  delete[] pi0;
+  delete[] grid_wts;
+  delete[] new_grid_wts;
   if(config_prior != NULL){
-    delete config_prior;
-    delete new_config_prior;
+    delete[] config_prior;
+    delete[] new_config_prior;
   }
 }
 
