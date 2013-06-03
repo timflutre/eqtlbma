@@ -843,12 +843,12 @@ void eQTL_controller::run_EM(double thresh)
       fprintf(stderr,"pi0  %7.3e     config ", pi0[0]);
 	      
       for(size_t i=0;i<config_size;i++)
-	fprintf(stderr,"%.3f  ",new_config_prior[i]);
+	fprintf(stderr,"%7.3e  ",new_config_prior[i]);
 
       fprintf(stderr,"  grid ");
 
       for(size_t i=0;i<grid_size;i++)
-      	fprintf(stderr,"%.3f  ",new_grid_wts[i]);
+      	fprintf(stderr,"%7.3e  ",new_grid_wts[i]);
 
       fprintf(stderr,"\n");
     }
@@ -909,7 +909,6 @@ void eQTL_controller::save_result(const string & out_file)
   txt << "#pi0\t" << scientific << pi0[0] << "\t" << left_pi0 << "\t" << right_pi0 << endl;
   ++nb_lines;
   gzwriteLine(stream, txt.str(), out_file, nb_lines);
-  txt.unsetf(ios_base::floatfield);
   for(size_t i = 0; i < type_vec.size(); ++i){
     txt.str("");
     txt << "#config." << type_vec[i].c_str()
@@ -932,7 +931,7 @@ void eQTL_controller::save_result(const string & out_file)
   }
   
   txt.str("");
-  txt << "gene\tgene.posterior.prob\tgene.log10.bf\t\tsnp\tsnp.log10.bf\t\t";
+  txt << "gene\tgene.posterior.prob\tgene.log10.bf\tsnp\tsnp.log10.bf\t";
   for(size_t i = 0; i < type_vec.size(); ++i)
     txt << "log10.bf." << type_vec[i].c_str() << "\t";
   txt << "\n";
@@ -947,11 +946,11 @@ void eQTL_controller::save_result(const string & out_file)
 	  << "\t"
 	  << geqVec[i].post_prob_gene
 	  << "\t"
-	  << geqVec[i].log10_BF
+	  << geqVec[i].compute_log10_BF()
 	  << "\t"
 	  << geqVec[i].snpVec[j].snp
 	  << "\t"
-	  << geqVec[i].snpVec[j].log10_BF;
+	  << geqVec[i].snpVec[j].compute_log10_BF();
       for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k) // loop over config
 	txt << "\t"
 	    << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
