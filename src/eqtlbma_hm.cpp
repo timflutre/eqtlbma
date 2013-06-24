@@ -118,7 +118,7 @@ public:
   void compute_posterior();
   
   void print_result();
-  void save_result(const string & out_file);
+  void save_result(const string & out_file, const bool & skip_bf);
 };
 
 eQTL_controller::~eQTL_controller()
@@ -866,7 +866,7 @@ void eQTL_controller::run_EM(double thresh)
 void eQTL_controller::compute_posterior()
 {
   if(verbose > 0)
-    cerr << "compute_posteriors ..." << flush;
+    cerr << "compute posteriors ..." << flush;
   clock_t startTime = clock();
   
 #pragma omp parallel for num_threads(nthread)
@@ -889,10 +889,11 @@ void eQTL_controller::print_result()
     geqVec[i].print_result();
 }
 
-void eQTL_controller::save_result(const string & out_file)
+void eQTL_controller::save_result(const string & out_file,
+				  const bool & skip_bf)
 {
   if(verbose > 0)
-    cerr << "save the Bayes factors and posterior probabilities ..." << flush;
+    cerr << "save the results in " << out_file << " ..." << flush;
   clock_t startTime = clock();
   
   gzFile stream;
@@ -929,36 +930,38 @@ void eQTL_controller::save_result(const string & out_file)
     ++nb_lines;
     gzwriteLine(stream, txt.str(), out_file, nb_lines);
   }
-  
-  txt.str("");
-  txt << "gene\tgene.posterior.prob\tgene.log10.bf\tsnp\tsnp.log10.bf\t";
-  for(size_t i = 0; i < type_vec.size(); ++i)
-    txt << "log10.bf." << type_vec[i].c_str() << "\t";
-  txt << "\n";
-  ++nb_lines;
-  gzwriteLine(stream, txt.str(), out_file, nb_lines);
-  
-  for(size_t i = 0; i < geqVec.size(); ++i){ // loop over gene
-    for(size_t j = 0; j < geqVec[i].snpVec.size(); ++j){ // loop over snp
-      txt.str("");
-      txt << setprecision(4)
-	  << geqVec[i].gene
-	  << "\t"
-	  << geqVec[i].post_prob_gene
-	  << "\t"
-	  << geqVec[i].compute_log10_BF()
-	  << "\t"
-	  << geqVec[i].snpVec[j].snp
-	  << "\t"
-	  << geqVec[i].snpVec[j].compute_log10_BF();
-      for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k) // loop over config
-	txt << "\t"
-	    << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
-				  geqVec[i].snpVec[j].grid_wts,
-				  geqVec[i].snpVec[j].grid_size);
-      txt << "\n";
-      ++nb_lines;
-      gzwriteLine(stream, txt.str(), out_file, nb_lines);
+
+  if(! skip_bf){
+    txt.str("");
+    txt << "gene\tgene.posterior.prob\tgene.log10.bf\tsnp\tsnp.log10.bf\t";
+    for(size_t i = 0; i < type_vec.size(); ++i)
+      txt << "log10.bf." << type_vec[i].c_str() << "\t";
+    txt << "\n";
+    ++nb_lines;
+    gzwriteLine(stream, txt.str(), out_file, nb_lines);
+    
+    for(size_t i = 0; i < geqVec.size(); ++i){ // loop over gene
+      for(size_t j = 0; j < geqVec[i].snpVec.size(); ++j){ // loop over snp
+	txt.str("");
+	txt << setprecision(4)
+	    << geqVec[i].gene
+	    << "\t"
+	    << geqVec[i].post_prob_gene
+	    << "\t"
+	    << geqVec[i].compute_log10_BF()
+	    << "\t"
+	    << geqVec[i].snpVec[j].snp
+	    << "\t"
+	    << geqVec[i].snpVec[j].compute_log10_BF();
+	for(size_t k = 0; k < geqVec[i].snpVec[j].config_size; ++k) // loop over config
+	  txt << "\t"
+	      << log10_weighted_sum(geqVec[i].snpVec[j].gm[k],
+				    geqVec[i].snpVec[j].grid_wts,
+				    geqVec[i].snpVec[j].grid_size);
+	txt << "\n";
+	++nb_lines;
+	gzwriteLine(stream, txt.str(), out_file, nb_lines);
+      }
     }
   }
   
@@ -981,7 +984,7 @@ void help(char ** argv)
        << "  -h, --help\tdisplay the help and exit" << endl
        << "  -V, --version\toutput version information and exit" << endl
        << "  -v, --verbose\tverbosity level (0/default=1/2/3)" << endl
-       << "  -d, --data\tinput data" << endl
+       << "  -d, --data\tinput data (usually output files from eqtlbma_bf)" << endl
        << "  -s\t\tnumber of subgroup configurations" << endl
        << "  -g, --grid\tnumber of grid points" << endl
        << "  -o, --out\toutput file (gzipped)" << endl
@@ -991,7 +994,9 @@ void help(char ** argv)
        << "      --thread\tnumber of threads (default=1)" << endl
        << "  -c, --ci\t" << endl
        << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
-       << "      --skipci\tavoid computing the confidence intervals" << endl
+       << "      --getci\tcompute the confidence intervals (single thread, thus slow)" << endl
+       << "      --getbf\tcompute the Bayes Factors using the estimated weights" << endl
+       << "\t\tcan take some time, otherwise only the estimated weights are reported" << endl
        << "      --pi0\tfixed value for pi0" << endl
        << endl;
 }
@@ -1032,7 +1037,8 @@ int main(int argc, char **argv)
   
   vector<string> configs_tokeep;
   
-  bool skip_ci = false;
+  bool skip_ci = true;
+  bool skip_bf = true;
   
   double fixed_pi0 = -1.0;
   
@@ -1091,8 +1097,12 @@ int main(int argc, char **argv)
       split(argv[++i], "|", configs_tokeep);
       continue;
     }
-    if(strcmp(argv[i],"--skipci")==0){
-      skip_ci = true;
+    if(strcmp(argv[i],"--getci")==0){
+      skip_ci = false;
+      continue;
+    }
+    if(strcmp(argv[i],"--getbf")==0){
+      skip_bf = false;
       continue;
     }
     if(strcmp(argv[i], "--pi0")==0){
@@ -1151,9 +1161,13 @@ int main(int argc, char **argv)
   controller.fix_pi0(fixed_pi0);
   
   controller.run_EM(thresh);
-  controller.compute_posterior();
+  
+  if(! skip_bf)
+    controller.compute_posterior();
+  
   controller.estimate_profile_ci(skip_ci);
-  controller.save_result(out_file);
+  
+  controller.save_result(out_file, skip_bf);
   
   time (&endRawTime);
   cerr << "END " << basename(argv[0]) << " " << getDateTime(endRawTime) << endl
