@@ -1,7 +1,7 @@
 /** \file LinkFunc.h
 *
 * `IRLS' is a C++ implementation of the IRLS algorithm for GLM
-* Copyright (C) 2013 Xioaquan Wen
+* Copyright (C) 2013 Xioaquan Wen, Timothee Flutre
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -23,18 +23,22 @@
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
 
-class LinkFunc {
-  
- public:
-  
-  virtual gsl_vector *init_mv(gsl_vector *Y)=0;
-  virtual gsl_vector *compute_Z(gsl_vector *Y, gsl_vector *mv)=0;
-  virtual gsl_vector *compute_weights(gsl_vector *mv)=0;
-    
-  virtual gsl_vector *compute_mv(gsl_vector *bv, gsl_matrix *Xv)=0;
-  
+class LinkFunc
+{
+public:
   bool quasi;
-  virtual double compute_dispersion(gsl_vector *Y, gsl_matrix *Xv, gsl_vector *bv, double rank, bool quasi_lik)=0;
-};
+  virtual void init_mv(gsl_vector * Y, gsl_vector * mv)=0;
+  virtual void compute_z(gsl_vector * y, gsl_vector * mv,
+			 gsl_vector * offset, gsl_vector * z)=0;
+  virtual void compute_weights(gsl_vector * mv, gsl_vector * w)=0;
+  virtual void compute_mv(gsl_vector * bv, gsl_matrix * Xv,
+			  gsl_vector * offset, gsl_vector * mv)=0;
+  virtual double compute_dispersion(gsl_vector * y, gsl_matrix * Xv,
+				    gsl_vector * bv, gsl_vector * offset,
+				    gsl_vector * mv, double rank,
+				    bool quasi_lik)=0;
+  virtual ~LinkFunc() {};
   
-#endif
+}; // LinkFunc
+
+#endif // _LINKFUNC_H_

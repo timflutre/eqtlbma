@@ -93,7 +93,7 @@ provide empirical Bayes estimates of hyperparameters
 and thus uses such estimates to re-compute Bayes factors and provide posterior probabilities.
 @end itemize
 
-More details are available in a preprint on @url{http://arxiv.org/abs/1212.4786,,arXiv}.
+The details of the model are freely available online in the @url{http://dx.doi.org/10.1371/journal.pgen.1003486,article} by Flutre @emph{et al} (PLoS Genetics, 2013).
 
 @c=============================================================================
 
@@ -133,15 +133,15 @@ we focus here on SNPs.
 Moreover, for each format, the names of the individuals have to be indicated 
 and they need to be the same as in the files containing the gene expression levels (see next section).
 
-Missing genotypes are not allowed.
-It is therefore required to impute them first with packages such as @url{http://mathgen.stats.ox.ac.uk/impute/impute_v2.html,IMPUTE2} or @url{http://stephenslab.uchicago.edu/blimp/index.html,BLIMP}.
+SNPs with missing genotypes are skipped with a warning.
+It is therefore advised to impute them first with packages such as @url{http://mathgen.stats.ox.ac.uk/impute/impute_v2.html,IMPUTE2} or @url{http://stephenslab.uchicago.edu/blimp/index.html,BLIMP}.
 
-The program @command{eqtlbma_bf} recognizes the original VCF format.
+The program @command{eqtlbma_bf} recognizes the original VCF format (it only requires the ``GT'' keyword in the FORMAT column).
 See the specificiations on the website of the 1000 Genomes project @url{http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41,here}.
 
 The program @command{eqtlbma_bf} can also handle a format very similar to the genotype format used by the IMPUTE program.
 The exact specification of this format is described @url{http://www.stats.ox.ac.uk/~marchini/software/gwas/file_format.html,here}.
-The only difference is that we require a header line.
+The only difference is that a header line is required.
 Here is an example:
 @verbatim
 chr name coord a1 a2 <ind1>_a1a1 <ind1>_a1a2 <ind1>_a2a2 <ind2>_a1a1 ...
@@ -149,7 +149,7 @@ chr name coord a1 a2 <ind1>_a1a1 <ind1>_a1a2 <ind1>_a2a2 <ind2>_a1a1 ...
 where the ``<ind1>'''s have to be replaced by the name of the individuals in the given data set.
 
 Finally, the program @command{eqtlbma_bf} also reads genotypes as allele dose, that is 0, 1, 2 or NA.
-This format is also read by the R package MatrixEQTL.
+This format is also read by the R package @url{http://dx.doi.org/10.1093/bioinformatics/bts163,MatrixEQTL}.
 Here is an example:
 @verbatim
 id ind1 ind2 ind3 ...
@@ -165,7 +165,7 @@ followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.
 This means that the coordinates are 0-based, there is no header line and the column separator is a tabulation.
 
 The option @option{--maf} allows to skip SNPs 
-if their minor allele frequency is below a given threshold, for instance 0.05.
+if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
 
 The option @option{--covar} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.
@@ -217,7 +217,7 @@ As the files with phenotypes don't contain the gene coordinates, we also need to
 Genes with no coordinates will be skipped (useful when launching the program in parallel, see below).
 
 The option @option{--qnorm} allows the program to transform the expression level of each gene
-into the quantile of a standard Normal distribution.
+into the quantiles of a standard Normal distribution.
 Otherwise, an FAQ entry at the end of this document indicates how to do this beforehand in R.
 
 
@@ -245,7 +245,7 @@ as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
 
 The program @command{eqtlbma_bf} can perform several types of analysis.
-The option @option{--type sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (separate analysis).
+The option @option{--type sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
 The option @option{--type join} means that the gene-SNP pairs will be tested for association using all subgroups jointly, which is more powerful in the context of eQTL studies, as shown in Flutre @emph{et al}.
 
 At the beginning of each step, summary statistics are computed in each subgroup 
@@ -255,28 +255,28 @@ This can be useful in some cases: for instance, when we want to run a set of job
 and another set of jobs with @option{--permsep 2}, both sets of jobs in the same directory.
 We would typically use option @option{--outss} with the first set of jobs but not with the second,
 otherwise both sets of jobs may overwrite each other's files.
-However, note that we need the summary stats per subgroup if we want to make meta-analysis-like forest plots.
+However, note that we need the summary stats per subgroup if we want to later make meta-analysis-like @url{https://en.wikipedia.org/wiki/Forest_plot,forest plots}.
 
 If the option @option{--outraw} is not specified, the raw Bayes Factors won't be saved.
 This can be useful in some cases: for instance, when the number of subgroups is large (>15-20).
-However, in order to fit the hierarchical model with the @command{hm} program, we need all the raw BFs.
+However, in order to fit the hierarchical model with the @command{eqtlbma_hm} program, we need all the raw BFs.
 
 When using option @option{--type join}, we need to specify the options @option{--gridL} and @option{--gridS},
 along with two files containing the grids over which the Bayes Factors are averaged.
 A grid has two columns, 
 the first contains values of @math{\phi^2} (prior variance of the standardized effects @math{b_s}'s in each subgroup) 
-and the second values of @math{\omega^2} (prior variance of the standardized effect @math{\bar{b}} averaged over all subgroups).
+and the second values of @math{\omega^2} (prior variance of the average standardized effect @math{\bar{b}}).
 
 The option @option{--gridL} specifies a ``large'' grid.
-It is typically used for meta-analysis (see this preprint of Wen & Stephens on @url{http://arxiv.org/abs/1111.1210,arXiv}),
-or for the BMAlite analysis (see the preprint of Flutre @emph{et al} on @url{http://arxiv.org/abs/1212.4786,arXiv}).
+It is typically used for meta-analysis (see this preprint by Wen & Stephens on @url{http://arxiv.org/abs/1111.1210,arXiv}),
+or for the BMAlite analysis (see the article by Flutre @emph{et al}).
 The option @option{--gridS} specifies a ``small'' grid used with configurations (see Flutre @emph{et al}).
 An FAQ entry below shows how to produce such files in R.
 
 The option @option{--bfs} allows to specify which Bayes Factors we want to compute.
 The acronym ``abf'' is used to mean ``approximated Bayes factor'' because the Bayes Factor
 can't be calculated analytically and therefore has to be approximated using Laplace's method.
-This approximation is very accurate, see Wen & Stephens for more details.
+This approximation is very accurate, see the preprint by Wen & Stephens for more details.
 
 Specifying @option{--bfs gen} computes the ``general'' BF 
 corresponding to the consistent configuration using the large grid.
@@ -285,11 +285,11 @@ This ``general'' BF is useful in a meta-analysis setting, and fixed-effect and m
 Specifying @option{--bfs sin} also computes the BF for each singleton, 
 that is for configurations (100), (010) and (001) if there are 3 subgroups.
 Also, the average of the ``general'' BF and each ``singleton'' BF is reported under the name ``abf.gen.sin''.
-It corresponds to @math{BF_BMAlite} in Flutre @emph{et al}.
+It corresponds to ``BF_BMAlite'' in Flutre @emph{et al}.
 
 Finally, specifying @option{--bfs all} computes the BF for each configuration.
 The weighted average of all these BFs is also reported under the name ``abf.all''.
-It corresponds to @math{BF_BMA} in Flutre @emph{et al}.
+It corresponds to ``BF_BMA'' in Flutre @emph{et al}.
 Using @option{--bfs all} can be too costly when the number of subgroups exceeds 15 or 20.
 
 The model implemented in this package is based on a linear regression, and there are several ways of
@@ -297,30 +297,31 @@ specifying the variance-covariance matrix of the errors.
 If the subgroups contain different individuals, we can choose @option{--error uvlr} (for univariate linear regression).
 If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr} (for multivariate linear regression, see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}).
 If the subgroups contain some individuals in common and some not, we can choose @option{--error hybrid}.
-For the latter, the effect sizes will be estimated using all individuals in each subgroup, 
-along with their variance, and their covariance will be calculated using each pair of subgroups with only individuals in common.
+For the latter, the effect sizes and their variance are estimated using all individuals in each subgroup,
+whereas their covariance are estimated using each pair of subgroups with only individuals in common.
 
 When using @option{--error mvlr} or @option{--error hybrid}, the option @option{--fiterr} is set by default at 0.5.
 See Wen's preprint for the rationale.
-Also, with @option{--error mvlr}, the summary statistics per subgroup are not exported anymore.
+Also, with @option{--error mvlr}, the summary statistics per subgroup are not exported (in theory it's possible but the current code doesn't allow it easily).
+So in this case, if we want to make forest plots, we will have to also launch @command{eqtlbma_bf} with option @option{--error uvlr}.
 
 
 @section Permutations
 
-Genes having different number of SNPs in cis and different patterns of linkage disequilibrium,
-we implemented a permutation procedure at the gene level (see Flutre @emph{et al}, 2013).
+Genes having different number of SNPs in @emph{cis} and different patterns of @url{https://en.wikipedia.org/wiki/Linkage_disequilibrium,linkage disequilibrium},
+we implemented a permutation procedure at the gene level (see Flutre @emph{et al}).
 
 The option @option{--nperm} allows to specify how many permutations will be performed.
-We recommend 10000.
+We recommend 10,000.
 In practice, we permute the individual labels (not the sample labels).
 As individuals can be present in several subgroups, we recommend to use @option{--permsep 1}
 to preserve such correlation structure when doing a subgroup-by-subgroup analysis.
 We can also specify the initialization of the random number generator with the option @option{--seed}
-in order to be able to replicate exactly the results.
+in order to be able to replicate the results exactly.
 
 To speed-up the permutations, we also recommend to use the option @option{--trick 1}.
 Indeed, when it is clear that there is no association between the given gene-SNP pair,
-it is not necessary to perform 10000 permutations, a much smaller number is enough,
+it is not necessary to perform 10,000 permutations, a much smaller number is enough,
 and this option implements this adaptively for each gene-SNP pair.
 It requires another random number generator, which also uses @option{--seed}.
 The output file will contain the total number of permutations performed.
@@ -328,7 +329,7 @@ The option @option{--tricut} allows to tune the speed gain of the trick:
 the smaller the faster (i.e. less permutations are performed when there is no association).
 We found that using @option{--tricut 10} is enough.
 
-If we want to compare the two approaches (separate or joint analysis), we may want
+If we want to compare the two approaches (separate versus joint analysis), we may want
 to use the exact same permutations for both.
 Yet we may also want to use the ``trick''.
 Specifying @option{--trick 2} allows to do just that and is therefore recommended.
@@ -365,7 +366,7 @@ To simplify this, i.e. to avoid the burden of creating new input files,
 we can have several BED files with different subsets of genes.
 
 Let's say that we want 100 batches, we only need to split all the genes into 100 lists.
-An FAQ entry indicates how to do this easily.
+An FAQ entry below indicates how to do this easily.
 
 Then, we can use the script @command{eqtlbma_bf_parallel.bash} present 
 in the directory @command{scripts/} of the package.
@@ -393,9 +394,9 @@ eqtlbma_bf_parallel.bash \
 @end verbatim
 
 Note that you can also use the option @option{--snp} if you want to analyse
-only a subset of all SNPs per batch, e.g. only those in cis of the genes
+only a subset of all SNPs per batch, e.g. only those in @emph{cis} of the genes
 in the corresponding batch.
-An FAQ entry shows how to find SNPs in cis for each gene.
+An FAQ entry shows how to find SNPs in @emph{cis} for each gene.
 
 @c=============================================================================
 
@@ -406,9 +407,10 @@ An FAQ entry shows how to find SNPs in cis for each gene.
 
 The program @command{eqtlbma_bf} creates several output files, all starting with 
 the character string given to option @option{--out}, e.g. ``out_eqtlbma''
-(remember to include the batch number when you parallelize).
+(remember to include the batch number when you parallelize yourselves,
+otherwise @command{eqtlbma_bf_parallel.bash} does it automatically).
 All output files contain a header line, which should make it easy to understand
-as well as load into R.
+what each file contains, as well as load each file into R.
 
 If @option{--outss} is set and @option{--error mvlr} is not, one file is created per subgroup with some summary statistics.
 They have the suffix ``_sumstats_<subgroup>.txt.gz''.
@@ -419,12 +421,13 @@ If @option{--permsep 2} was given, there will be one file per subgroup, with suf
 
 One file contains all the BFs averaged over the grid, with suffix ``_l10abfs_avg-grids.txt.gz''.
 If option @option{--outraw} was given, there will also be one file with all the raw BFs,
-i.e. one per grid value, with suffix ``_l10abfs_raw.txt.gz''.
-Such files are necessary to run the hierarchical model (see below).
+i.e. one per config per grid value, with suffix ``_l10abfs_raw.txt.gz''.
+Such files are necessary to run the hierarchical model with @command{eqtlbma_hm} (see below).
 For steps 4 and 5, there will also be a file with the results of the permutations,
 with suffix ``_jointPermPvals.txt.gz''.
 
-An FAQ entry describes how to concatenate the output files from all batches, for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a single file.
+An FAQ entry describes how to concatenate the output files from all batches,
+for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a single file.
 
 @c=============================================================================
 
@@ -433,65 +436,74 @@ An FAQ entry describes how to concatenate the output files from all batches, for
 
 @cindex hierarchical model
 
-The @command{eqtlbma_hm} program can take four options.
+The @command{eqtlbma_hm} program can take several options, available in the command line via @command{eqtlbma_hm -h}.
 
-The option @option{-d} requires the input file (not compressed, no header line) with the Bayes Factors.
-The format is the following:
+The option @option{-d,--data} requires the input file with the Bayes Factors,
+typically the output file from @command{eqtlbma_bf} with suffix ``_l10abfs_raw.txt.gz''.
+We can also give a file pattern (a @url{https://en.wikipedia.org/wiki/Glob_%28programming%29,glob}),
+such as @option{--data ``out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz''},
+where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001,002,etc).
 
-@verbatim
-snpname_genename model_index  log10_bf_grid1 log10_bf_grid2 ...
-@end verbatim
+The option @option{-s} requires the number of ``models'' to considered.
+That is, it corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
 
-The option @option{-s} requires the number of models to considered.
-It corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
+The option @option{-g,--grid} requires the number of grid points to consider.
+For instance, if we launched @command{eqtlbma_bf} with a ``small'' grid og 10 points (@math{\phi^2,\omega^2}),
+we need to specify @option{-g 10}.
 
-The option @option{-g} requires the number of grids to consider.
-For instance, if you used a grid with 10 pairs (@math{\phi^2,\omega^2}), you need to specify @option{-g 10}.
+The option @option{-o,--out} requires the name of the output file, which will be gzipped.
+The first lines start with a @url{https://en.wikipedia.org/wiki/Hashtag,hashtag} 
+and corresponds to the estimates of the hyperparameters,
+along with their confidence intervals (if option @option{--getci} was given).
+By default, these lines will be considered as comments by R and won't be loaded.
+Then, if the option @option{--getbf} was given, the rest of the file contains averaged Bayes Factors 
+for each gene and gene-SNP pair.
 
-The option @option{-t} can be given the threshold increase to terminate the EM algorithm.
+The option @option{-t} can be given the threshold to terminate the EM algorithm.
 That is, if the log10-likelihood increases less than this threshold, the iterations stop.
 The default value is set at 0.05.
 
-The @command{eqtlbma_hm} program writes information on stderr and stdout.
-On stderr, it outputs at each EM iteration the current parameter values and log10-likelihood of the model.
-At the end of the run, it also outputs the profile likelihood 95% confidence interval and the point estimates of pi0,
-configuration probabilities and grid probabilities.
-On stdout, it writes one line per gene-SNP pair with the gene-level log10(BF) and posterior probability, 
-the snp-level log10(BF) and the log10(BF) for each configuration.
+In order to speed-up the computations greatly, the option @option{--thread} can be given
+a number of threads (the code uses @url{https://en.wikipedia.org/wiki/OpenMP,OpenMP}).
 
-Importantly, if you want to launch the @command{eqtlbma_hm} program with the output files from the @command{eqtlbma_bf} program, 
-you can use the script @command{eqtlbma_hm.bash}.
-It will automatically decompress the output file(s) with suffix ``_l10abfs_raw.txt.gz'' 
-(one per job if @command{eqtlbma_bf} was run in parallel),
-filter them to only keep the log10(BFs) corresponding to the configurations,
-and concatenate them into a single file in the proper format.
-The stdout and stderr of @command{eqtlbma_hm} will be available as gzip files with a common prefix.
+If we want to fit the hierarchical model using only a pair of subgroups, we can use the option @option{--configs}.
+For instance, among 3 subgroups, to only load the Bayes Factors corresponding to subgroups 1 and 3,
+we would do @option{--configs ``1|3|1-3''}.
 
-Launch @command{eqtlbma_hm.bash -h} to get the help.
-The command-line will typically look like this:
+The option @option{--getci} can be set in order to compute and return 95% confidence intervals 
+using the @url{https://en.wikipedia.org/wiki/Likelihood_function#Profile_likelihood,profile likelihood}.
+However, this is not multi-threaded and can therefore be quite long.
+Otherwise, only the maximum-likelihood estimates of the hyperparameters will be returned.
+
+By default, only the estimates of the hyperparameters (gene-level @math{\pi_0}, grid and configuration weights) 
+are returned in the output file.
+We can use option @option{--getbf} in order to also get the Bayes Factor for each gene and each gene-SNP pair, 
+as well as the BF for each configuration, which can take a lot of time to compute and result in a big file.
+We would hence surely prefer to use the @command{eqtlbma_avg_bfs} program (see below) which offers more flexibility 
+about which quantities to compute (averaged Bayes Factors, various posteriors).
+
+The gene-level @math{\pi_0} (the probability for a gene to have no eQTL) 
+is hard to estimate accurately, therefore it can be useful to estimate it by another method 
+and set it manually to see how it impacts the estimates of the other hyperparameters.
+We can easily do it using option @option{--pi0}, meaning that pi0 won't be updated by the EM algorithm.
+
+Finally, the command-line will typically look like this:
 @verbatim
-eqtlbma_hm.bash \
---p2b ~/bin/eqtlbma_hm \
---inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
---nbC 7 \
---nbG 10 \
---outp out_hm
+eqtlbma_hm \
+--data ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
+-s 7 \
+--grid 10 \
+--out out_hm.txt.gz \
+--thread 4
 @end verbatim
 
-If the number of subgroups is large, you may also want to fit the hierarchical model for pairs of subgroups.
-This can be done easily with the option @option{--reconf}.
-You only need to follow it with a regular expression able to catch the configurations you are interested in.
-For instance, if you are interested in configurations @command{1} and @command{3}, you will run:
-@verbatim
-eqtlbma_hm.bash --p2b ~/bin/hm --inp ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
---nbG 10 --outp out_hm --nbC 3 --reconf ``^1$|^3$|^1-3$"
-@end verbatim
+After launching the @command{eqtlbma_hm} program, we can follow the EM iterating on stdout.
 
-It is also possible to use option @option{--pi0} to fix the value of pi0 (the probability for a gene to have no eQTL).
-This means that pi0 won't be updated by the EM algorithm.
-
-In order to speed-up the program, you can use option @option{--skip-ci}.
-As a result, only maximum-likelihood estimates of the hyper-parameters will be reported, i.e. without confidence intervals.
+If option @option{--getbf} was not given, we can use the @command{eqtlbma_avg_bfs} program 
+to compute the final quantity of interest.
+This program currently has to be computed manually: go to @command{eqtlbma/src} 
+and run @command{grep ``g++'' eqtlbma_avg_bfs.cpp} to see how to do it.
+Then run @command{eqtlbma_avg_bfs.cpp -h} to get the list of options.
 
 @c=============================================================================
 
@@ -606,15 +618,20 @@ cut -f8 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
 Note that, if you want a cis region centered on the TSS only (i.e. neglecting the TES), 
-you will first have to modify the file "gene_coords.bed.gz".
+you will first have to modify the file "gene_coords.bed.gz":
+
+@verbatim
+zcat gene_coords.bed.gz | awk 'BEGIN{OFS="\t"} {print $1,$2,$2+1,$4}' | gzip > gene_coords_TSS.bed.gz
+@end verbatim
 
 @sp 1
 
 @item
 @strong{How do I easily concatenate the output files from all batches?}
 
-When launching @command{eqtlbma} in parallel, you will get output files for each batch.
-Below are simple bash commands to concatenate them into a single file and compress it:
+When launching @command{eqtlbma_bf} in parallel, you will get output files for each batch.
+Below are simple bash commands to concatenate them into a single file and compress it,
+for instance the summary statistics of a given subgroup:
 @verbatim
 sbgrp="Tissue3"; i=0; \
 ls out_eqtlbma_[0-9][0-9][0-9]_sumstats_${sbgrp}.txt.gz | while read f; do \
@@ -633,11 +650,8 @@ We implemented some R code in order to perform functional tests on @command{eqtl
 Launching them is automatized via @option{make check}.
 
 You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
-It can thus be used to test the @command{eqtlbma_hm} program.
-To compile it, enter into the @command{src/} directory and run:
-@verbatim
-g++ -Wall -Wextra -g utils.cpp simul_flutre_et_al.cpp -lgsl -lgslcblas -lz
-@end verbatim
+To compile it, enter into the @command{src/} directory and run @command{grep ``g++'' simul_flutre_et_al.cpp} 
+to see how to do it.
 As usual, a help message is available with the option @command{-h}.
 
 @sp 1

@@ -188,9 +188,10 @@ namespace quantgen {
       else{
 	irls.link->quasi = false;
       }
-      irls.load_data(Y[0], X);
+      vector<double> offv(Y[0].size(), 0.0);
+      irls.load_data(Y[0], X, offv);
       irls.fit_model();
-      vector<double> coef = irls.get_fit_coef(),
+      vector<double> coef = irls.get_coef(),
 	se_coef = irls.get_stderr();
       subgroup2sigmahat_[subgroup] = sqrt(irls.get_dispersion());
       subgroup2sstats_[subgroup][0] = coef[1];

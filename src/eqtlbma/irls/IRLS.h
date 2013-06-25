@@ -1,7 +1,7 @@
 /** \file IRLS.h
 *
 * `IRLS' is a C++ implementation of the IRLS algorithm for GLM
-* Copyright (C) 2013 Xioaquan Wen
+* Copyright (C) 2013 Xioaquan Wen, Timothee Flutre
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -27,38 +27,43 @@
 
 #include "LinkFunc.h"
 
-class IRLS {
+class IRLS
+{
+private:
+  gsl_vector * y;      // response vector
+  gsl_matrix * X;      // design matrix
+  gsl_vector * offset; // offset vector
+  bool free_data;      // depends on load_data() or set_data()
   
- private:
-  gsl_vector *Y;  // response vector
-  gsl_matrix *X;  // design matrix
-  bool free_data; // depends on load_data() or set_data()
+  size_t n;            // sample size;
+  size_t p;            // number of parameters (including intercept)
+  size_t rank;         // of X (useful for p-values)
   
-  gsl_vector *fit_coef;
+  gsl_vector * bv;     // vector of estimated effect sizes
+  gsl_matrix * VB;     // covariance matrix of estimated effect sizes
+  double psi;          // dispersion
   
-  int n; // sample size;
-  int p; // number of parameters (including intercept)
-  size_t rank; // of X (useful for p-values)
+public:
   
-  double psi; // dispersion
-  gsl_matrix *VB;
-  
- public:
-  
-  LinkFunc *link;
+  LinkFunc * link;
   
   IRLS(const char * link_type);
   ~IRLS();
-  void load_data(std::vector<double> & yv, std::vector<std::vector<double> > &Xv);
-  void set_data(gsl_vector * yv, gsl_matrix * Xv);
+  void load_data(const std::vector<double> & yv,
+		 const std::vector<std::vector<double> > &Xv,
+		 const std::vector<double> & offv);
+  void set_data(gsl_vector * yv,
+		gsl_matrix * Xv,
+		gsl_vector * offv);
   void fit_model();
-  std::vector<double> get_fit_coef();
+  std::vector<double> get_coef();
   std::vector<double> get_stderr();
   size_t get_rank_X() { return rank; };
   double get_dispersion() { return psi; };
   
- private:
+private:
   void compute_variance(gsl_vector *w);
-};
+  
+}; // IRLS
 
-#endif
+#endif // _IRLS_H_

@@ -1,7 +1,7 @@
 /** \file LogLink.cc
 *
 * `IRLS' is a C++ implementation of the IRLS algorithm for GLM
-* Copyright (C) 2013 Xioaquan Wen
+* Copyright (C) 2013 Xioaquan Wen, Timothee Flutre
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -25,96 +25,73 @@
 
 using namespace std;
 
-gsl_vector * LogLink::init_mv(gsl_vector *Y){
-  size_t n = Y->size;
-  
-  gsl_vector *mv = gsl_vector_calloc(n);
-  
-  for(int i=0;i<n;i++){
-    double val = gsl_vector_get(Y,i);
-    double mval = val;
-    if(val == 0){
-      mval = 0.01;
-    }
-    
-    gsl_vector_set(mv,i,mval);
+void LogLink::init_mv(gsl_vector * y, gsl_vector * mv)
+{
+  size_t n = y->size;
+  for(size_t i = 0; i < n; ++i){
+    if(gsl_vector_get(y, i) == 0)
+      gsl_vector_set(mv, i, 0.01);
+    else
+      gsl_vector_set(mv, i, gsl_vector_get(y, i));
   }
-  
-  return mv;
 }
 
-
-
-gsl_vector *LogLink::compute_Z(gsl_vector *Y, gsl_vector *mv){
-  
-  size_t n = Y->size;
-  gsl_vector *Z = gsl_vector_calloc(n);
-  for(int i=0;i<n;i++){
-    double mu = gsl_vector_get(mv,i);
-    double y = gsl_vector_get(Y,i);
-    double val = log(mu)+(1.0/mu)*(y-mu);
-    gsl_vector_set(Z,i,val);
+void LogLink::compute_z(gsl_vector * y, gsl_vector * mv,
+			gsl_vector * offset, gsl_vector * z)
+{
+  size_t n = y->size;
+  double mv_i, y_i, val;
+  for(size_t i = 0; i < n; ++i){
+    mv_i = gsl_vector_get(mv, i);
+    y_i = gsl_vector_get(y, i);
+    val = log(mv_i) + (1.0/mv_i)*(y_i-mv_i) - gsl_vector_get(offset, i);
+    gsl_vector_set(z, i, val);
   }
-
-  return Z;
 }
 
-gsl_vector *LogLink::compute_weights(gsl_vector *mv){
-  
+void LogLink::compute_weights(gsl_vector * mv, gsl_vector * w)
+{
   size_t n = mv->size;
-  gsl_vector *w = gsl_vector_calloc(n);
-  for(int i=0;i<n;i++){
-    double val = gsl_vector_get(mv,i);
-    gsl_vector_set(w,i,val);
-  }
-  return w;
-
+  for(size_t i = 0; i < n; ++i)
+    gsl_vector_set(w, i, gsl_vector_get(mv, i));
 }
 
-
-
-gsl_vector *LogLink::compute_mv(gsl_vector *bv, gsl_matrix *Xv){
+void LogLink::compute_mv(gsl_vector * bv, gsl_matrix * Xv,
+			 gsl_vector * offset, gsl_vector * mv)
+{
   size_t n = Xv->size1, p = Xv->size2;
   
-  gsl_matrix *beta = gsl_matrix_calloc(p,1);
+  gsl_matrix * B = gsl_matrix_calloc(p, 1);
+  for(size_t i = 0; i < p; ++i)
+    gsl_matrix_set(B, i, 0, gsl_vector_get(bv, i));
   
-  for(int i=0;i<p;i++){
-    gsl_matrix_set(beta,i,0,gsl_vector_get(bv,i));
-  }
-
-  gsl_matrix *fit = gsl_matrix_calloc(n,1);
-  gsl_blas_dgemm(CblasNoTrans,CblasNoTrans,1,Xv,beta,0,fit);
+  gsl_matrix * fit = gsl_matrix_calloc(n, 1);
+  gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1, Xv, B, 0, fit);
   
-  gsl_vector *mv = gsl_vector_calloc(n);
-
-  for(int i=0;i<n;i++){
-    double val = gsl_matrix_get(fit,i,0);
-    gsl_vector_set(mv,i,exp(val));
-  }
+  for(size_t i = 0; i < n; ++i)
+    gsl_vector_set(mv, i, exp(gsl_matrix_get(fit, i, 0) 
+			      + gsl_vector_get(offset, i)));
   
+  gsl_matrix_free(B);
   gsl_matrix_free(fit);
-  gsl_matrix_free(beta);
-
-  return mv;
 }
 
-
-
-
-double LogLink::compute_dispersion(gsl_vector *Y, gsl_matrix *Xv, gsl_vector *bv, double rank, bool quasi_lik)
+double LogLink::compute_dispersion(gsl_vector * y, gsl_matrix * Xv,
+				   gsl_vector * bv, gsl_vector * offset,
+				   gsl_vector * mv, double rank,
+				   bool quasi_lik)
 {
   double psi;
   if(! quasi_lik){
     psi = 1.0;
   }
   else{
-    gsl_vector *mv = compute_mv(bv, Xv);
+    compute_mv(bv, Xv, offset, mv);
     double wtss = 0.0;
-    for(size_t i = 0; i < Y->size; ++i)
-      wtss += pow(gsl_vector_get(Y,i) - gsl_vector_get(mv,i), 2) / 
+    for(size_t i = 0; i < y->size; ++i)
+      wtss += pow(gsl_vector_get(y,i) - gsl_vector_get(mv,i), 2) / 
 	gsl_vector_get(mv,i);
-    psi = (1/(Y->size-rank)) * wtss;
-    gsl_vector_free(mv);
+    psi = (1/(y->size-rank)) * wtss;
   }
   return psi;
 }

@@ -1,7 +1,7 @@
 /** \file LogLink.h
 *
 * `IRLS' is a C++ implementation of the IRLS algorithm for GLM
-* Copyright (C) 2013 Xioaquan Wen
+* Copyright (C) 2013 Xioaquan Wen, Timothee Flutre
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -22,18 +22,18 @@
 
 #include "LinkFunc.h"
 
-
-
-class LogLink : public LinkFunc{
-  
-  gsl_vector *init_mv(gsl_vector *Y);
-  gsl_vector *compute_Z(gsl_vector *Y, gsl_vector *mv);
-  gsl_vector *compute_weights(gsl_vector *mv);
-  
-  gsl_vector *compute_mv(gsl_vector *bv, gsl_matrix *Xv);
-  
+class LogLink : public LinkFunc
+{
   bool quasi;
-  double compute_dispersion(gsl_vector *Y, gsl_matrix *Xv, gsl_vector *bv, double rank, bool quasi_lik);
-};
+  void init_mv(gsl_vector *y, gsl_vector * mv);
+  void compute_z(gsl_vector * y, gsl_vector * mv, gsl_vector * offset,
+		 gsl_vector * z);
+  void compute_weights(gsl_vector * mv, gsl_vector * w);
+  void compute_mv(gsl_vector * bv, gsl_matrix * Xv, gsl_vector * offset,
+		  gsl_vector * mv);
+  double compute_dispersion(gsl_vector * y, gsl_matrix * Xv,
+			    gsl_vector * bv, gsl_vector * offset,
+			    gsl_vector * mv, double rank, bool quasi_lik);
+}; // LogLink
 
-#endif
+#endif // _LOGLINK_H_
