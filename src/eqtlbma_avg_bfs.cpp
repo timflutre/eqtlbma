@@ -489,18 +489,19 @@ void Gene::calc_snp_posteriors_subgroup(
   stringstream subgroup_id;
   for(size_t i = 0; i < snps.size(); ++i){
     snps[i].post_subgroups = vector<double>(nb_subgroups, NaN);
+    
     for(size_t s = 0; s < nb_subgroups; ++s){
       subgroup_id.str("");
       subgroup_id << s+1;
       snps[i].post_subgroups[s] = 0.0;
-      for(size_t j = 0; j < config_names.size(); ++j){
+      for(size_t j = 0; j < config_names.size(); ++j)
       	if(find(config2subgroups[j].begin(), config2subgroups[j].end(), subgroup_id.str())
-      	   != config2subgroups[j].end()){
+      	   != config2subgroups[j].end())
       	  snps[i].post_subgroups[s] += snps[i].post_configs[j];
-      	}
-      }
-    }
-  }
+      if(snps[i].post_subgroups[s] > 1.0)
+	snps[i].post_subgroups[s] = 1.0;
+    } // end of "for each subgroup"
+  } // end of "for each SNP"
 }
 
 void Gene::identify_best_snps(const int & save_best_snps){
