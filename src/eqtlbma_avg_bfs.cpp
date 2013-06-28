@@ -68,6 +68,9 @@ void help(char ** argv)
        << "  -v, --verbose\tverbosity level (0/default=1/2/3)" << endl
        << "      --in\tpattern to glob '_l10abfs_raw' files from 'eqtlbma_bf'" << endl
        << "      --gwts\tfile with grid weights (one per line, only the value)" << endl
+       << "      --gtk\tind-ex/icies of grid weights to keep (all by default)" << endl
+       << "\t\tused only if --cwts is empty (i.e. before running the EM)" << endl
+       << "\t\te.g. '1+3+5+7+9' to keep only those with no heterogeneity" << endl
        << "      --cwts\tfile with configuration weights (one per line, name<sep>value)" << endl
        // << "      --ebf\testimate pi0 via the EBF procedure" << endl
        << "      --save\tprecise what to save (bf/post/bf+post)" << endl
@@ -116,6 +119,7 @@ parseCmdLine(
   int & verbose,
   string & file_pattern,
   string & file_grid_weights,
+  vector<size_t> & grid_idx_to_keep,
   string & file_config_weights,
   vector<string> & quantities_to_save,
   double & pi0,
@@ -134,6 +138,7 @@ parseCmdLine(
       {"verbose", required_argument, 0, 'v'},
       {"in", required_argument, 0, 0},
       {"gwts", required_argument, 0, 0},
+      {"gtk", required_argument, 0, 0},
       {"cwts", required_argument, 0, 0},
       {"save", required_argument, 0, 0},
       {"pi0", required_argument, 0, 0},
@@ -160,6 +165,13 @@ parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "gwts") == 0){
 	file_grid_weights = optarg;
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "gtk") == 0){
+	vector<string> tmp;
+	split(optarg, "+", tmp);
+	for(size_t i = 0; i < tmp.size(); ++i)
+	  grid_idx_to_keep.push_back(atoi(tmp[i].c_str()));
 	break;
       }
       if(strcmp(long_options[option_index].name, "cwts") == 0){
@@ -290,11 +302,12 @@ public:
   string gene;
   string snp;
   string config;
-  double bf;
+  double log10_val;
   BayesFactor(void);
   BayesFactor(const string & g, const string & s, const string & c);
   void avg_raw_bfs(const vector<string> & tokens,
-		   const vector<double> & grid_weights);
+		   const vector<double> & grid_weights,
+		   const vector<size_t> & grid_idx_to_keep);
 };
 
 BayesFactor::BayesFactor(void)
@@ -309,12 +322,17 @@ BayesFactor::BayesFactor(const string & g, const string & s, const string & c)
 }
 
 void BayesFactor::avg_raw_bfs(const vector<string> & tokens,
-			      const vector<double> & grid_weights)
+			      const vector<double> & grid_weights,
+			      const vector<size_t> & grid_idx_to_keep)
 {
-  vector<double> values(tokens.size(), NaN);
-  for(size_t i = 0; i < tokens.size(); ++i)
-    values[i] = atof(tokens[i].c_str());
-  bf = log10_weighted_sum(&values[0], &grid_weights[0], values.size());
+  vector<double> log10_values(grid_idx_to_keep.size(), NaN);
+  vector<double> weights(grid_idx_to_keep.size(), NaN);
+  for(size_t i = 0; i < grid_idx_to_keep.size(); ++i){
+    log10_values[i] = atof(tokens[grid_idx_to_keep[i]].c_str());
+    weights[i] = grid_weights[grid_idx_to_keep[i]];
+  }
+  log10_val = log10_weighted_sum(&log10_values[0], &weights[0],
+				 log10_values.size());
 }
 
 class Snp
@@ -607,6 +625,7 @@ void loadFileConfigWeights(const string & file_config_weights,
 void averageBFs(const string & file_bf_out,
 		const vector<string> & lines,
 		const vector<double> & grid_weights,
+		const vector<size_t> & grid_idx_to_keep,
 		vector<BayesFactor> & bfs)
 {
   vector<string> tokens;
@@ -623,7 +642,7 @@ void averageBFs(const string & file_bf_out,
     BayesFactor bf(tokens[0], tokens[1], tokens[2]);
     bf.avg_raw_bfs(vector<string> (tokens.begin()+3,
 				   tokens.begin()+3+grid_weights.size()),
-		   grid_weights);
+		   grid_weights, grid_idx_to_keep);
     bfs.push_back(bf);
   }
 }
@@ -637,22 +656,41 @@ void saveAvgBFs(const vector<BayesFactor> & bfs,
   for(size_t i = 0; i < bfs.size(); ++i){
     txt.str("");
     txt << bfs[i].gene << "\t" << bfs[i].snp
-	<< "\t" << bfs[i].config << "\t" << bfs[i].bf << "\n";
+	<< "\t" << bfs[i].config << "\t" << bfs[i].log10_val << "\n";
     gzwriteLine(stream_hm, txt.str(), file_hm, nb_lines_hm);
   }
 }
 
 void averageRawBFsOverGrid(const vector<string> & files_bf_out,
 			   const vector<double> & grid_weights,
+			   vector<size_t> & grid_idx_to_keep,
 			   const string & file_hm,
 			   const int & verbose)
 {
   if(verbose > 0)
     cout << "average raw BFs over grid ..." << endl;
   
+  if(grid_idx_to_keep.empty()){
+    if(verbose > 0)
+      cout << "use all grid weights" << endl;
+    for(size_t i = 0; i < grid_weights.size(); ++i)
+      grid_idx_to_keep.push_back(i);
+  }
+  else{
+    if(*(max_element(grid_idx_to_keep.begin(), grid_idx_to_keep.end()))
+       >= grid_weights.size()){
+      cerr << "ERROR: --gtk doesn't correspond to --gwts" << endl;
+      exit (1);
+    }
+    if(verbose > 0)
+      cout << "use only " << grid_idx_to_keep.size() << " grid weights" << endl;
+  }
+  
   gzFile stream_hm;
   openFile(file_hm, stream_hm, "wb");
   stringstream txt;
+  txt.precision(6);
+  txt.setf(ios::scientific);
   size_t nb_lines_hm = 0;
   
   txt << "gene\tsnp\tconfig\tl10abf.grid.avg" << endl;
@@ -665,7 +703,7 @@ void averageRawBFsOverGrid(const vector<string> & files_bf_out,
     if(verbose > 0)
       progressBar("", f+1, files_bf_out.size());
     readFile(files_bf_out[f], lines);
-    averageBFs(files_bf_out[f], lines, grid_weights, bfs);
+    averageBFs(files_bf_out[f], lines, grid_weights, grid_idx_to_keep, bfs);
     saveAvgBFs(bfs, file_hm, stream_hm, txt, nb_lines_hm);
     lines.clear();
     bfs.clear();
@@ -932,6 +970,7 @@ void averageRawBFsOverGridAndConfig(const vector<string> & files_bf_out,
 
 void run(const string & file_pattern,
 	 const string & file_grid_weights,
+	 vector<size_t> & grid_idx_to_keep,
 	 const string & file_config_weights,
 	 const vector<string> & quantities_to_save,
 	 const double & pi0,
@@ -968,8 +1007,10 @@ void run(const string & file_pattern,
     cerr << "nb of files with raw BFs: " << files_bf_out.size()
 	 << endl << flush;
   
-  if(file_config_weights.empty()) // reduce input for 'eqtlbma_hm'
-    averageRawBFsOverGrid(files_bf_out, grid_weights, file_hm, verbose);
+  if(file_config_weights.empty()){ // reduce input for 'eqtlbma_hm'
+    averageRawBFsOverGrid(files_bf_out, grid_weights, grid_idx_to_keep,
+			  file_hm, verbose);
+  }
   else
     averageRawBFsOverGridAndConfig(files_bf_out, grid_weights,
 				   config_names, config_weights,
@@ -986,12 +1027,13 @@ int main(int argc, char ** argv)
   string file_pattern, file_grid_weights, file_config_weights, file_hm,
     file_genes_to_keep;
   double pi0 = NaN;
+  vector<size_t> grid_idx_to_keep;
   vector<string> quantities_to_save, post_probas_to_save;
   bool save_configs = false;
   
   parseCmdLine(argc, argv, verbose, file_pattern, file_grid_weights,
-	       file_config_weights, quantities_to_save, pi0,
-	       post_probas_to_save, file_genes_to_keep, save_best_snps,
+	       grid_idx_to_keep, file_config_weights, quantities_to_save,
+	       pi0, post_probas_to_save, file_genes_to_keep, save_best_snps,
 	       save_configs, file_hm, nb_threads);
   
   time_t time_start, time_end;
@@ -1005,7 +1047,7 @@ int main(int argc, char ** argv)
 	 << "cwd: " << getCurrentDirectory() << endl << flush;
   }
   
-  run(file_pattern, file_grid_weights, file_config_weights,
+  run(file_pattern, file_grid_weights, grid_idx_to_keep, file_config_weights,
       quantities_to_save, pi0, post_probas_to_save, file_genes_to_keep,
       save_best_snps, save_configs, file_hm, nb_threads, verbose);
   
