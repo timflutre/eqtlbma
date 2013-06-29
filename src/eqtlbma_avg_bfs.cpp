@@ -69,7 +69,6 @@ void help(char ** argv)
        << "      --in\tpattern to glob '_l10abfs_raw' files from 'eqtlbma_bf'" << endl
        << "      --gwts\tfile with grid weights (one per line, only the value)" << endl
        << "      --gtk\tind-ex/icies of grid weights to keep (all by default)" << endl
-       << "\t\tused only if --cwts is empty (i.e. before running the EM)" << endl
        << "\t\te.g. '1+3+5+7+9' to keep only those with no heterogeneity" << endl
        << "      --cwts\tfile with configuration weights (one per line, name<sep>value)" << endl
        // << "      --ebf\testimate pi0 via the EBF procedure" << endl
@@ -288,6 +287,14 @@ parseCmdLine(
     help(argv);
     exit(1);
   }
+  if(save_best_snps == 2
+     && find(quantities_to_save.begin(), quantities_to_save.end(), "post")
+     == quantities_to_save.end()){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: --bestsnp 2 can only be used with --save post" << endl << endl;
+    help(argv);
+    exit(1);
+  }
   if(! file_genes_to_keep.empty() && ! doesFileExist(file_genes_to_keep)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_genes_to_keep << endl << endl;
@@ -350,6 +357,7 @@ public:
   Snp(void);
   Snp(const string & n, const vector<vector<double> > & vv);
   void avg_raw_bfs(const vector<double> & grid_weights,
+		   const vector<size_t> & grid_idx_to_keep,
 		   const vector<double> & config_weights);
 };
 
@@ -366,19 +374,29 @@ Snp::Snp(const string & n, const vector<vector<double> > & vv)
 }
 
 void Snp::avg_raw_bfs(const vector<double> & grid_weights,
+		      const vector<size_t> & grid_idx_to_keep,
 		      const vector<double> & config_weights)
 {
+  vector<double> log10_grid_values_tmp, grid_weights_tmp;
   config_log10_bfs = vector<double>(config_weights.size(), NaN);
   
+  // for each config, average BFs over grid
   for(size_t i = 0; i < config_weights.size(); ++i){
-    config_log10_bfs[i] = log10_weighted_sum(&config_grid_log10_bfs[i][0],
-					     &grid_weights[0],
-					     config_grid_log10_bfs[i].size());
+    log10_grid_values_tmp.assign(grid_idx_to_keep.size(), NaN);
+    grid_weights_tmp.assign(grid_idx_to_keep.size(), NaN);
+    for(size_t j = 0; j < grid_idx_to_keep.size(); ++j){
+      log10_grid_values_tmp[j] = config_grid_log10_bfs[i][grid_idx_to_keep[j]];
+      grid_weights_tmp[j] = grid_weights[grid_idx_to_keep[j]];
+    }
+    config_log10_bfs[i] = log10_weighted_sum(&log10_grid_values_tmp[0],
+					     &grid_weights_tmp[0],
+					     log10_grid_values_tmp.size());
     if(best_config_idx == string::npos
        || config_log10_bfs[i] > config_log10_bfs[best_config_idx])
       best_config_idx = i;
   }
   
+  // average BFs over configs
   log10_bf = log10_weighted_sum(&config_log10_bfs[0],
 				&config_weights[0],
 				config_log10_bfs.size());
@@ -412,6 +430,7 @@ public:
   Gene(void);
   Gene(const string & n);
   void avg_raw_bfs(const vector<double> & grid_weights,
+		   const vector<size_t> & grid_idx_to_keep,
 		   const vector<double> & config_weights);
   void calc_posterior(const double & pi0);
   void calc_snp_posteriors_the_eQTL(void);
@@ -435,11 +454,12 @@ Gene::Gene(const string & n)
 }
 
 void Gene::avg_raw_bfs(const vector<double> & grid_weights,
+		       const vector<size_t> & grid_idx_to_keep,
 		       const vector<double> & config_weights)
 {
   vector<double> tmp(snps.size(), NaN);
   for(size_t i = 0; i < snps.size(); ++i){
-    snps[i].avg_raw_bfs(grid_weights, config_weights);
+    snps[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
     tmp[i] = snps[i].log10_bf;
   }
   log10_bf = log10_weighted_sum(&tmp[0], tmp.size());
@@ -772,6 +792,7 @@ void parseLines(const string & file_bf_out,
 }
 
 void averageBFs(const vector<double> & grid_weights,
+		const vector<size_t> & grid_idx_to_keep,
 		const vector<string> & config_names,
 		const vector<double> & config_weights,
 		const vector<vector<string> > & config2subgroups,
@@ -785,7 +806,7 @@ void averageBFs(const vector<double> & grid_weights,
 {
 #pragma omp parallel for num_threads(nb_threads)
   for(int i = 0; i < (int) genes.size(); ++i){
-    genes[i].avg_raw_bfs(grid_weights, config_weights);
+    genes[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
     if(find(quantities_to_save.begin(), quantities_to_save.end(), "post")
        != quantities_to_save.end()){
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "a")
@@ -806,8 +827,8 @@ void averageBFs(const vector<double> & grid_weights,
 	genes[i].calc_snp_posteriors_subgroup(config_names,
 					      config2subgroups);
       }
-      genes[i].identify_best_snps(save_best_snps);
     } // end of "if save posteriors"
+    genes[i].identify_best_snps(save_best_snps);
   } // end of "for each gene"
 }
 
@@ -819,7 +840,7 @@ void saveAvgBFs(const vector<Gene> & genes,
 		const string & file_hm,
 		gzFile & stream_hm,
 		stringstream & txt,
-		const size_t & nb_lines_hm)
+		size_t & nb_lines_hm)
 {
   size_t nb_subgroups = (size_t) log2(config_names.size() + 1);
   
@@ -862,6 +883,7 @@ void saveAvgBFs(const vector<Gene> & genes,
       txt << "\t" << config_names[genes[i].snps[j].best_config_idx]
 	  << "\t" << genes[i].snps[j].post_configs[genes[i].snps[j].best_config_idx]
 	  << "\n";
+      ++nb_lines_hm;
       gzwriteLine(stream_hm, txt.str(), file_hm, nb_lines_hm);
     } // end of "for each SNP"
   } // end of "for each gene"
@@ -869,6 +891,7 @@ void saveAvgBFs(const vector<Gene> & genes,
 
 void averageRawBFsOverGridAndConfig(const vector<string> & files_bf_out,
 				    const vector<double> & grid_weights,
+				    const vector<size_t> & grid_idx_to_keep,
 				    const vector<string> & config_names,
 				    const vector<double> & config_weights,
 				    const vector<vector<string> > & config2subgroups,
@@ -892,7 +915,16 @@ void averageRawBFsOverGridAndConfig(const vector<string> & files_bf_out,
   
   size_t nb_subgroups = (size_t) log2(config_weights.size() + 1);
   
+  // write pi0 if posteriors are saved
+  if(find(quantities_to_save.begin(), quantities_to_save.end(), "post")
+     != quantities_to_save.end()){
+    txt << "#pi0=" << setprecision(4) << scientific << pi0 << endl;
+    ++nb_lines_hm;
+    gzwriteLine(stream_hm, txt.str(), file_hm, nb_lines_hm);
+  }
+  
   // write header line
+  txt.str("");
   txt << "gene\tsnp";
   if(find(quantities_to_save.begin(), quantities_to_save.end(), "bf")
      != quantities_to_save.end()){
@@ -926,7 +958,7 @@ void averageRawBFsOverGridAndConfig(const vector<string> & files_bf_out,
   txt << "\tbest.config"
       << "\tpost.best.config"
       << endl;
-  nb_lines_hm = 1;
+  ++nb_lines_hm;
   gzwriteLine(stream_hm, txt.str(), file_hm, nb_lines_hm);
   
   // read each input file, process and save
@@ -952,7 +984,8 @@ void averageRawBFsOverGridAndConfig(const vector<string> & files_bf_out,
 	   << fixed << setprecision(2) << getElapsedTime(startTime) << " sec)"
 	   << endl << flush;
     
-    averageBFs(grid_weights, config_names, config_weights,
+    averageBFs(grid_weights, grid_idx_to_keep,
+	       config_names, config_weights,
 	       config2subgroups, quantities_to_save,
 	       pi0, post_probas_to_save, save_best_snps,
 	       save_configs, nb_threads, genes);
@@ -1013,6 +1046,7 @@ void run(const string & file_pattern,
   }
   else
     averageRawBFsOverGridAndConfig(files_bf_out, grid_weights,
+				   grid_idx_to_keep,
 				   config_names, config_weights,
 				   config2subgroups,
 				   quantities_to_save, pi0,
