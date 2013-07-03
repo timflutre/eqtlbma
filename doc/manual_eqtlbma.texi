@@ -521,38 +521,13 @@ Flutre T, Wen X, Pritchard J, Stephens M (2013) A Statistical Framework for Join
 @item
 @strong{How do I make the file(s) for the grid(s)?}
 
-You can use the following R function:
-@verbatim
-getGrid <- function(grid.type="general", no.het=FALSE){
-  oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
-  oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
-  if(grid.type != "general"){
-    if(no.het){
-      oma2.over.oma2.plus.phi2 <- c(1)
-    } else
-      oma2.over.oma2.plus.phi2 <- c(3/4, 1)
-  }
-  grid <- matrix(NA, nrow=length(oma2.plus.phi2) *
-                 length(oma2.over.oma2.plus.phi2), ncol=2)
-  colnames(grid) <- c("phi2", "oma2")
-  i <- 1
-  for(aes in oma2.plus.phi2){
-    for(hom in oma2.over.oma2.plus.phi2){
-      grid[i,"phi2"] <- aes * (1 - hom)
-      grid[i,"oma2"] <- aes * hom
-      i <- i + 1
-    }
-  }
-  return(grid)
-}
-@end verbatim
-
+See the function @option{MakeGrid} in the file @command{scripts/utils_eqtlbma.R}.
 A typical code would look like this:
 @verbatim
-gridL <- getGrid(``general'')
+gridL <- MakeGrid(``general'')
 write.table(x=gridL, file=gzfile(``grid_phi2_oma2_general.txt.gz''),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
-gridS <- getGrid(``configs'')
+gridS <- MakeGrid(``configs'')
 write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
 @end verbatim
@@ -562,24 +537,7 @@ write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
 @item
 @strong{How do I transform my phenotypes beforehand into the quantiles of a standard Normal?}
 
-You can use the following R command, assuming that @command{matrix.original} has genes in rows and samples in columns:
-@verbatim
-matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
-  qqnorm(exp.per.gene, plot.it=FALSE)$x
-}))
-colnames(matrix.qnormed) <- colnames(matrix.original)
-@end verbatim
-
-In the presence of ties, it's better to break them randomly:
-@verbatim
-set.seed(1859)
-matrix.qnormed <- t(apply(matrix.original, 1, function(exp.per.gene){
-  idx <- sample(length(exp.per.gene))
-  tmp <- qqnorm(exp.per.gene[idx], plot.it=FALSE)$x
-  tmp[sort(idx, index.return=TRUE)$ix]
-}))
-colnames(matrix.qnormed) <- colnames(matrix.original)
-@end verbatim
+See the function @option{TransformGeneExpInStdNormal} in the file @command{scripts/utils_eqtlbma.R}.
 
 @sp 1
 
