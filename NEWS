@@ -10,6 +10,7 @@ change for eqtlbma_bf and eqtlbma_hm, see the manual
 * implement Poisson likelihood and quasi-likelihood for single-tissue analysis
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility
+* add 'utils_eqtlbma.R'
 
 Bug fixes
 * in 'eqtlbma_hm', don't use underscore to split identifiers

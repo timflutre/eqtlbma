@@ -50,7 +50,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = eqtlbma_bf$(EXEEXT) eqtlbma_hm$(EXEEXT)
+bin_PROGRAMS = eqtlbma_bf$(EXEEXT) eqtlbma_hm$(EXEEXT) \
+	eqtlbma_avg_bfs$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/build-aux/depcomp
@@ -63,15 +64,25 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_eqtlbma_bf_OBJECTS = eqtlbma_bf-eqtlbma_bf.$(OBJEXT)
-eqtlbma_bf_OBJECTS = $(am_eqtlbma_bf_OBJECTS)
+am_eqtlbma_avg_bfs_OBJECTS =  \
+	eqtlbma_avg_bfs-eqtlbma_avg_bfs.$(OBJEXT)
+eqtlbma_avg_bfs_OBJECTS = $(am_eqtlbma_avg_bfs_OBJECTS)
 am__DEPENDENCIES_1 =
-eqtlbma_bf_DEPENDENCIES = $(top_builddir)/src/eqtlbma/libeqtlbma.la \
+eqtlbma_avg_bfs_DEPENDENCIES =  \
+	$(top_builddir)/src/eqtlbma/libeqtlbma.la \
 	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+eqtlbma_avg_bfs_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
+	$(AM_CXXFLAGS) $(CXXFLAGS) $(eqtlbma_avg_bfs_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_eqtlbma_bf_OBJECTS = eqtlbma_bf-eqtlbma_bf.$(OBJEXT)
+eqtlbma_bf_OBJECTS = $(am_eqtlbma_bf_OBJECTS)
+eqtlbma_bf_DEPENDENCIES = $(top_builddir)/src/eqtlbma/libeqtlbma.la \
+	$(am__DEPENDENCIES_1)
 eqtlbma_bf_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
 	$(CXXFLAGS) $(eqtlbma_bf_LDFLAGS) $(LDFLAGS) -o $@
@@ -135,8 +146,10 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(eqtlbma_bf_SOURCES) $(eqtlbma_hm_SOURCES)
-DIST_SOURCES = $(eqtlbma_bf_SOURCES) $(eqtlbma_hm_SOURCES)
+SOURCES = $(eqtlbma_avg_bfs_SOURCES) $(eqtlbma_bf_SOURCES) \
+	$(eqtlbma_hm_SOURCES)
+DIST_SOURCES = $(eqtlbma_avg_bfs_SOURCES) $(eqtlbma_bf_SOURCES) \
+	$(eqtlbma_hm_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -288,11 +301,15 @@ eqtlbma_bf_SOURCES = eqtlbma_bf.cpp
 eqtlbma_bf_CPPFLAGS = -fopenmp
 eqtlbma_bf_LDFLAGS = -fopenmp #-pg
 eqtlbma_bf_LDADD = $(top_builddir)/src/eqtlbma/libeqtlbma.la $(AM_LDFLAGS)
-eqtlbma_hm_SOURCES = eqtlbma_hm.cpp hm_classes.h hm_methods.cpp
+eqtlbma_hm_SOURCES = eqtlbma_hm.cpp hm_classes.hpp hm_methods.cpp
 eqtlbma_hm_CPPFLAGS = -fopenmp
 eqtlbma_hm_LDFLAGS = -fopenmp #-pg
 eqtlbma_hm_LDADD = $(top_builddir)/src/eqtlbma/libeqtlbma.la $(AM_LDFLAGS)
-EXTRA_DIST = simul_flutre_et_al.cpp eqtlbma_avg_bfs.cpp
+eqtlbma_avg_bfs_SOURCES = eqtlbma_avg_bfs.cpp
+eqtlbma_avg_bfs_CPPFLAGS = -fopenmp
+eqtlbma_avg_bfs_LDFLAGS = -fopenmp #-pg
+eqtlbma_avg_bfs_LDADD = $(top_builddir)/src/eqtlbma/libeqtlbma.la $(AM_LDFLAGS)
+EXTRA_DIST = simul_flutre_et_al.cpp
 all: all-am
 
 .SUFFIXES:
@@ -376,6 +393,9 @@ clean-binPROGRAMS:
 	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
 	echo " rm -f" $$list; \
 	rm -f $$list
+eqtlbma_avg_bfs$(EXEEXT): $(eqtlbma_avg_bfs_OBJECTS) $(eqtlbma_avg_bfs_DEPENDENCIES) $(EXTRA_eqtlbma_avg_bfs_DEPENDENCIES) 
+	@rm -f eqtlbma_avg_bfs$(EXEEXT)
+	$(AM_V_CXXLD)$(eqtlbma_avg_bfs_LINK) $(eqtlbma_avg_bfs_OBJECTS) $(eqtlbma_avg_bfs_LDADD) $(LIBS)
 eqtlbma_bf$(EXEEXT): $(eqtlbma_bf_OBJECTS) $(eqtlbma_bf_DEPENDENCIES) $(EXTRA_eqtlbma_bf_DEPENDENCIES) 
 	@rm -f eqtlbma_bf$(EXEEXT)
 	$(AM_V_CXXLD)$(eqtlbma_bf_LINK) $(eqtlbma_bf_OBJECTS) $(eqtlbma_bf_LDADD) $(LIBS)
@@ -389,6 +409,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma_bf-eqtlbma_bf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma_hm-eqtlbma_hm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/eqtlbma_hm-hm_methods.Po@am__quote@
@@ -413,6 +434,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+eqtlbma_avg_bfs-eqtlbma_avg_bfs.o: eqtlbma_avg_bfs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_avg_bfs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma_avg_bfs-eqtlbma_avg_bfs.o -MD -MP -MF $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Tpo -c -o eqtlbma_avg_bfs-eqtlbma_avg_bfs.o `test -f 'eqtlbma_avg_bfs.cpp' || echo '$(srcdir)/'`eqtlbma_avg_bfs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Tpo $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='eqtlbma_avg_bfs.cpp' object='eqtlbma_avg_bfs-eqtlbma_avg_bfs.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_avg_bfs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma_avg_bfs-eqtlbma_avg_bfs.o `test -f 'eqtlbma_avg_bfs.cpp' || echo '$(srcdir)/'`eqtlbma_avg_bfs.cpp
+
+eqtlbma_avg_bfs-eqtlbma_avg_bfs.obj: eqtlbma_avg_bfs.cpp
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_avg_bfs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma_avg_bfs-eqtlbma_avg_bfs.obj -MD -MP -MF $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Tpo -c -o eqtlbma_avg_bfs-eqtlbma_avg_bfs.obj `if test -f 'eqtlbma_avg_bfs.cpp'; then $(CYGPATH_W) 'eqtlbma_avg_bfs.cpp'; else $(CYGPATH_W) '$(srcdir)/eqtlbma_avg_bfs.cpp'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Tpo $(DEPDIR)/eqtlbma_avg_bfs-eqtlbma_avg_bfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='eqtlbma_avg_bfs.cpp' object='eqtlbma_avg_bfs-eqtlbma_avg_bfs.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_avg_bfs_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o eqtlbma_avg_bfs-eqtlbma_avg_bfs.obj `if test -f 'eqtlbma_avg_bfs.cpp'; then $(CYGPATH_W) 'eqtlbma_avg_bfs.cpp'; else $(CYGPATH_W) '$(srcdir)/eqtlbma_avg_bfs.cpp'; fi`
 
 eqtlbma_bf-eqtlbma_bf.o: eqtlbma_bf.cpp
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(eqtlbma_bf_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT eqtlbma_bf-eqtlbma_bf.o -MD -MP -MF $(DEPDIR)/eqtlbma_bf-eqtlbma_bf.Tpo -c -o eqtlbma_bf-eqtlbma_bf.o `test -f 'eqtlbma_bf.cpp' || echo '$(srcdir)/'`eqtlbma_bf.cpp

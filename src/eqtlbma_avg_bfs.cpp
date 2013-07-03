@@ -1,7 +1,7 @@
 /** \file eqtlbma_avg_bfs.cpp
  *
  *  `eqtlbma_avg_bfs' averages the raw BFs, over the grid only, or over both
- *  the grid and the configurations.
+ *  the grid and the configurations, and can also compute posteriors.
  *  Copyright (C) 2013 Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -16,8 +16,6 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- *  g++ -Wall -Wextra -g eqtlbma_avg_bfs.cpp eqtlbma/utils/utils_io.cpp eqtlbma/utils/utils_math.cpp -I./eqtlbma -lgsl -lgslcblas -lz -fopenmp -o eqtlbma_avg_bfs
  */
 
 #include <ctime>
@@ -58,7 +56,8 @@ using namespace utils;
 void help(char ** argv)
 {
   cout << "`" << argv[0] << "'"
-       << " averages the raw BFs over the grid only, or over both the grid and the configurations." << endl
+       << " averages the raw BFs over the grid only, or over both the grid" << endl
+       << "and the configurations, and it can also compute posteriors." << endl
        << endl
        << "Usage: " << argv[0] << " [OPTIONS] ..." << endl
        << endl

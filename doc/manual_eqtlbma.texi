@@ -500,10 +500,7 @@ eqtlbma_hm \
 After launching the @command{eqtlbma_hm} program, we can follow the EM iterating on stdout.
 
 If option @option{--getbf} was not given, we can use the @command{eqtlbma_avg_bfs} program 
-to compute the final quantity of interest.
-This program currently has to be computed manually: go to @command{eqtlbma/src} 
-and run @command{grep ``g++'' eqtlbma_avg_bfs.cpp} to see how to do it.
-Then run @command{eqtlbma_avg_bfs.cpp -h} to get the list of options.
+to compute the final quantities of interest, e.g. posteriors.
 
 @c=============================================================================
 
