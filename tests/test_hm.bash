@@ -101,10 +101,11 @@ function calc_obs_res () {
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
 	-v 1 >& stdout_bf
-    $pathToHm --data obs_bf_l10abfs_raw.txt.gz -s 7 --grid 10 \
-	--out obs_hm.txt.gz --getbf --getci >& stdout_hm
+    $pathToHm --data obs_bf_l10abfs_raw.txt.gz --nconf 7 --ngrid 10 \
+    	--out obs_hm.txt.gz --getbf --getci >& stdout_hm
     zcat obs_hm.txt.gz | grep "#grid" | cut -f2 > obs_grid_probas.txt
     zcat obs_hm.txt.gz | grep "#config" | awk '{split($1,a,"."); print a[2]"\t"$2}' > obs_config_probas.txt
+    zcat obs_hm.txt.gz | grep "#" | sed 's/#//g' > obs_file_for_ci.txt
     # eqtlbma_avg_bfs --in obs_bf_l10abfs_raw.txt.gz --gwts obs_grid_probas.txt --cwts obs_config_probas.txt --save bf+post --pi0 2.2517e-01 --post a+b+c+d --bestsnp 2 --out obs_avg.txt.gz -v 2 --config
 }
 
@@ -133,7 +134,7 @@ function comp_obs_vs_exp () {
     fi
     
     if [ ! $(zcat obs_hm.txt.gz | grep "pi0" | cut -f2) == "2.2517e-01" ]; then
-	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
+	echo "file 'obs_hm.txt.gz' has differences with exp"
 	exit 1
     fi
     
@@ -165,6 +166,7 @@ testDir=tmp_test_${uniqId}
 rm -rf ${testDir}
 mkdir ${testDir}
 cd ${testDir}
+if [ $verbose -gt "0" ]; then echo "temp dir: "$(pwd); fi
 
 simul_data_and_calc_exp_res
 

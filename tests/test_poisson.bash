@@ -159,6 +159,7 @@ testDir=tmp_test_${uniqId}
 rm -rf ${testDir}
 mkdir ${testDir}
 cd ${testDir}
+if [ $verbose -gt "0" ]; then echo "temp dir: "$(pwd); fi
 
 simul_data_and_calc_exp_res
 
