@@ -337,7 +337,7 @@ void BayesFactor::avg_raw_bfs(const vector<string> & tokens,
     log10_values[i] = atof(tokens[grid_idx_to_keep[i]].c_str());
     weights[i] = grid_weights[grid_idx_to_keep[i]];
   }
-  log10_val = log10_weighted_sum(&log10_values[0], &weights[0],
+  log10_val = log10_weighted_sum(&(log10_values[0]), &(weights[0]),
 				 log10_values.size());
 }
 
@@ -387,8 +387,8 @@ void Snp::avg_raw_bfs(const vector<double> & grid_weights,
       log10_grid_values_tmp[j] = config_grid_log10_bfs[i][grid_idx_to_keep[j]];
       grid_weights_tmp[j] = grid_weights[grid_idx_to_keep[j]];
     }
-    config_log10_bfs[i] = log10_weighted_sum(&log10_grid_values_tmp[0],
-					     &grid_weights_tmp[0],
+    config_log10_bfs[i] = log10_weighted_sum(&(log10_grid_values_tmp[0]),
+					     &(grid_weights_tmp[0]),
 					     log10_grid_values_tmp.size());
     if(best_config_idx == string::npos
        || config_log10_bfs[i] > config_log10_bfs[best_config_idx])
@@ -396,8 +396,8 @@ void Snp::avg_raw_bfs(const vector<double> & grid_weights,
   }
   
   // average BFs over configs
-  log10_bf = log10_weighted_sum(&config_log10_bfs[0],
-				&config_weights[0],
+  log10_bf = log10_weighted_sum(&(config_log10_bfs[0]),
+				&(config_weights[0]),
 				config_log10_bfs.size());
 }
 
@@ -461,7 +461,7 @@ void Gene::avg_raw_bfs(const vector<double> & grid_weights,
     snps[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
     tmp[i] = snps[i].log10_bf;
   }
-  log10_bf = log10_weighted_sum(&tmp[0], tmp.size());
+  log10_bf = log10_weighted_sum(&(tmp[0]), tmp.size());
 }
 
 void Gene::calc_posterior(const double & pi0)
@@ -568,7 +568,8 @@ void Gene::identify_best_snps(const int & save_best_snps){
 
 void loadFileGridWeights(const string & file_grid_weights,
 			 const int & verbose,
-			 vector<double> & grid_weights)
+			 vector<double> & grid_weights,
+			 vector<size_t> & grid_idx_to_keep)
 {
   if(verbose > 0)
     cout <<"load grid weights ..." << endl << flush;
@@ -598,6 +599,22 @@ void loadFileGridWeights(const string & file_grid_weights,
       cout << "grid weight " << i+1 << ": "
 	   << setprecision(4) << scientific
 	   << grid_weights[i] << endl;
+  
+  if(grid_idx_to_keep.empty()){
+    if(verbose > 0)
+      cout << "use all grid weights" << endl;
+    for(size_t i = 0; i < grid_weights.size(); ++i)
+      grid_idx_to_keep.push_back(i);
+  }
+  else{
+    if(*(max_element(grid_idx_to_keep.begin(), grid_idx_to_keep.end()))
+       >= grid_weights.size()){
+      cerr << "ERROR: --gtk doesn't correspond to --gwts" << endl;
+      exit (1);
+    }
+    if(verbose > 0)
+      cout << "use only " << grid_idx_to_keep.size() << " grid weights" << endl;
+  }
 }
 
 void loadFileConfigWeights(const string & file_config_weights,
@@ -682,28 +699,12 @@ void saveAvgBFs(const vector<BayesFactor> & bfs,
 
 void averageRawBFsOverGrid(const vector<string> & files_bf_out,
 			   const vector<double> & grid_weights,
-			   vector<size_t> & grid_idx_to_keep,
+			   const vector<size_t> & grid_idx_to_keep,
 			   const string & file_hm,
 			   const int & verbose)
 {
   if(verbose > 0)
     cout << "average raw BFs over grid ..." << endl;
-  
-  if(grid_idx_to_keep.empty()){
-    if(verbose > 0)
-      cout << "use all grid weights" << endl;
-    for(size_t i = 0; i < grid_weights.size(); ++i)
-      grid_idx_to_keep.push_back(i);
-  }
-  else{
-    if(*(max_element(grid_idx_to_keep.begin(), grid_idx_to_keep.end()))
-       >= grid_weights.size()){
-      cerr << "ERROR: --gtk doesn't correspond to --gwts" << endl;
-      exit (1);
-    }
-    if(verbose > 0)
-      cout << "use only " << grid_idx_to_keep.size() << " grid weights" << endl;
-  }
   
   gzFile stream_hm;
   openFile(file_hm, stream_hm, "wb");
@@ -1018,7 +1019,8 @@ void run(const string & file_pattern,
     cout << "pi0: " << setprecision(4) << scientific << pi0 << endl;
   
   vector<double> grid_weights;
-  loadFileGridWeights(file_grid_weights, verbose, grid_weights);
+  loadFileGridWeights(file_grid_weights, verbose,
+		      grid_weights, grid_idx_to_keep);
   
   vector<string> config_names;
   vector<double> config_weights;
