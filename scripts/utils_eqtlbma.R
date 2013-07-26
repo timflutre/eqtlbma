@@ -163,6 +163,55 @@ CalcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
   return(list(subgroups=probas1, configs=probas2))
 }
 
+CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
+                                            subgroups=NULL){
+  ## Calculate the pairwise eQTL sharing by marginalizing other subgroup
+  ##
+  ## Args:
+  ##  configs: data.frame with configuration probabilities
+  ##  reformat: if TRUE, configs should have a column "id" ("1", "1-3-4", etc)
+  ##            and column "proba"; else, configs should have one column
+  ##            per subgroup (with 0 or 1 per row) and a column  "proba"
+  ##  subgroups: vector of names (otherwise "subgroup.s" will be used)
+  ##
+  ## Returns:
+  ##  matrix with element i,j being Pr(eQTL in subgroup j | eQTL in subgroup i)
+  stopifnot(is.data.frame(configs),
+            is.logical(reformat))
+  
+  S <- log2(nrow(configs) + 1)
+  if(is.null(subgroups))
+    subgroups <- paste0("subgroup.", 1:S)
+  
+  ## reformat the data
+  if(reformat){
+    stopifnot("id" %in% colnames(configs),
+              "proba" %in% colnames(configs))
+    tmp <- list()
+    for(s in subgroups)
+      tmp[[s]] <- rep(0, nrow(configs))
+    tmp[["proba"]] <- configs$proba
+    tmp <- do.call(cbind, tmp)
+    for(i in 1:nrow(configs))
+      tmp[i, as.numeric(strsplit(configs$id[i], "-")[[1]])] <- 1
+  } else
+    tmp <- configs
+  
+  ## compute the marginals
+  pi1.marginal <- matrix(nrow=S, ncol=S,
+                         dimnames=list(subgroups, subgroups))
+  diag(pi1.marginal) <- 1
+  for(j in 1:S){ # for each column
+    for(i in 1:S){ # for each row
+      num <- which(tmp[,i] == 1 & tmp[,j] == 1)
+      denom <- which(tmp[,i] == 1)
+      pi1.marginal[i,j] <- sum(tmp[num,"proba"]) / sum(tmp[denom,"proba"])
+    }
+  }
+  
+  return(pi1.marginal)
+}
+
 Log10WeightedSum <- function(x, weights=NULL){
   ## Compute log_{10}(\sum_i w_i 10^x_i) stably.
   ##
