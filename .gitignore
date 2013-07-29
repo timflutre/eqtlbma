@@ -18,5 +18,6 @@ doc/version.texi
 eqtlbma-*.tar.gz
 src/eqtlbma_bf
 src/eqtlbma_hm
+src/eqtlbma_avg_bfs
 src/simul_flutre_et_al
 .Rhistory
