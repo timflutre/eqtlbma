@@ -83,14 +83,14 @@ void help(char ** argv)
        << "\t\ta: the gene has at least one eQTL" << endl
        << "\t\tb: the SNP is 'the' eQTL for the gene, in at least one subgroup, given that the gene has exactly one eQTL,\n\t\tassuming all cis SNPs are equally likely and a single eQTL per gene" << endl
        << "\t\tc: the SNP is 'an' eQTL for the gene, in at least one subgroup, given that the gene contains at least one eQTL\n\t\tand that SNPs are independent" << endl
-       << "\t\td: the SNP is an eQTL in subgroup s, given that it is 'the' eQTL for the gene" << endl
+       << "\t\td: the SNP is an eQTL in subgroup s, given that it is 'the' eQTL for the gene, the configs/types being marginalized" << endl
        << "      --gene\tfile with subset of gene(s) to keep (one per line)" << endl
        << "      --bestsnp\treport the best SNP(s) per gene" << endl
        << "\t\t0: report all SNPs (default)" << endl
        << "\t\t1: report only the single best SNP (pick one if tie)" << endl
        << "\t\t2: report the best SNP(s) listed in decreasing order of their probability of being the eQTL (conditional on the gene containing an eQTL), such that the sum of these probabilities exceeds 0.95" << endl
        << "      --bestdim\treport the best config/type per SNP (and its posterior)" << endl
-       << "      --svdim\tsave also one BF and/or posterior for each dimension ('configs', 'types', 'types+subgroups')" << endl
+       << "      --alldim\treport also BF and/or posterior for all dimensions (configs or types)" << endl
        << "\t\tcaution, the number of configurations can be big" << endl
        << "      --out\tname of the output file (gzipped)" << endl
        << "\t\tif --cwts is not provided, the output file will be used as input for 'eqtlbma_hm'" << endl
@@ -134,7 +134,7 @@ parseCmdLine(
   string & file_genes_to_keep,
   int & save_best_snps,
   bool & save_best_dim,
-  vector<string> & dim_to_save,
+  bool & save_all_dims,
   string & file_hm,
   int & nb_threads)
 {
@@ -158,7 +158,7 @@ parseCmdLine(
       {"gene", required_argument, 0, 0},
       {"bestsnp", required_argument, 0, 0},
       {"bestdim", no_argument, 0, 0},
-      {"svdim", required_argument, 0, 0},
+      {"alldim", no_argument, 0, 0},
       {"out", required_argument, 0, 0},
       {"thread", required_argument, 0, 0},
       {0, 0, 0, 0}
@@ -231,8 +231,8 @@ parseCmdLine(
 	save_best_dim = true;
 	break;
       }
-      if(strcmp(long_options[option_index].name, "svdim") == 0){
-	split(optarg, "+", dim_to_save);
+      if(strcmp(long_options[option_index].name, "alldim") == 0){
+	save_all_dims = true;
 	break;
       }
       if(strcmp(long_options[option_index].name, "out") == 0){
@@ -480,8 +480,9 @@ void Snp::avg_raw_bfs(const vector<double> & grid_weights,
       log10_grid_values_tmp[l] = 0.0;
       for(size_t s = 0; s < subgroup_weights[0].size(); ++s)
 	log10_grid_values_tmp[l] += log10(subgroup_weights[k][s]
-					  * pow(10, raw_log10_bfs_[s][l])
+					  * pow(10, raw_log10_bfs_[s][grid_idx_to_keep[l]])
 					  + 1 - subgroup_weights[k][s]);
+      grid_weights_tmp[l] = grid_weights[grid_idx_to_keep[l]];
     }
     dim_log10_bfs_[k] = log10_weighted_sum(&(log10_grid_values_tmp[0]),
 					   &(grid_weights_tmp[0]),
@@ -540,7 +541,8 @@ public:
     const vector<vector<string> > & config2subgroups);
   void calc_cond_snp_posteriors_subgroup(const vector<double> & type_weights,
 					 const vector<vector<double> > & subgroup_weights,
-					 const vector<double> & grid_weights);
+					 const vector<double> & grid_weights,
+					 const vector<size_t> & grid_idx_to_keep);
   void identify_best_snps(const int & save_best_snps);
 };
 
@@ -703,9 +705,50 @@ void Gene::calc_cond_snp_posteriors_subgroup(
 // averaging over types
 void Gene::calc_cond_snp_posteriors_subgroup(const vector<double> & type_weights,
 					     const vector<vector<double> > & subgroup_weights,
-					     const vector<double> & grid_weights)
+					     const vector<double> & grid_weights,
+					     const vector<size_t> & grid_idx_to_keep)
 {
-  // to be done
+  size_t nb_subgroups = subgroup_weights[0].size(),
+    dim = type_weights.size(),
+    grid_size = grid_idx_to_keep.size();
+  vector<double> log10_grid_values_tmp(grid_size, NaN),
+    grid_weights_tmp(grid_size, NaN);
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snps_[p].post_subgroups_.assign(nb_subgroups, NaN);
+    
+    for(size_t s = 0; s < nb_subgroups; ++s){
+      snps_[p].post_subgroups_[s] = 0.0;
+      
+      for(size_t k = 0; k < dim; ++k){
+	double log10_type_k_tmp = log10(type_weights[k])
+	  + log10(subgroup_weights[k][s])
+	  - snps_[p].log10_bf_;
+	
+	for(size_t l = 0; l < grid_size; ++l){
+	  log10_grid_values_tmp[l] = snps_[p].raw_log10_bfs_[s][grid_idx_to_keep[l]];
+	  for(size_t s2 = 0; s2 < nb_subgroups; ++s2)
+	    if(s2 != s)
+	      log10_grid_values_tmp[l] +=
+		log10(subgroup_weights[k][s2]
+		      * pow(10, snps_[p].raw_log10_bfs_[s2][grid_idx_to_keep[l]])
+		      + 1 - subgroup_weights[k][s2]);
+	  grid_weights_tmp[l] = grid_weights[grid_idx_to_keep[l]];
+	}
+	
+	log10_type_k_tmp +=
+	  log10_weighted_sum(&(log10_grid_values_tmp[0]),
+			     &(grid_weights_tmp[0]),
+			     grid_size);
+	
+	snps_[p].post_subgroups_[s] += pow(10, log10_type_k_tmp);
+      }
+      
+      if(snps_[p].post_subgroups_[s] > 1.0)
+	snps_[p].post_subgroups_[s] = 1.0;
+      
+    } // end of "for each subgroup"
+  } // end of "for each SNP"
 }
 
 void Gene::identify_best_snps(const int & save_best_snps){
@@ -1050,7 +1093,7 @@ void averageBFs(const vector<double> & grid_weights,
 		const double & pi0,
 		const vector<string> & post_probas_to_save,
 		const int & save_best_snps,
-		const vector<string> & dim_to_save,
+		const bool & save_all_dims,
 		const int & nb_threads,
 		vector<Gene> & genes)
 {
@@ -1076,26 +1119,26 @@ void averageBFs(const vector<double> & grid_weights,
 	 != post_probas_to_save.end())
 	genes[i].calc_cond_snp_posteriors_an_eQTL();
       
-      if(find(dim_to_save.begin(), dim_to_save.end(), "configs")
-	 != dim_to_save.end())
-	genes[i].calc_cond_snp_posteriors_config(config_weights);
-      if(find(dim_to_save.begin(), dim_to_save.end(), "types")
-	 != dim_to_save.end())
-	genes[i].calc_cond_snp_posteriors_type(type_weights);
+      if(save_all_dims){
+	if(model == "configs")
+	  genes[i].calc_cond_snp_posteriors_config(config_weights);
+	else if(model == "types")
+	  genes[i].calc_cond_snp_posteriors_type(type_weights);
+      }
       
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "d")
 	 != post_probas_to_save.end()){
-	if(find(dim_to_save.begin(), dim_to_save.end(), "configs")
-	   == dim_to_save.end()){
-	  genes[i].calc_cond_snp_posteriors_config(config_weights);
-	  genes[i].calc_cond_snp_posteriors_subgroup(config_names,
-						     config2subgroups);
-	}
-	if(find(dim_to_save.begin(), dim_to_save.end(), "types")
-	   != dim_to_save.end()){
-	  genes[i].calc_cond_snp_posteriors_subgroup(type_weights,
-						     subgroup_weights,
-						     grid_weights);
+	if(save_all_dims){
+	  if(model == "configs"){
+	    genes[i].calc_cond_snp_posteriors_config(config_weights);
+	    genes[i].calc_cond_snp_posteriors_subgroup(config_names,
+						       config2subgroups);
+	  }
+	  else if(model == "types")
+	    genes[i].calc_cond_snp_posteriors_subgroup(type_weights,
+						       subgroup_weights,
+						       grid_weights,
+						       grid_idx_to_keep);
 	}
       }
     } // end of "if save posteriors"
@@ -1110,7 +1153,7 @@ void saveAvgBFs(const size_t & nb_subgroups,
 		const vector<string> & post_probas_to_save,
 		const string & model,
 		const bool & save_best_dim,
-		const vector<string> & dim_to_save,
+		const bool & save_all_dims,
 		const string & file_hm,
 		gzFile & stream_hm,
 		stringstream & txt,
@@ -1126,7 +1169,7 @@ void saveAvgBFs(const size_t & nb_subgroups,
       	 != quantities_to_save.end()){
       	txt << "\t" << genes[i].log10_bf_
       	    << "\t" << genes[i].snps_[j].log10_bf_;
-      	if(! dim_to_save.empty())
+      	if(save_all_dims)
       	  for(size_t k = 0; k < genes[i].snps_[j].dim_log10_bfs_.size(); ++k)
       	    txt << "\t" << genes[i].snps_[j].dim_log10_bfs_[k];
       }
@@ -1146,7 +1189,7 @@ void saveAvgBFs(const size_t & nb_subgroups,
       	  for(size_t s = 0; s < nb_subgroups; ++s)
       	    txt << "\t" << genes[i].snps_[j].post_subgroups_[s];
       	}
-      	if(! dim_to_save.empty())
+      	if(save_all_dims)
       	  for(size_t k = 0; k < genes[i].snps_[j].post_dims_.size(); ++k)
       	    txt << "\t" << genes[i].snps_[j].post_dims_[k];
       }
@@ -1180,8 +1223,8 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
 				    const vector<string> & post_probas_to_save,
 				    const vector<string> & genes_to_keep,
 				    const int & save_best_snps,
-				    const bool & save_best_dim, 
-				    const vector<string> dim_to_save,
+				    const bool & save_best_dim,
+				    const bool & save_all_dims,
 				    const string & file_hm,
 				    const int & nb_threads,
 				    const int & verbose)
@@ -1208,20 +1251,15 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
   if(find(quantities_to_save.begin(), quantities_to_save.end(), "bf")
      != quantities_to_save.end()){
     txt << "\tgene.log10.bf\tsnp.log10.bf";
-    if(find(dim_to_save.begin(), dim_to_save.end(), "configs")
-       != dim_to_save.end())
-      for(size_t k = 0; k < dim; ++k)
-	txt << "\tlog10.bf." << config_names[k];
-    if(find(dim_to_save.begin(), dim_to_save.end(), "types")
-       != dim_to_save.end())
-      for(size_t k = 0; k < dim; ++k)
-	txt << "\tlog10.bf.type." << k+1;
-    if(find(dim_to_save.begin(), dim_to_save.end(), "subgroups")
-       != dim_to_save.end())
-      for(size_t k = 0; k < dim; ++k)
-	for(size_t s = 0; s < nb_subgroups; ++s)
-	  txt << "\tlog10.bf.subgroup." << k+1 << "-" << s+1;
-  }
+    if(save_all_dims){
+      if(model == "configs")
+	for(size_t k = 0; k < dim; ++k)
+	  txt << "\tlog10.bf." << config_names[k];
+      else if(model == "types")
+	for(size_t k = 0; k < dim; ++k)
+	  txt << "\tlog10.bf.type." << k+1;
+    }
+  } // end of "if save bf"
   if(find(quantities_to_save.begin(), quantities_to_save.end(), "post")
      != quantities_to_save.end()){
     if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "a")
@@ -1238,22 +1276,15 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
       for(size_t i = 0; i < nb_subgroups; ++i)
 	txt << "\tsnp.post.s" << i+1;
     }
-    if(! dim_to_save.empty()){
-      if(find(dim_to_save.begin(), dim_to_save.end(), "configs")
-	 != dim_to_save.end())
+    if(save_all_dims){
+      if(model == "configs")
 	for(size_t i = 0; i < config_names.size(); ++i)
-	  txt << "\tpost." << config_names[i];
-      if(find(dim_to_save.begin(), dim_to_save.end(), "types")
-	      != dim_to_save.end())
-	for(size_t i = 0; i < config_names.size(); ++i)
-	  txt << "\tpost." << config_names[i];
-      if(find(dim_to_save.begin(), dim_to_save.end(), "subgroups")
-	 != dim_to_save.end())
+	  txt << "\tpost.config." << config_names[i];
+      else if(model == "types")
 	for(size_t k = 0; k < dim; ++k)
-	  for(size_t s = 0; s < nb_subgroups; ++s)
-	    txt << "\tpost.subgroup." << k+1 << "-" << s+1;
+	  txt << "\tpost.type." << k+1;
     }
-  }
+  } // end of "if save post"
   if(save_best_dim){
     if(model == "configs")
       txt << "\tbest.config"
@@ -1298,9 +1329,9 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
 	       config2subgroups, type_weights, subgroup_weights,
 	       quantities_to_save,
 	       pi0, post_probas_to_save, save_best_snps,
-	       dim_to_save, nb_threads, genes);
+	       save_all_dims, nb_threads, genes);
     saveAvgBFs(nb_subgroups, genes, config_names, quantities_to_save,
-  	       post_probas_to_save, model, save_best_dim, dim_to_save,
+  	       post_probas_to_save, model, save_best_dim, save_all_dims,
 	       file_hm, stream_hm, txt, nb_lines_hm);
     lines.clear();
     genes.clear();
@@ -1325,7 +1356,7 @@ void run(const string & file_pattern,
 	 const string & file_genes_to_keep,
 	 const int & save_best_snps,
 	 const bool & save_best_dim,
-	 const vector<string> & dim_to_save,
+	 const bool & save_all_dims,
 	 const string & file_hm,
 	 const int & nb_threads,
 	 const int & verbose)
@@ -1374,8 +1405,9 @@ void run(const string & file_pattern,
 				   subgroup_weights,
 				   quantities_to_save, pi0,
 				   post_probas_to_save, genes_to_keep,
-				   save_best_snps, save_best_dim, dim_to_save,
-				   file_hm, nb_threads, verbose);
+				   save_best_snps, save_best_dim,
+				   save_all_dims, file_hm, nb_threads,
+				   verbose);
 }
 
 int main(int argc, char ** argv)
@@ -1384,18 +1416,18 @@ int main(int argc, char ** argv)
   size_t nb_subgroups = string::npos, dim = string::npos;
   string file_pattern, file_grid_weights, model = "configs",
     file_config_weights, file_type_subgroup_weights, file_hm,
-    file_genes_to_keep, save_dim;
+    file_genes_to_keep;
   double pi0 = NaN;
   vector<size_t> grid_idx_to_keep;
-  vector<string> quantities_to_save, post_probas_to_save, dim_to_save;
-  bool save_best_dim = false;
+  vector<string> quantities_to_save, post_probas_to_save;
+  bool save_all_dims = false, save_best_dim = false;
   
   parseCmdLine(argc, argv, verbose, file_pattern, file_grid_weights,
 	       grid_idx_to_keep, model, nb_subgroups, dim,
 	       file_config_weights, file_type_subgroup_weights,
 	       quantities_to_save, pi0, post_probas_to_save,
 	       file_genes_to_keep, save_best_snps, save_best_dim,
-	       dim_to_save, file_hm, nb_threads);
+	       save_all_dims, file_hm, nb_threads);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -1411,7 +1443,7 @@ int main(int argc, char ** argv)
   run(file_pattern, file_grid_weights, grid_idx_to_keep, model,
       nb_subgroups, dim, file_config_weights, file_type_subgroup_weights,
       quantities_to_save, pi0, post_probas_to_save, file_genes_to_keep,
-      save_best_snps, save_best_dim, dim_to_save, file_hm, nb_threads,
+      save_best_snps, save_best_dim, save_all_dims, file_hm, nb_threads,
       verbose);
   
   if(verbose > 0){

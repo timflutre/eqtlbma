@@ -106,11 +106,11 @@ function calc_obs_res () {
     zcat obs_hm.txt.gz | grep "#grid" | cut -f2 > obs_grid_probas.txt
     zcat obs_hm.txt.gz | grep "#config" | awk '{split($1,a,"."); print a[2]"\t"$2}' > obs_config_probas.txt
     zcat obs_hm.txt.gz | grep "#" | sed 's/#//g' > obs_file_for_ci.txt
-    # eqtlbma_avg_bfs --in obs_bf_l10abfs_raw.txt.gz --gwts obs_grid_probas.txt --model configs --nsubgrp 3 --dim 7 --cwts obs_config_probas.txt --save bf+post --pi0 2.2517e-01 --post a+b+c+d --bestsnp 2 --svdim configs --out obs_avg_bfs.txt.gz -v 2
+    # eqtlbma_avg_bfs --in obs_bf_l10abfs_raw.txt.gz --gwts obs_grid_probas.txt --model configs --nsubgrp 3 --dim 7 --cwts obs_config_probas.txt --save bf+post --pi0 2.2517e-01 --post a+b+c+d --bestsnp 2 --alldim --out obs_avg_bfs.txt.gz -v 2
     
     # ~/src/eqtlbma/src/hm/eqtlbma_hm --data obs_bf_l10abfs_raw.txt.gz --nsubgrp 3 --model types --dim 4 --ngrid 10 --out obs_hm_types.txt.gz --configs "1|2|3" --getbf >& stdout_hm_types &
     # zcat obs_hm_types.txt.gz | grep "#type\|#subgroup" | sed 's/#//g' | cut -f1,2 > obs_type_subgroup_probas.txt
-    # ~/src/eqtlbma/src/eqtlbma_avg_bfs --in obs_bf_l10abfs_raw.txt.gz --gwts obs_grid_probas.txt --model types --nsubgrp 3 --dim 4 --tswts obs_type_subgroup_probas.txt --save bf+post --pi0 2.1345e-01 --post a+b --svdim types --out obs_avg_bfs_types.txt.gz
+    # ~/src/eqtlbma/src/eqtlbma_avg_bfs --in obs_bf_l10abfs_raw.txt.gz --gwts obs_grid_probas.txt --model types --nsubgrp 3 --dim 4 --tswts obs_type_subgroup_probas.txt --save bf+post --pi0 2.1345e-01 --post a+b --alldim --out obs_avg_bfs_types.txt.gz
 }
 
 function comp_obs_vs_exp () {
