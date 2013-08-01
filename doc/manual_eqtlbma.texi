@@ -81,17 +81,19 @@ to interpret them.
 
 The implemented methods allow to jointly analyze data sets from multiple subgroups.
 Here subgroups can be different tissues, cell types, populations, platforms, etc.
-Currently two tools are available:
+Currently two main tools are available:
 @itemize
 @item
 @command{eqtlbma_bf} can compute summary statistics in each subgroup, 
 Bayes Factors for the joint analysis using default hyperparameters, 
 as well as perform permutations;
 @item
-@command{eqtlbma_hm} can fit the hierarchical model via an EM algorithm,
-provide empirical Bayes estimates of hyperparameters 
-and thus uses such estimates to re-compute Bayes factors and provide posterior probabilities.
+@command{eqtlbma_hm} can fit the hierarchical model via an EM algorithm (maximum likelihood),
+and thus provide ``empirical Bayes'' estimates of hyperparameters.
 @end itemize
+
+A third program, @command{eqtlbma_avg_bfs}, allows to average the raw Bayes Factors over
+the hyperparameters' estimates, and then to compute various posterior probabilities of interest.
 
 The details of the model are freely available online in the @url{http://dx.doi.org/10.1371/journal.pgen.1003486,article} by Flutre @emph{et al} (PLoS Genetics, 2013).
 
@@ -308,8 +310,10 @@ So in this case, if we want to make forest plots, we will have to also launch @c
 
 @section Permutations
 
-Genes having different number of SNPs in @emph{cis} and different patterns of @url{https://en.wikipedia.org/wiki/Linkage_disequilibrium,linkage disequilibrium},
-we implemented a permutation procedure at the gene level (see Flutre @emph{et al}).
+Genes having different numbers of SNPs in @emph{cis}, with different patterns of @url{https://en.wikipedia.org/wiki/Linkage_disequilibrium,linkage disequilibrium},
+we implemented a permutation procedure @emph{at the gene level} (see Flutre @emph{et al}).
+Such a procedure provides a p-value for each gene, required to control the FDR at the gene level,
+hence allowing statements such as ``there are X genes having at least one eQTL at an FDR of x%''.
 
 The option @option{--nperm} allows to specify how many permutations will be performed.
 We recommend 10,000.
@@ -327,12 +331,12 @@ It requires another random number generator, which also uses @option{--seed}.
 The output file will contain the total number of permutations performed.
 The option @option{--tricut} allows to tune the speed gain of the trick:
 the smaller the faster (i.e. less permutations are performed when there is no association).
-We found that using @option{--tricut 10} is enough.
+In our experience, using @option{--tricut 10} gives good results.
 
-If we want to compare the two approaches (separate versus joint analysis), we may want
+If we want to compare the two approaches (``separate'' versus ``joint'' analysis), we may want
 to use the exact same permutations for both.
 Yet we may also want to use the ``trick''.
-Specifying @option{--trick 2} allows to do just that and is therefore recommended.
+Specifying @option{--trick 2} allows to do just that and is therefore recommended in this setting.
 
 Finally, the option @option{--pbf} specifies which BF is used as a test statistic when @option{--type join}.
 The BF called ``BMA'' in Flutre @emph{et al} corresponds to @option{--pbf all},
@@ -442,7 +446,7 @@ The option @option{-d,--data} requires the input file with the Bayes Factors,
 typically the output file from @command{eqtlbma_bf} with suffix ``_l10abfs_raw.txt.gz''.
 We can also give a file pattern (a @url{https://en.wikipedia.org/wiki/Glob_%28programming%29,glob}),
 such as @option{--data ``out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz''},
-where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001,002,etc).
+where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001, 002, ..., 100).
 
 The option @option{-s} requires the number of ``models'' to considered.
 That is, it corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
@@ -559,7 +563,7 @@ This will create around 100 files in a directory, such as ``lists_genes/list_gen
 @sp 1
 
 @item
-@strong{How do I get a file with SNPs in cis for each batch of genes?}
+@strong{How do I get a file with SNPs in @emph{cis} for each batch of genes?}
 
 Using @url{http://bedtools.readthedocs.org/en/latest/,BEDTools}, it's quite easy.
 As it can take some time, we can use @url{http://www.gnu.org/software/parallel/,GNU parallel} to speed this up:
@@ -572,11 +576,14 @@ parallel 'i={}; bedtools window -w 100000 -a lists_genes/list_genes_${i}.bed.gz 
 cut -f8 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
-Note that, if you want a cis region centered on the TSS only (i.e. neglecting the TES), 
+Change the "100000" into "1000000" if you want a 1Mb radius instead of a 100Kb radius for the @emph{cis} window.
+Note also that, if you want a @emph{cis} region centered on the TSS only (i.e. neglecting the TES), 
 you will first have to modify the file "gene_coords.bed.gz":
 
 @verbatim
-zcat gene_coords.bed.gz | awk 'BEGIN{OFS="\t"} {print $1,$2,$2+1,$4}' | gzip > gene_coords_TSS.bed.gz
+zcat gene_coords.bed.gz \
+| awk 'BEGIN{OFS="\t"} {print $1,$2,$2+1,$4}' \
+| gzip > gene_coords_TSS.bed.gz
 @end verbatim
 
 @sp 1
