@@ -6,11 +6,13 @@ New features
 * major refactoring (use multiple libraries) which causes some options to
 change for eqtlbma_bf and eqtlbma_hm, see the manual
 * add tests for the multivariate Bayes Factor and the EM algorithm
-* use OpenMP tp speed-up the EM algorithm fitting the hierarchical model
+* use OpenMP to speed-up the EM algorithm fitting the hierarchical model
 * implement Poisson likelihood and quasi-likelihood for single-tissue analysis
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility
 * add 'utils_eqtlbma.R'
+* add "type" model (still beta)
+* keep median of log10(ABF) from permutations for QBF procedure (still beta)
 
 Bug fixes
 * in 'eqtlbma_hm', don't use underscore to split identifiers
