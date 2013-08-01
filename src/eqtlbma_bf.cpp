@@ -165,7 +165,7 @@ void help(char ** argv)
        << "\t\t than trueTestStat equals this cutoff" << endl
        << "      --permsep\twhich permutation procedure for the separate analysis" << endl
        << "\t\t0 (default): no permutations are done for the separate analysis" << endl
-       << "\t\t1: use the minimum P-value over SNPs and subgroups as a test statistic (keep correlations)" << endl
+       << "\t\t1: use the minimum P-value over SNPs and subgroups as a test statistic (keeps correlations)" << endl
        << "\t\t2: use the minimum P-value over SNPs but in each subgroup separately (breaks correlations)" << endl
        << "      --pbf\twhich BF to use as the test statistic for the joint-analysis permutations" << endl
        << "\t\t'none' (default): no permutations are done for the joint analysis" << endl
@@ -1991,7 +1991,8 @@ void writeResSepPermPval(
     gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
     
     ssTxt.str("");
-    ssTxt << "gene nb.snps sep.perm.pval nb.permutations true.min.pval" << endl;
+    ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
+	  << sep << "nb.permutations" << sep << "true.min.pval" << endl;
     ++nb_lines;
     gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
     
@@ -2043,7 +2044,8 @@ void writeResSepPermPval(
   gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
   ssTxt.str("");
-  ssTxt << "gene nb.snps sep.perm.pval nb.permutations true.min.pval" << endl;
+  ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
+	<< sep << "nb.permutations" << sep << "true.min.pval" << endl;
   ++nb_lines;
   gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
@@ -2322,7 +2324,9 @@ void writeResJoinPermPval(
   gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
   ssTxt.str("");
-  ssTxt << "gene nb.snps join.perm.pval nb.permutations true.l10abf" << endl;
+  ssTxt << "gene" << sep << "nb.snps" << sep << "join.perm.pval"
+	<< sep << "nb.permutations" << sep << "true.l10abf"
+	<< sep << "med.perm.l10abf" << endl;
   ++nb_lines;
   gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
@@ -2336,7 +2340,8 @@ void writeResJoinPermPval(
 	    << sep << it_gene->second.GetPermutationPvalueJoin()
 	    << sep << it_gene->second.GetNbPermutationsJoin();
       ssTxt.setf(ios::scientific);
-      ssTxt << sep << setprecision(6) << it_gene->second.GetTrueL10Abf(use_max_bf);
+      ssTxt << setprecision(6) << sep << it_gene->second.GetTrueL10Abf(use_max_bf)
+	    << sep << it_gene->second.GetMedianPermL10Abf();
       ssTxt.unsetf(ios::scientific);
       ssTxt << "\n";
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);

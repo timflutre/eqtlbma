@@ -70,6 +70,7 @@ namespace quantgen {
     double pval_perm_join_;
     double l10_abf_true_max_;
     double l10_abf_true_avg_;
+    double l10_abf_perm_med_;
     
     void FindMinTruePvaluePerSubgroup(const std::string & subgroup);
     void FindMinTruePvalueAllSubgroups(void);
@@ -168,6 +169,7 @@ namespace quantgen {
     double GetPermutationPvalueJoin(void) const { return pval_perm_join_; };
     size_t GetNbPermutationsJoin(void) const { return nbpermutations_join_; };
     double GetTrueL10Abf(const bool & use_max_bf) const;
+    double GetMedianPermL10Abf(void) const { return l10_abf_perm_med_; };
   };
   
   bool operator==(const Gene& lhs, const Gene& rhs);

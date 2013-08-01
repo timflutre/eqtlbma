@@ -557,8 +557,10 @@ namespace quantgen {
   
     nbpermutations_join_ = 0;
     pval_perm_join_ = 1;
+    l10_abf_perm_med_ = NaN;
   
-    vector<double> l10_abfs_perm; // per SNP
+    vector<double> l10_abfs_perm_snps, // per SNP
+      l10_abfs_perms(nb_permutations, NaN); // for the median
     double l10_abf_perm_max, l10_abf_perm_avg;
     bool shuffle_only = false;
   
@@ -575,13 +577,13 @@ namespace quantgen {
 	continue;
     
       ++nbpermutations_join_;
-      l10_abfs_perm.assign(snps_.size(), 0.0);
+      l10_abfs_perm_snps.assign(snps_.size(), 0.0);
       if(useMaxBfOverSnps)
 	l10_abf_perm_max = - numeric_limits<double>::infinity();
       else
 	l10_abf_perm_avg = NaN;
     
-#pragma omp parallel for shared(l10_abfs_perm)
+#pragma omp parallel for shared(l10_abfs_perm_snps)
       for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
 	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
@@ -606,20 +608,22 @@ namespace quantgen {
 					 covariates, need_qnorm, whichPermBf,
 					 iGridL, iGridS, prop_cov_errors, perm);
 	}
-	l10_abfs_perm[idx_snp] = gene_snp_pair.GetWeightedAbf(whichPermBf);
+	l10_abfs_perm_snps[idx_snp] = gene_snp_pair.GetWeightedAbf(whichPermBf);
       }
     
       if(useMaxBfOverSnps){
-	l10_abf_perm_max = *max_element(l10_abfs_perm.begin(),
-					l10_abfs_perm.end());
+	l10_abf_perm_max = *max_element(l10_abfs_perm_snps.begin(),
+					l10_abfs_perm_snps.end());
 	if(l10_abf_perm_max >= l10_abf_true_max_)
 	  ++pval_perm_join_;
+	l10_abfs_perms[perm_id] = l10_abf_perm_max;
       }
       else{ // if avg over SNPs
-	l10_abf_perm_avg = log10_weighted_sum(&(l10_abfs_perm[0]),
-					      l10_abfs_perm.size());
+	l10_abf_perm_avg = log10_weighted_sum(&(l10_abfs_perm_snps[0]),
+					      l10_abfs_perm_snps.size());
 	if(l10_abf_perm_avg >= l10_abf_true_avg_)
 	  ++pval_perm_join_;
+	l10_abfs_perms[perm_id] = l10_abf_perm_avg;
       }
       if(trick != 0 && pval_perm_join_ == 1 + trick_cutoff){
 	if(trick == 1)
@@ -632,6 +636,9 @@ namespace quantgen {
     pval_perm_join_ = CalcPermutationPvalue(
       nb_permutations, nbpermutations_join_, pval_perm_join_, trick_cutoff,
       rngTrick);
+  
+    l10_abf_perm_med_ = median(l10_abfs_perms.begin(),
+			       l10_abfs_perms.begin() + nbpermutations_join_ + 1);
   
     gsl_permutation_free(perm);
   }

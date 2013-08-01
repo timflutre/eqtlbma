@@ -26,6 +26,7 @@
 #include <limits>
 #include <iostream>
 #include <vector>
+#include <iterator>
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
@@ -52,6 +53,28 @@ namespace utils {
 
   double log10_weighted_sum(const double * vec, const double * weights,
 			    const size_t size);
+
+  template<class RandAccessIter>
+  double median(RandAccessIter begin, RandAccessIter end)
+  {
+    if(begin == end){
+      fprintf(stderr, "ERROR: the median of an empty list is undefined\n");
+      exit(1);
+    }
+    size_t size = end - begin, middleIdx = size/2;
+    RandAccessIter target = begin + middleIdx;
+    nth_element(begin, target, end);
+    
+    if(size % 2 != 0) // odd number of elements
+      return *target;
+    else{            // even number of elements
+      double a = *target;
+      RandAccessIter targetNeighbor = target-1;
+      nth_element(begin, targetNeighbor, end);
+      return (a + *targetNeighbor) / 2.0;
+    }
+  }
+
 
   void FitSingleGeneWithSingleSnp(const gsl_matrix * X,
 				  const gsl_vector * y,
