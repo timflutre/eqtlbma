@@ -28,6 +28,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 #include "zlib.h"
 
@@ -78,7 +79,15 @@ namespace utils {
 
   void progressBar (std::string msg, double currentIter, double nbIterations);
 
-  template <class T> inline std::string toString (const T & t);
+/** \brief Convert int, float, etc into a string.
+ *  \note http://notfaq.wordpress.com/2006/08/30/c-convert-int-to-string/
+ */
+  template <class T> inline std::string toString (const T & t)
+  {
+    std::stringstream ss;
+    ss << t;
+    return ss.str();
+  }
 
   std::string copyString (const std::string input);
 

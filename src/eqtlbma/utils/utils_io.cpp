@@ -424,17 +424,6 @@ namespace utils {
     cout << setprecision(2) << fixed << progress << "%" << flush;
   }
 
-/** \brief Convert int, float, etc into a string.
- *  \note http://notfaq.wordpress.com/2006/08/30/c-convert-int-to-string/
- */
-  template <class T>
-  inline string toString (const T & t)
-  {
-    stringstream ss;
-    ss << t;
-    return ss.str();
-  }
-
 /** \brief Copy a string into another.
  */
   string

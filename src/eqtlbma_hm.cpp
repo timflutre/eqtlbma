@@ -302,7 +302,7 @@ void Controller::load_data(
     fprintf(stderr, "load data ...\n");
   clock_t startTime = clock();
   
-  if(! configs_tokeep.empty()){
+  if(model_ == "configs" && ! configs_tokeep.empty()){
     fprintf(stderr, "configurations to keep: %s", configs_tokeep[0].c_str());
     for(size_t i = 1; i < configs_tokeep.size(); ++i)
       fprintf(stderr, " %s", configs_tokeep[i].c_str());
@@ -1575,6 +1575,11 @@ void parseCmdLine(
 	 << "ERROR: --getci should be given with --ci" << endl << endl;
     help(argv);
     exit(1);
+  }
+  if(model == "type"){
+    configs_tokeep.clear(); // ignore --configs if model = "type"
+    for(size_t s = 0; s < nb_subgroups; ++s)
+      configs_tokeep.push_back(toString(s));
   }
 }
 

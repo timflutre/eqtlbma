@@ -442,29 +442,41 @@ for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a sing
 
 The @command{eqtlbma_hm} program can take several options, available in the command line via @command{eqtlbma_hm -h}.
 
-The option @option{-d,--data} requires the input file with the Bayes Factors,
+The option @option{--data} requires the input file with the Bayes Factors,
 typically the output file from @command{eqtlbma_bf} with suffix ``_l10abfs_raw.txt.gz''.
 We can also give a file pattern (a @url{https://en.wikipedia.org/wiki/Glob_%28programming%29,glob}),
 such as @option{--data ``out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz''},
 where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001, 002, ..., 100).
 
-The option @option{-s} requires the number of ``models'' to considered.
-That is, it corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
+The option @option{--nsubgrp} requires the number of subgroups, e.g. 3.
 
-The option @option{-g,--grid} requires the number of grid points to consider.
-For instance, if we launched @command{eqtlbma_bf} with a ``small'' grid og 10 points (@math{\phi^2,\omega^2}),
-we need to specify @option{-g 10}.
+The option @option{--dim} requires the number of configurations to considered (i.e. the dimension of the latent space).
+More specifically, it corresponds to the number of active configurations, e.g. 7 if there are 3 subgroups.
 
-The option @option{-o,--out} requires the name of the output file, which will be gzipped.
+The option @option{--ngrid} requires the number of grid points to consider.
+For instance, if we launched @command{eqtlbma_bf} with a ``small'' grid of 10 points (@math{\phi_l^2,\omega_l^2}),
+we need to specify @option{--ngrid 10}.
+
+The option @option{--out} requires the name of the output file, which will be gzipped.
 The first lines start with a @url{https://en.wikipedia.org/wiki/Hashtag,hashtag} 
-and corresponds to the estimates of the hyperparameters,
+and correspond to the estimates of the hyperparameters,
 along with their confidence intervals (if option @option{--getci} was given).
 By default, these lines will be considered as comments by R and won't be loaded.
 Then, if the option @option{--getbf} was given, the rest of the file contains averaged Bayes Factors 
 for each gene and gene-SNP pair.
 
-The option @option{-t} can be given the threshold to terminate the EM algorithm.
-That is, if the log10-likelihood increases less than this threshold, the iterations stop.
+The option @option{--init} can take an initialization file.
+It should have 3 columns separated by a tabulation and one line per parameter.
+The first column should contain the name of the parameter, such as ``config.1-2-3'' or ``grid.1''.
+The second column should contain the value of the parameter.
+The third column should contain a boolean, encoded as TRUE or FALSE, indicating if the parameter should be kept fixed or not.
+Note that all parameters should be present in the file.
+
+The option @option{rand} can be used to randomly initialize the parameters at the beginning of the EM.
+To make inference replicable, we can sue the option @option{seed}.
+
+The option @option{--tresh} can be given the threshold to terminate the EM algorithm.
+That is, if the log-likelihood increases less than this threshold, the iterations stop.
 The default value is set at 0.05.
 
 In order to speed-up the computations greatly, the option @option{--thread} can be given
@@ -477,7 +489,7 @@ we would do @option{--configs ``1|3|1-3''}.
 The option @option{--getci} can be set in order to compute and return 95% confidence intervals 
 using the @url{https://en.wikipedia.org/wiki/Likelihood_function#Profile_likelihood,profile likelihood}.
 However, this is not multi-threaded and can therefore be quite long.
-Otherwise, only the maximum-likelihood estimates of the hyperparameters will be returned.
+Otherwise, only the maximum-likelihood estimates of the hyperparameters are returned.
 
 By default, only the estimates of the hyperparameters (gene-level @math{\pi_0}, grid and configuration weights) 
 are returned in the output file.
@@ -490,20 +502,21 @@ The gene-level @math{\pi_0} (the probability for a gene to have no eQTL)
 is hard to estimate accurately, therefore it can be useful to estimate it by another method 
 and set it manually to see how it impacts the estimates of the other hyperparameters.
 We can easily do it using option @option{--pi0}, meaning that pi0 won't be updated by the EM algorithm.
+Another way is to use a file with @option{--init}, but in that case all other parameters should also be present in the file.
 
 Finally, the command-line will typically look like this:
 @verbatim
 eqtlbma_hm \
 --data ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
--s 7 \
---grid 10 \
+--nsubgrp 7 \
+--ngrid 10 \
 --out out_hm.txt.gz \
 --thread 4
 @end verbatim
 
 After launching the @command{eqtlbma_hm} program, we can follow the EM iterating on stdout.
 
-If option @option{--getbf} was not given, we can use the @command{eqtlbma_avg_bfs} program 
+Then, if option @option{--getbf} was not given, we can use the @command{eqtlbma_avg_bfs} program 
 to compute the final quantities of interest, e.g. posteriors.
 
 @c=============================================================================
