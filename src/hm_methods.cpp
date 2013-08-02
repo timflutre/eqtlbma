@@ -456,7 +456,7 @@ void gene_eQTL::em_update_subgroup(const vector<double> & grid_wts,
 						snpVec.size())
 	- log10_obs_lik_;
   
-  // compute the normalization constant per typ (same for all subgroups within a type)
+  // compute the normalization constant per type (same for all subgroups within a type)
   for(size_t k = 0; k < dim_; ++k)
     exp_gpkl_gene[k] = log10_weighted_sum(&(subgroup_denom_snps_[k][0]),
 					  &(snp_wts_[0]),

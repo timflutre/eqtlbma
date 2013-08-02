@@ -608,7 +608,7 @@ void Controller::em_update_config()
     // compute each new config weight
     for(size_t k = 0; k < dim_; ++k)
       new_config_prior_[k] = pow(10, (new_config_prior_[k] - l10_denom));
-  } // end of "if fixed configs"
+  } // end of "if configs not fixed"
   else
     new_config_prior_ = config_prior_;
   
@@ -652,7 +652,7 @@ void Controller::em_update_type()
     // compute each new type weight
     for(size_t k = 0; k < dim_; ++k)
       new_type_prior_[k] = pow(10, (new_type_prior_[k] - l10_denom));
-  } // end of "if fixed types"
+  } // end of "if types not fixed"
   else
     new_type_prior_ = type_prior_;
   
@@ -665,7 +665,7 @@ void Controller::em_update_type()
 void Controller::em_update_subgroup()
 {
   if(! param2fixed_["subgroups-per-type"]){
-    // compute the contribution of each gene to each type and subgroup weight
+    // compute the contribution of each gene to each "subgroup per type" weight
 #pragma omp parallel for num_threads(nb_threads_)
     for(int g = 0; g < (int)geneVec_.size(); ++g){
       vector<vector<double> > exp_gpkls_gene(dim_, vector<double>(nb_subgroups_, NaN));
@@ -678,7 +678,7 @@ void Controller::em_update_subgroup()
       }
     }
     
-    // average the contribution of all genes per type and subgroup
+    // average the contribution of all genes per "subgroup per type"
     for(size_t k = 0; k < dim_; ++k)
       for(size_t s = 0; s < nb_subgroups_; ++s)
 	new_subgroup_prior_[k][s] = log10_weighted_sum(&(subgroup_num_genes_[k][s][0]),
@@ -686,18 +686,18 @@ void Controller::em_update_subgroup()
 						       geneVec_.size())
 	  + log10(subgroup_prior_[k][s]);
     
-    // compute the normalization constant (per type and subgroup)
+    // compute the normalization constant
     vector<double> l10_denom(dim_, NaN);
     for(size_t k = 0; k < dim_; ++k)
       l10_denom[k] = log10_weighted_sum(&(subgroup_denom_genes_[k][0]),
 					&(gene_wts_ones_[0]),
 					geneVec_.size());
     
-    // compute each new weight per type and subgroup
+    // compute each new weight per "subgroup per type"
     for(size_t k = 0; k < dim_; ++k)
       for(size_t s = 0; s < nb_subgroups_; ++s)
 	new_subgroup_prior_[k][s] = pow(10, (new_subgroup_prior_[k][s] - l10_denom[k]));
-  } // end of "if fixed subgroups"
+  } // end of "if subgroups per type not fixed"
   else
     new_subgroup_prior_ = subgroup_prior_;
   
