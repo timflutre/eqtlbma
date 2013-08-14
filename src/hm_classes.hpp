@@ -93,6 +93,12 @@ public:
 		      const std::vector<std::vector<double> > & subgroup_prior,
 		      std::vector<double> & new_grid_wts);
   
+  double compute_log10_aug_BF(const double & pi0,
+			      const std::vector<double> & grid_wts,
+			      const std::vector<double> & type_prior,
+			      const std::vector<std::vector<double> > & subgroup_prior,
+			      const double & log10_obs_lik_gene);
+  
   void print_result(const std::vector<double> & grid_wts);
 };
 
@@ -158,6 +164,15 @@ public:
 		      const std::vector<std::vector<double> > & subgroup_prior,
 		      std::vector<double> & new_grid_wts);
   void em_update_snp_prior();
+  
+  double compute_log10_aug_BF(const double & pi0,
+			      const std::vector<double> & grid_wts,
+			      const std::vector<double> & type_prior,
+			      const std::vector<std::vector<double> > & subgroup_prior);
+  double compute_log10_aug_lik(const double & pi0,
+			       const std::vector<double> & grid_wts,
+			       const std::vector<double> & type_prior,
+			       const std::vector<std::vector<double> > & subgroup_prior);
   
   void compute_posterior(const double & pi0,
 			 const std::vector<double> & grid_wts,

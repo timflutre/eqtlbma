@@ -199,6 +199,39 @@ void snp_eQTL::em_update_grid(const vector<double> & type_prior,
   }
 }
 
+double snp_eQTL::compute_log10_aug_BF(const double & pi0,
+				      const vector<double> & grid_wts,
+				      const vector<double> & type_prior,
+				      const vector<vector<double> > & subgroup_prior,
+				      const double & log10_obs_lik_gene)
+{
+  double log10_aug_BF = 0.0;
+  
+  for(size_t l = 0; l < grid_size_; ++l)
+    log10_aug_BF += log10(grid_wts[l]);
+  
+  for(size_t k = 0; k < dim_; ++k)
+    log10_aug_BF += log10(type_prior[k]);
+  
+  for(size_t l = 0; l < grid_size_; ++l)
+    for(size_t k = 0; k < dim_; ++k)
+      for(size_t s = 0; s < nb_subgroups_; ++s){
+	
+	double log10_p_gpks = log10(subgroup_prior[k][s])
+	  + raw_log10_bfs_[s][l]
+	  - log10(subgroup_prior[k][s] * pow(10, raw_log10_bfs_[s][l])
+		  + (1-subgroup_prior[k][s]));
+	
+	if(pow(10, log10_p_gpks) >= 0.5)
+	  log10_aug_BF += log10(subgroup_prior[k][s])
+	    + raw_log10_bfs_[s][l];
+	else
+	  log10_aug_BF += log10(1 - subgroup_prior[k][s]);
+      }
+  
+  return log10_aug_BF;
+}
+
 double snp_eQTL::compute_log10_config_BF(const size_t & config_idx,
 					 const vector<double> & grid_wts)
 {
@@ -503,6 +536,39 @@ void gene_eQTL::em_update_grid(const vector<double> & type_prior,
 					 &(snp_wts_[0]),
 					 snpVec.size())
       - log10_obs_lik_;
+}
+
+double gene_eQTL::compute_log10_aug_BF(const double & pi0,
+				       const vector<double> & grid_wts,
+				       const vector<double> & type_prior,
+				       const vector<vector<double> > & subgroup_prior)
+{
+  double log10_aug_BF = 0.0;
+  
+  for(size_t p = 0; p < snpVec.size(); ++p)
+    log10_aug_BF += log10(snpVec[p].snp_prior)
+      + snpVec[p].compute_log10_aug_BF(pi0, grid_wts, type_prior,
+				       subgroup_prior, log10_obs_lik_);
+  
+  return log10_aug_BF;
+}
+
+// ignore p(Y_g | X_g, z_g=0)
+double gene_eQTL::compute_log10_aug_lik(
+  const double & pi0,
+  const vector<double> & grid_wts,
+  const vector<double> & type_prior,
+  const vector<vector<double> > & subgroup_prior)
+{
+  double log10_aug_lik;
+  
+  if(pow(10, log10(1 - pi0) + log10_BF_ - log10_obs_lik_) >= 0.5)
+    log10_aug_lik = log10(1 - pi0)
+      + compute_log10_aug_BF(pi0, grid_wts, type_prior, subgroup_prior);
+  else
+    log10_aug_lik = log10(pi0);
+  
+  return log10_aug_lik;
 }
 
 void gene_eQTL::compute_posterior(const double & pi0,

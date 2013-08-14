@@ -133,6 +133,8 @@ public:
   
   void run_EM();
   
+  void compute_log10_ICL();
+  
   void compute_posterior();
   
   void estimate_profile_ci_pi0(const double & tick,
@@ -311,7 +313,7 @@ void Controller::load_data(
   
   vector<string> files = glob(file_pattern);
   if(verbose_ > 0)
-    cerr << "nb of input files: " << files.size() << endl << flush;
+    cout << "nb of input files: " << files.size() << endl << flush;
   
   vector<string> lines;
   for(size_t i = 0; i < files.size(); ++i){
@@ -321,7 +323,7 @@ void Controller::load_data(
     lines.clear();
   }
   if(verbose_ > 0)
-    cerr << endl << flush;
+    cout << endl << flush;
   
   // initialization of useful data structures for the EM
   gene_wts_ones_.assign(geneVec_.size(), 1.0);
@@ -830,7 +832,7 @@ void Controller::show_state_EM(const size_t & iter)
 void Controller::run_EM()
 {
   if(verbose_ > 0)
-    cerr << "run EM algorithm ..." << endl << flush;
+    cout << "run EM algorithm ..." << endl << flush;
   time_t startRawTime, endRawTime;
   time (&startRawTime);
   
@@ -926,7 +928,7 @@ void Controller::run_EM()
     show_state_EM(iter);
   
   time (&endRawTime);
-  cerr << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl << flush;
+  cout << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl << flush;
 }
 
 void Controller::estimate_profile_ci_pi0(const double & tick,
@@ -1133,7 +1135,7 @@ void Controller::estimate_profile_ci_grids(const double & tick,
 void Controller::estimate_profile_ci()
 {
   if(verbose_ > 0)
-    cerr << "compute profile-likelihood confidence intervals ..." << flush;
+    cout << "compute profile-likelihood confidence intervals ..." << flush;
   clock_t startTime = clock();
   
   double tick = 0.001,
@@ -1154,13 +1156,37 @@ void Controller::estimate_profile_ci()
   estimate_profile_ci_grids(tick, max_l10_obs_lik);
   
   if(verbose_ > 0)
-    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
+    cout << " (" << getElapsedTime(startTime) << " sec)" << endl;
+}
+
+// choose K via the ICL (based on the augmented log-lik minus a BIC-like penalty)
+void Controller::compute_log10_ICL()
+{
+  if(model_ == "types"){
+    if(verbose_ > 0)
+      cout << "compute the ICL ..." << flush;
+    clock_t startTime = clock();
+    
+    double log10_icl = - (double)(1 + grid_size_ + dim_ * (nb_subgroups_ + 1)) / 2.0
+      * log10(geneVec_.size());
+    
+#pragma omp parallel for num_threads(nb_threads_) reduction(+:log10_icl)
+    for(int g = 0; g < (int)geneVec_.size(); ++g)
+      log10_icl += geneVec_[g].compute_log10_aug_lik(pi0_, grid_wts_, 
+						     type_prior_,
+						     subgroup_prior_);
+    
+    if(verbose_ > 0)
+      cout << " log10(ICL)=" << setprecision(4) << scientific << log10_icl << fixed
+	   << " (" << getElapsedTime(startTime) << " sec)"
+	   << endl;
+  }
 }
 
 void Controller::compute_posterior()
 {
   if(verbose_ > 0)
-    cerr << "compute posteriors ..." << flush;
+    cout << "compute posteriors ..." << flush;
   clock_t startTime = clock();
   
 #pragma omp parallel for num_threads(nb_threads_)
@@ -1168,14 +1194,14 @@ void Controller::compute_posterior()
     geneVec_[i].compute_posterior(pi0_, grid_wts_, config_prior_);
   
   if(verbose_ > 0)
-    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
+    cout << " (" << getElapsedTime(startTime) << " sec)" << endl;
 }
 
 void Controller::save_result(const string & out_file,
 			     const bool & skip_bf)
 {
   if(verbose_ > 0)
-    cerr << "save the results in " << out_file << " ..." << flush;
+    cout << "save the results in " << out_file << " ..." << flush;
   clock_t startTime = clock();
   
   gzFile stream;
@@ -1302,7 +1328,7 @@ void Controller::save_result(const string & out_file,
   closeFile(out_file, stream);
   
   if(verbose_ > 0)
-    cerr << " (" << getElapsedTime(startTime) << " sec)" << endl;
+    cout << " (" << getElapsedTime(startTime) << " sec)" << endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -1620,6 +1646,8 @@ void run(
     
     controller.run_EM();
     
+    controller.compute_log10_ICL();
+    
     if(! skip_bf)
       controller.compute_posterior();
     
@@ -1648,7 +1676,7 @@ int main(int argc, char **argv)
   time_t time_start, time_end;
   if(verbose > 0){
     time (&time_start);
-    cerr << "START " << basename(argv[0])
+    cout << "START " << basename(argv[0])
 	 << " " << getDateTime(time_start) << endl
 	 << "version " << VERSION << " compiled " << __DATE__
 	 << " " << __TIME__ << endl
@@ -1662,7 +1690,7 @@ int main(int argc, char **argv)
   
   if(verbose > 0){
     time (&time_end);
-    cerr << "END " << basename(argv[0])
+    cout << "END " << basename(argv[0])
 	 << " " << getDateTime(time_end) << endl
 	 << "elapsed -> " << getElapsedTime(time_start, time_end) << endl
 	 << "max.mem -> " << getMaxMemUsedByProcess2Str() << endl;
