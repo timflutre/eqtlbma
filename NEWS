@@ -16,6 +16,7 @@ change for eqtlbma_bf and eqtlbma_hm, see the manual
 
 Bug fixes
 * in 'eqtlbma_hm', don't use underscore to split identifiers
+* in 'test_poisson.bash', improve portability when using R with pipe
 
 
 2013-03-28 v1.2
