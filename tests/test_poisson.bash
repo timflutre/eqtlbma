@@ -115,7 +115,7 @@ function comp_obs_vs_exp () {
     
     tol="1e-5" # hard to have exact same results between C++ and R "glm"
     for i in {1..3}; do
-	if ! $(echo "exp <- read.table(\"exp_bf_sumstats_s${i}.txt.gz\", header=TRUE); obs <- read.table(\"obs_bf_sumstats_s${i}.txt.gz\", header=TRUE); if(isTRUE(all.equal(target=exp, current=obs, tolerance=${tol}))){quit(\"no\",0,FALSE)}else{quit(\"no\",1,FALSE)}" | R --vanilla --quiet --slave); then
+	if ! $(unset R_HOME; echo "exp <- read.table(\"exp_bf_sumstats_s${i}.txt.gz\", header=TRUE); obs <- read.table(\"obs_bf_sumstats_s${i}.txt.gz\", header=TRUE); if(isTRUE(all.equal(target=exp, current=obs, tolerance=${tol}))){quit(\"no\",0,FALSE)}else{quit(\"no\",1,FALSE)}" | R --vanilla --quiet --slave); then
 	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
 	    exit 1
 	fi
