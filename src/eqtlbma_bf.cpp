@@ -50,6 +50,8 @@ using namespace std;
 #include <gsl/gsl_statistics_double.h>
 #include <gsl/gsl_sf_gamma.h>
 
+#include <omp.h>
+
 #include "utils/utils_io.hpp"
 #include "utils/utils_math.hpp"
 using namespace utils;
@@ -174,7 +176,7 @@ void help(char ** argv)
        << "\t\t'all': average over all configurations (also called BF_BMA)" << endl
        << "      --maxbf\tuse the maximum ABF over SNPs as test statistic for permutations" << endl
        << "\t\totherwise the average ABF over SNPs is used (more Bayesian)" << endl
-       << "      --thread\tnumber of threads for the permutations (default=1)" << endl
+       << "      --thread\tnumber of threads (default=1, parallelize over SNPs)" << endl
        << "      --snp\tfile with a list of SNPs to analyze" << endl
        << "\t\tone SNP name per line, useful when launched in parallel" << endl
        << "\t\tprogram exits if an empty file is given" << endl
@@ -1651,6 +1653,7 @@ void testForAssociations(
 	 << " likelihood=" << likelihood;
     if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
       cout << " errors=" << type_errors << " prop_cov_errors=" << prop_cov_errors;
+    cout << " threads=" << omp_get_num_threads();
     cout << endl << flush;
   }
   
@@ -1710,7 +1713,6 @@ void makePermutationsSep(
   const int & trick,
   const size_t & trick_cutoff,
   const int & type_perm_sep,
-  const int & nb_threads,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
   const int & verbose,
@@ -1735,7 +1737,7 @@ void makePermutationsSep(
 						  likelihood,
 						  need_qnorm, covariates,
 						  nb_permutations, trick,
-						  trick_cutoff, nb_threads,
+						  trick_cutoff,
 						  rngPerm, rngTrick);
     }
     if(verbose == 1)
@@ -1766,7 +1768,7 @@ void makePermutationsSep(
 						   likelihood,
 						   need_qnorm, covariates,
 						   nb_permutations, trick,
-						   trick_cutoff, nb_threads,
+						   trick_cutoff,
 						   rngPerm, rngTrick);
       }
       if(verbose == 1)
@@ -1792,7 +1794,6 @@ void makePermutationsJoin(
   const size_t & trick_cutoff,
   const string & type_permbf,
   const bool & use_max_bf,
-  const int & nb_threads,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
   const int & verbose,
@@ -1820,7 +1821,7 @@ void makePermutationsJoin(
 				     covariates, iGridL, iGridS, type_errors,
 				     prop_cov_errors, nb_permutations, trick,
 				     trick_cutoff, type_permbf, use_max_bf,
-				     nb_threads, rngPerm, rngTrick);
+				     rngPerm, rngTrick);
   }
   
   if(verbose == 1)
@@ -1847,7 +1848,6 @@ makePermutations(
   const int & type_perm_sep,
   const string & type_permbf,
   const bool & use_max_bf,
-  const int & nb_threads,
   const int & verbose,
   map<string, Gene> & gene2object)
 {
@@ -1863,8 +1863,7 @@ makePermutations(
       cout << " perm_sep=" << type_perm_sep;
     else if(type_analysis.compare("join") == 0)
       cout << " perm_bf=" << type_permbf;
-    if(nb_threads > 1)
-      cout << " threads=" << nb_threads;
+    cout << " threads=" << omp_get_num_threads();
     cout << endl << flush;
   }
   
@@ -1886,13 +1885,13 @@ makePermutations(
   if(type_analysis.compare("sep") == 0 && type_perm_sep != 0)
     makePermutationsSep(subgroups, samples, likelihood, need_qnorm, covariates,
 			nb_permutations, seed, trick, trick_cutoff,
-			type_perm_sep, nb_threads, rngPerm, rngTrick,
+			type_perm_sep, rngPerm, rngTrick,
 			verbose, gene2object);
   if(type_analysis.compare("join") == 0 && type_permbf.compare("none") != 0)
     makePermutationsJoin(subgroups, samples, likelihood, need_qnorm, covariates, iGridL,
 			 iGridS, type_errors, prop_cov_errors, nb_permutations,
 			 seed, trick, trick_cutoff, type_permbf, use_max_bf,
-			 nb_threads, rngPerm, rngTrick, verbose, gene2object);
+			 rngPerm, rngTrick, verbose, gene2object);
   
   gsl_rng_free(rngPerm);
   if(trick != 0)
@@ -2472,6 +2471,7 @@ void run(const string & file_genopaths,
   Grid iGridL(file_largegrid, true, verbose);
   Grid iGridS(file_smallgrid, false, verbose);
   
+  omp_set_num_threads(nb_threads);
   testForAssociations(mChr2VecPtSnps, anchor, radius, subgroups, samples,
 		      likelihood, type_analysis, need_qnorm, covariates,
 		      iGridL, iGridS, type_bfs, type_errors, prop_cov_errors,
@@ -2481,7 +2481,7 @@ void run(const string & file_genopaths,
     makePermutations(subgroups, samples, likelihood, type_analysis, need_qnorm,
 		     covariates, iGridL, iGridS, type_errors, prop_cov_errors,
 		     nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
-		     type_permbf, use_max_bf, nb_threads, verbose, gene2object);
+		     type_permbf, use_max_bf, verbose, gene2object);
   
   writeRes(out_prefix, save_sstats, save_raw_abfs, subgroups, gene2object,
 	   snp2object, type_analysis, iGridL, iGridS, type_bfs, nb_permutations,

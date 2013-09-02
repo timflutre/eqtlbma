@@ -127,7 +127,6 @@ namespace quantgen {
       const size_t & nb_permutations,
       const int & trick,
       const size_t & trick_cutoff,
-      const int & nb_threads,
       const gsl_rng * rngPerm,
       const gsl_rng * rngTrick);
     size_t GetNbGeneSnpPairs(const std::string & subgroup) const;
@@ -143,7 +142,6 @@ namespace quantgen {
       const size_t & nb_permutations,
       const int & trick,
       const size_t & trick_cutoff,
-      const int & nb_threads,
       const gsl_rng * rngPerm,
       const gsl_rng * rngTrick);
     double GetPermutationPvalueSep(void) const { return pval_perm_sep_allsbgrps_; };
@@ -163,7 +161,6 @@ namespace quantgen {
 			      const size_t & trick_cutoff,
 			      const std::string & whichPermBf,
 			      const bool & useMaxBfOverSnps,
-			      const int & nb_threads,
 			      const gsl_rng * rngPerm,
 			      const gsl_rng * rngTrick);
     double GetPermutationPvalueJoin(void) const { return pval_perm_join_; };

@@ -217,19 +217,17 @@ namespace quantgen {
     const float & prop_cov_errors,
     const int & verbose)
   {
-    Snp * pt_snp;
-    gsl_permutation * perm = NULL;
-  
-    for(vector<Snp*>::const_iterator it_snp = snps_.begin();
-	it_snp != snps_.end(); ++it_snp){
-    
-      pt_snp = *it_snp;
+#pragma omp parallel for
+    for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+      
+      Snp * pt_snp = snps_[idx_snp];
       if(verbose > 0)
 	cout << name_ << " (" << GetNbSubgroups() << " subgroups) versus "
 	     << pt_snp->name_ << " (" << pt_snp->GetNbSubgroups()
 	     << " subgroups)" << endl;
     
       GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
+      gsl_permutation * perm = NULL;
     
       if(type_analysis.compare("sep") == 0 ||
 	 (type_analysis.compare("join") == 0 && type_errors.compare("uvlr") == 0)){
@@ -320,7 +318,6 @@ namespace quantgen {
     const size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
-    const int & nb_threads,
     const gsl_rng * rngPerm,
     const gsl_rng * rngTrick)
   {
@@ -340,8 +337,6 @@ namespace quantgen {
     bool shuffle_only = false;
   
     FindMinTruePvaluePerSubgroup(subgroup);
-  
-    omp_set_num_threads(nb_threads);
   
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
@@ -433,7 +428,6 @@ namespace quantgen {
     const size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
-    const int & nb_threads,
     const gsl_rng * rngPerm,
     const gsl_rng * rngTrick)
   {
@@ -453,8 +447,6 @@ namespace quantgen {
     bool shuffle_only = false;
   
     FindMinTruePvalueAllSubgroups();
-  
-    omp_set_num_threads(nb_threads);
   
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
@@ -543,7 +535,6 @@ namespace quantgen {
 				  const size_t & trick_cutoff,
 				  const string & whichPermBf,
 				  const bool & useMaxBfOverSnps,
-				  const int & nb_threads,
 				  const gsl_rng * rngPerm,
 				  const gsl_rng * rngTrick)
   {
@@ -568,8 +559,6 @@ namespace quantgen {
       FindMaxTrueL10Abf(whichPermBf);
     else
       AvgTrueL10Abfs(whichPermBf);
-    
-    omp_set_num_threads(nb_threads);
     
     for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
