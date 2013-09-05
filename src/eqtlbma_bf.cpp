@@ -1,6 +1,6 @@
-/** \file bf.cpp
+/** \file eqtlbma_bf.cpp
  *
- *  `bf' performs eQTL mapping in multiple subgroups via a Bayesian model.
+ *  `eqtlbma_bf' performs eQTL mapping in multiple subgroups via a Bayesian model.
  *  Copyright (C) 2012-2013 Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <getopt.h>
 #include <libgen.h>
+#include <sys/stat.h>
 
 #include <iostream>
 #include <iomanip>
@@ -61,6 +62,9 @@ using namespace utils;
 #include "quantgen/gene_snp_pair.hpp"
 using namespace quantgen;
 
+#include "tabix/bgzf.h"
+#include "tabix/tabix.h"
+
 /** \brief Display the help on stdout.
  */
 void help(char ** argv)
@@ -86,6 +90,7 @@ void help(char ** argv)
        << "      --scoord\tfile with the SNP coordinates (compulsory if custom genotype format)" << endl
        << "\t\tshould be in the BED format (delimiter: tab)" << endl
        << "\t\tSNPs in the genotype files without coordinate are skipped" << endl
+       << "\t\tif a tabix-indexed file is also present, it will be used" << endl
        << "      --exp\tfile with absolute paths to expression level files" << endl
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
        << "\t\tcan be a single line (single subgroup)" << endl
@@ -1337,7 +1342,68 @@ void loadGenosAndSnpInfo(
     cout << "nb of SNPs: " << snp2object.size() << endl;
 }
 
-/** \brief Parse the BED file
+/** \brief Parse the tabix-indexed BED file
+ */
+void loadSnpInfo(const string & file_snpcoords,
+		 const string & file_snpcoords_idx,
+		 const set<string> & sSnpsToKeep,
+		 const map<string,Gene> gene2object,
+		 const string & anchor,
+		 const size_t & radius,
+		 const int & verbose,
+		 map<string, Snp> & snp2object,
+		 map<string, vector<Snp*> > & mChr2VecPtSnps)
+{
+  struct stat stat_bed, stat_tbi;
+  stat(file_snpcoords.c_str(), &stat_bed);
+  stat(file_snpcoords_idx.c_str(), &stat_tbi);
+  if(stat_bed.st_mtime > stat_tbi.st_mtime){
+    cerr << "ERROR: index file (" << file_snpcoords_idx
+	 << ") is older than data file (" << file_snpcoords << ")" << endl;
+    exit(1);
+  }
+  
+  tabix_t * t;
+  if((t = ti_open(file_snpcoords.c_str(), 0)) == 0){
+    cerr << "ERROR: fail to open the data file (tabix)" << endl;
+    exit(1);
+  }
+  if(ti_lazy_index_load(t) < 0){
+    cerr << "ERROR: failed to load the index file (tabix)" << endl;
+    exit(1);
+  }
+  
+  const char *s;
+  ti_iter_t iter;
+  vector<string> tokens;
+  for(map<string,Gene>::const_iterator it = gene2object.begin();
+      it != gene2object.end(); ++it){
+    int t_id, t_beg, t_end, len;
+    if(ti_parse_region(t->idx, it->second.GetRegionInTabixFormat(anchor, radius).c_str(),
+		       &t_id, &t_beg, &t_end) == 0){
+      iter = ti_queryi(t, t_id, t_beg, t_end);
+      while((s = ti_read(t, iter, &len)) != 0){
+	
+	split(string(s), "\t", tokens);
+	if(! sSnpsToKeep.empty() && sSnpsToKeep.find(tokens[3])
+	   == sSnpsToKeep.end())
+	  continue;
+	if(snp2object.find(tokens[3]) != snp2object.end())
+	  continue; // in case of redundancy
+	Snp snp(tokens[3], tokens[0], tokens[2]);
+	snp2object.insert(make_pair(snp.GetName(), snp));
+	if(mChr2VecPtSnps.find(snp.GetChromosome()) == mChr2VecPtSnps.end())
+	  mChr2VecPtSnps.insert(make_pair(snp.GetChromosome(), vector<Snp*>()));
+	mChr2VecPtSnps[snp.GetChromosome()].push_back(&(snp2object[snp.GetName()]));
+	
+      }
+      ti_iter_destroy(iter);
+    }
+  }
+  ti_close(t);
+}
+
+/** \brief Parse the unindexed BED file
  */
 void loadSnpInfo(const string & snpCoordsFile,
 		 const set<string> & sSnpsToKeep,
@@ -1345,12 +1411,8 @@ void loadSnpInfo(const string & snpCoordsFile,
 		 map<string, Snp> & snp2object,
 		 map<string, vector<Snp*> > & mChr2VecPtSnps)
 {
-  if(verbose > 0)
-    cout << "load SNP coordinates ..." << endl << flush;
-  clock_t startTime = clock();
-  
   gzFile snpCoordsStream;
-  openFile (snpCoordsFile, snpCoordsStream, "rb");
+  openFile(snpCoordsFile, snpCoordsStream, "rb");
   string line;
   vector<string> tokens;
   while(getline(snpCoordsStream, line)){
@@ -1373,6 +1435,36 @@ void loadSnpInfo(const string & snpCoordsFile,
     exit(1);
   }
   closeFile(snpCoordsFile, snpCoordsStream);
+}
+
+/** \brief Parse the BED file (indexed or not)
+ */
+void loadSnpInfo(const string & file_snpcoords,
+		 const set<string> & sSnpsToKeep,
+		 const map<string,Gene> gene2object,
+		 const string & anchor,
+		 const size_t & radius,
+		 const int & verbose,
+		 map<string, Snp> & snp2object,
+		 map<string, vector<Snp*> > & mChr2VecPtSnps)
+{
+  if(verbose > 0)
+    cout << "load SNP coordinates";
+  clock_t startTime = clock();
+  
+  stringstream file_snpcoords_idx;
+  file_snpcoords_idx << file_snpcoords << ".tbi";
+  if(doesFileExist(file_snpcoords_idx.str())){
+    cout << " (tabix-indexed BED file) ..." << endl << flush;
+    loadSnpInfo(file_snpcoords, file_snpcoords_idx.str(), sSnpsToKeep,
+		gene2object, anchor, radius, verbose, snp2object,
+		mChr2VecPtSnps);
+  }
+  else{
+    cout << " (unindexed BED file) ..." << endl << flush;
+    loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose,
+		snp2object, mChr2VecPtSnps);
+  }
   
   // sort the SNPs per chr
   for(map<string,vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
@@ -2461,8 +2553,8 @@ void run(const string & file_genopaths,
     loadGenosAndSnpInfo(subgroup2genofile, min_maf, sSnpsToKeep,
 			mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
   else{
-    loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose, snp2object,
-		mChr2VecPtSnps);
+    loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
+		verbose, snp2object, mChr2VecPtSnps);
     loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
   }
   if(snp2object.empty())

@@ -10,6 +10,7 @@ change for eqtlbma_bf and eqtlbma_hm, see the manual
 as well as to parallelize over SNPs in 'eqtlbma_bf'
 * implement Poisson likelihood and quasi-likelihood for single-tissue analysis
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
+* in 'eqtlbma_bf', handle tabix-indexed BED file for SNP coordinates
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility
 * add 'utils_eqtlbma.R'
 * add "type" model (still beta)

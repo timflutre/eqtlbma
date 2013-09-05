@@ -1,2 +1,3 @@
 * create a data/ directory with example files
-* think about using BGZIP or HDF5 files to efficiently store and retrieve results
+* use tabix library when parsing genotype files in VCF and IMPUTE formats
+* think about using HDF5 files to efficiently store and retrieve results

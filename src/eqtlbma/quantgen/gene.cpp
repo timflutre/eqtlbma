@@ -86,6 +86,18 @@ namespace quantgen {
     return *pt_lhs < *pt_rhs;
   }
 
+  string Gene::GetRegionInTabixFormat(const string & anchor,
+				      const size_t & radius) const
+  {
+    stringstream region;
+    region << chromosome_ << ":";
+    if(anchor.compare("TSS+TES") == 0)
+      region << start_ - radius << "-" << end_ + radius;
+    else if(anchor.compare("TSS") == 0)
+      region << start_ - radius << "-" << start_ + radius;
+    return region.str();
+  }
+
   void Gene::AddSubgroup(const string & subgroup,
 			 const vector<string>::const_iterator & begin,
 			 const vector<string>::const_iterator & end)

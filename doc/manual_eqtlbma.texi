@@ -166,6 +166,12 @@ Therefore, with the latter, we also need to use the option @option{--scoord}
 followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
 This means that the coordinates are 0-based, there is no header line and the column separator is a tabulation.
 
+When parallelizing an analyzis over genes, we may want to only load the SNPs in @emph{cis} of the genes in the given job.
+In order to speed-up this, the code uses the @url{https://github.com/samtools/tabix,tabix} library (Li, 2011).
+More specifically, if a bgzip-compressed BED file named ``snp_coords.bed.gz'' is given to the option @option{--scoord},
+the code will look for a tabix-indexed file named ``snp_coords.bed.gz.tbi''.
+If this index file is not present, the SNP loading will be slower.
+
 The option @option{--maf} allows to skip SNPs 
 if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
 

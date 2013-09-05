@@ -90,6 +90,8 @@ namespace quantgen {
     std::string GetChromosome(void) const { return chromosome_; };
     size_t GetStart(void) const { return start_; };
     size_t GetEnd(void) const { return end_; };
+    std::string GetRegionInTabixFormat(const std::string & anchor,
+				       const size_t & radius) const;
     size_t GetNbSubgroups(void) const { return subgroup2explevels_.size(); };
     size_t GetNbGeneSnpPairs(void) const { return gene_snp_pairs_.size(); };
     bool HasExplevelsInAtLeastOneSubgroup(void) const;
