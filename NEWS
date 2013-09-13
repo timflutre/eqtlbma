@@ -8,17 +8,16 @@ change for eqtlbma_bf and eqtlbma_hm, see the manual
 * add tests for the multivariate Bayes Factor and the EM algorithm
 * use OpenMP to speed-up the EM algorithm fitting the hierarchical model
 as well as to parallelize over SNPs in 'eqtlbma_bf'
-* implement Poisson likelihood and quasi-likelihood for single-tissue analysis
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
 * in 'eqtlbma_bf', handle tabix-indexed BED file for SNP coordinates
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility
 * add 'utils_eqtlbma.R'
+* implement Poisson likelihood and quasi-likelihood for single-tissue analysis (still beta)
 * add "type" model (still beta)
 * keep median of log10(ABF) from permutations for QBF procedure (still beta)
 
 Bug fixes
 * in 'eqtlbma_hm', don't use underscore to split identifiers
-* in 'test_poisson.bash', improve portability when using R with pipe
 
 
 2013-03-28 v1.2

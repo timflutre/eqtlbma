@@ -169,8 +169,10 @@ This means that the coordinates are 0-based, there is no header line and the col
 When parallelizing an analyzis over genes, we may want to only load the SNPs in @emph{cis} of the genes in the given job.
 In order to speed-up this, the code uses the @url{https://github.com/samtools/tabix,tabix} library (Li, 2011).
 More specifically, if a bgzip-compressed BED file named ``snp_coords.bed.gz'' is given to the option @option{--scoord},
-the code will look for a tabix-indexed file named ``snp_coords.bed.gz.tbi''.
-If this index file is not present, the SNP loading will be slower.
+the code will look for a tabix-indexed file named ``snp_coords.bed.gz.tbi'' 
+and use it to only load the SNPs in @emph{cis} of the genes specified by the option @option{--gcoord}.
+If the index file is not present, all SNPs will be loaded which will be slower and use more memory.
+See the FAQ below to know how to build the index for the BED file.
 
 The option @option{--maf} allows to skip SNPs 
 if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
@@ -539,6 +541,8 @@ to compute the final quantities of interest, e.g. posteriors.
 
 Flutre T, Wen X, Pritchard J, Stephens M (2013) A Statistical Framework for Joint eQTL Analysis in Multiple Tissues. PLoS Genet 9(5): e1003486. doi:10.1371/journal.pgen.1003486
 
+This article is freely available @url{http://dx.doi.org/10.1371/journal.pgen.1003486,online}.
+
 @sp 1
 
 @item
@@ -578,6 +582,21 @@ zcat ../gene_coords.bed.gz | cut -f1-4 | split \
 @end verbatim
 
 This will create around 100 files in a directory, such as ``lists_genes/list_genes_001.bed.gz''.
+
+@sp 1
+
+@item
+@strong{How do I make the tabix index for the BED file with SNP coordinates?}
+
+Start by installing the @url{https://github.com/samtools/tabix,TABIX} package.
+Then sort the BED file and compress it with the @command{bgzip} program (part of the TABIX package).
+Finally, make the index with the @command{tabix} program.
+All this can be done with the following commands:
+
+@verbatim
+cat snp_coords.bed | sort -k1,1 -k2,2g | bgzip > snp_coords.bed.gz
+tabix -p bed snp_coords.bed.gz
+@end verbatim
 
 @sp 1
 
@@ -627,7 +646,7 @@ gzip out_eqtlbma_sumstats_${sbgrp}.txt
 @item
 @strong{Is this packaged tested?}
 
-We implemented some R code in order to perform functional tests on @command{eqtlbma_bf}.
+We implemented some R code in order to perform @url{https://en.wikipedia.org/wiki/Functional_testing,functional tests} on @command{eqtlbma_bf} and @command{eqtlbma_hm}.
 Launching them is automatized via @option{make check}.
 
 You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
