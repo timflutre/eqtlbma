@@ -165,7 +165,7 @@ namespace utils {
     const time_t & inTime)
   {
     struct tm * ptTm = localtime (&inTime);
-    char buffer[100];
+    char buffer[128];
     snprintf (buffer, 126, "%i-%02i-%02i %02i:%02i:%02i",
 	      1900 + ptTm->tm_year, ptTm->tm_mon + 1, ptTm->tm_mday,
 	      ptTm->tm_hour, ptTm->tm_min, ptTm->tm_sec);
