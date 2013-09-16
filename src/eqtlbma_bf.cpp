@@ -1745,7 +1745,7 @@ void testForAssociations(
 	 << " likelihood=" << likelihood;
     if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
       cout << " errors=" << type_errors << " prop_cov_errors=" << prop_cov_errors;
-    cout << " threads=" << omp_get_max_threads();
+    cout << " threads=1";
     cout << endl << flush;
   }
   
@@ -2563,17 +2563,18 @@ void run(const string & file_genopaths,
   Grid iGridL(file_largegrid, true, verbose);
   Grid iGridS(file_smallgrid, false, verbose);
   
-  omp_set_num_threads(nb_threads);
   testForAssociations(mChr2VecPtSnps, anchor, radius, subgroups, samples,
 		      likelihood, type_analysis, need_qnorm, covariates,
 		      iGridL, iGridS, type_bfs, type_errors, prop_cov_errors,
 		      verbose, gene2object);
   if(nb_permutations > 0 &&
-     (type_perm_sep != 0 || type_permbf.compare("none") != 0))
+     (type_perm_sep != 0 || type_permbf.compare("none") != 0)){
+    omp_set_num_threads(nb_threads);
     makePermutations(subgroups, samples, likelihood, type_analysis, need_qnorm,
 		     covariates, iGridL, iGridS, type_errors, prop_cov_errors,
 		     nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
 		     type_permbf, use_max_bf, verbose, gene2object);
+  }
   
   writeRes(out_prefix, save_sstats, save_raw_abfs, subgroups, gene2object,
 	   snp2object, type_analysis, iGridL, iGridS, type_bfs, nb_permutations,
