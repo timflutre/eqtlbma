@@ -133,6 +133,8 @@ namespace quantgen {
   public:
     GeneSnpPair();
     GeneSnpPair(const std::string & gene_name, const std::string & snp_name);
+    void SetGeneName(const std::string gene_name) { gene_name_ = gene_name; };
+    void SetSnpName(const std::string snp_name) { snp_name_ = snp_name; };
     std::string GetGeneName(void) const { return gene_name_; };
     std::string GetSnpName(void) const { return snp_name_; };
     bool HasResults(const std::string & subgroup) const;

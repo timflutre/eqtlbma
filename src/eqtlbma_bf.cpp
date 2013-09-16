@@ -1745,7 +1745,7 @@ void testForAssociations(
 	 << " likelihood=" << likelihood;
     if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
       cout << " errors=" << type_errors << " prop_cov_errors=" << prop_cov_errors;
-    cout << " threads=" << omp_get_num_threads();
+    cout << " threads=" << omp_get_max_threads();
     cout << endl << flush;
   }
   
@@ -1955,7 +1955,7 @@ makePermutations(
       cout << " perm_sep=" << type_perm_sep;
     else if(type_analysis.compare("join") == 0)
       cout << " perm_bf=" << type_permbf;
-    cout << " threads=" << omp_get_num_threads();
+    cout << " threads=" << omp_get_max_threads();
     cout << endl << flush;
   }
   
@@ -2551,10 +2551,10 @@ void run(const string & file_genopaths,
   map<string, vector<Snp*> > mChr2VecPtSnps;
   if(file_snpcoords.empty())
     loadGenosAndSnpInfo(subgroup2genofile, min_maf, sSnpsToKeep,
-			mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
+  			mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
   else{
     loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
-		verbose, snp2object, mChr2VecPtSnps);
+  		verbose, snp2object, mChr2VecPtSnps);
     loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
   }
   if(snp2object.empty())

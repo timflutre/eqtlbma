@@ -229,9 +229,11 @@ namespace quantgen {
     const float & prop_cov_errors,
     const int & verbose)
   {
-#pragma omp parallel for
+    // To use OpenMP here, need to have a temporary vector shared between all
+    // threads, replacing gene_snp_pairs_ inside the loop.
+    // As this  requires more memory, I prefer not to use OpenMP here.
     for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
-      
+    
       Snp * pt_snp = snps_[idx_snp];
       if(verbose > 0)
 	cout << name_ << " (" << GetNbSubgroups() << " subgroups) versus "
@@ -271,6 +273,7 @@ namespace quantgen {
 				       covariates, need_qnorm, whichBfs, iGridL,
 				       iGridS, prop_cov_errors, perm);
       }
+    
       gene_snp_pairs_.push_back(gene_snp_pair);
     }
   }

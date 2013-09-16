@@ -7,7 +7,7 @@ New features
 change for eqtlbma_bf and eqtlbma_hm, see the manual
 * add tests for the multivariate Bayes Factor and the EM algorithm
 * use OpenMP to speed-up the EM algorithm fitting the hierarchical model
-as well as to parallelize over SNPs in 'eqtlbma_bf'
+as well as to parallelize over SNPs in 'eqtlbma_bf' for permutations
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
 * in 'eqtlbma_bf', handle tabix-indexed BED file for SNP coordinates
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility

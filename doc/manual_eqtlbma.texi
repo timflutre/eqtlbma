@@ -594,9 +594,12 @@ Finally, make the index with the @command{tabix} program.
 All this can be done with the following commands:
 
 @verbatim
-cat snp_coords.bed | sort -k1,1 -k2,2g | bgzip > snp_coords.bed.gz
+cat snp_coords.bed | sort -k1,1V -k2,2g | bgzip > snp_coords.bed.gz
 tabix -p bed snp_coords.bed.gz
 @end verbatim
+
+The option @option{-V,--version-sort} of GNU sort allows to sort chromosome names in alpha-numeric order, i.e. ``chr10'' after ``chr2''.
+It is available at least in version 8.17 of @url{https://www.gnu.org/software/coreutils/, GNU coreutils} or later.
 
 @sp 1
 
