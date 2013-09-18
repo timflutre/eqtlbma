@@ -217,12 +217,17 @@ namespace quantgen {
 	  else
 	    os << idx;
 	  os << " covariate=";
-	  idx = subgroup2covariates_.find(it_sbgrp->first)->second
-	    [it_all - all_.begin()];
-	  if(idx == string::npos)
-	    os << "missing";
+	  if(subgroup2covariates_.find(it_sbgrp->first) !=
+	     subgroup2covariates_.end()){
+	    idx = subgroup2covariates_.find(it_sbgrp->first)->second
+	      [it_all - all_.begin()];
+	    if(idx == string::npos)
+	      os << "missing";
+	    else
+	      os << idx;
+	  }
 	  else
-	    os << idx;
+	    os << "none";
 	}
 	os << endl;
       }

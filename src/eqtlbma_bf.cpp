@@ -592,6 +592,13 @@ parseCmdLine(
     exit(1);
   }
   if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
+     type_permbf.compare("none") == 0){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: if --type join --nperm > 0, --pbf should be different than 'none'" << endl << endl;
+    help(argv);
+    exit(1);
+  }
+  if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
      type_permbf.compare("none") != 0 && type_bfs.compare("gen") == 0 &&
      type_permbf.compare("gen") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
