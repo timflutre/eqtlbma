@@ -229,7 +229,7 @@ namespace quantgen {
   {
     // To use OpenMP here, need to have a temporary vector shared between all
     // threads, replacing gene_snp_pairs_ inside the loop.
-    // As this  requires more memory, I prefer not to use OpenMP here.
+    // As this requires more memory, I prefer not to use OpenMP here.
     for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
     
       Snp * pt_snp = snps_[idx_snp];

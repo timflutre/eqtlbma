@@ -312,7 +312,11 @@ void Controller::load_data(
   }
   
   vector<string> files = glob(file_pattern);
-  if(verbose_ > 0)
+  if(files.size() == 0){
+    cerr << "ERROR: no input file was found from pattern " << file_pattern << endl;
+    exit(1);
+  }
+  else if(verbose_ > 0)
     cout << "nb of input files: " << files.size() << endl << flush;
   
   vector<string> lines;

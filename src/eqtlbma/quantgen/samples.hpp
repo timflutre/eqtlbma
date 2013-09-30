@@ -25,8 +25,12 @@
 #include <string>
 #include <iostream>
 
-namespace quantgen {
+// #include "quantgen/gene.hpp" // do NOT uncomment, otherwise circular dependency
 
+namespace quantgen {
+  
+  class Gene; // forward declaration
+  
   class Samples {
   private:
     std::vector<std::string> all_;
@@ -57,6 +61,7 @@ namespace quantgen {
     void GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
       const std::string & subgroup1,
       const std::string & subgroup2,
+      const Gene & gene,
       std::vector<size_t> & inds_s1s2,
       std::vector<size_t> & inds_s1,
       std::vector<size_t> & inds_s2) const;

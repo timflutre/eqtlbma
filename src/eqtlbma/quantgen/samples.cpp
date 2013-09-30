@@ -23,6 +23,7 @@
 #include "utils/utils_io.hpp"
 
 #include "quantgen/samples.hpp"
+#include "quantgen/gene.hpp"
 
 using namespace std;
 
@@ -146,6 +147,7 @@ namespace quantgen {
   void Samples::GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
     const string & subgroup1,
     const string & subgroup2,
+    const Gene & gene,
     vector<size_t> & inds_s1s2,
     vector<size_t> & inds_s1,
     vector<size_t> & inds_s2) const
@@ -153,14 +155,32 @@ namespace quantgen {
     inds_s1s2.clear();
     inds_s1.clear();
     inds_s2.clear();
+    size_t idx_explevel;
     bool present_in_s1, present_in_s2;
     for (size_t idx_all = 0; idx_all < all_.size(); ++idx_all) {
-      present_in_s1 = (
-	subgroup2genotypes_.find(subgroup1)->second[idx_all] != string::npos
-	&& subgroup2explevels_.find(subgroup1)->second[idx_all] != string::npos);
-      present_in_s2 = (
-	subgroup2genotypes_.find(subgroup2)->second[idx_all] != string::npos
-	&& subgroup2explevels_.find(subgroup2)->second[idx_all] != string::npos);
+      
+      idx_explevel = GetIndexExplevel(idx_all, subgroup1);
+      if(gene.GetName() != "")
+	present_in_s1 = (
+	  GetIndexGenotype(idx_all, subgroup1) != string::npos
+	  && idx_explevel != string::npos
+	  && ! isNan(gene.GetExplevel(subgroup1, idx_explevel)));
+      else // used in ShowPairs() below
+	present_in_s1 = (
+	  GetIndexGenotype(idx_all, subgroup1) != string::npos
+	  && idx_explevel != string::npos);
+      
+      idx_explevel = GetIndexExplevel(idx_all, subgroup2);
+      if(gene.GetName() != "")
+	present_in_s2 = (
+	  GetIndexGenotype(idx_all, subgroup2) != string::npos
+	  && idx_explevel != string::npos
+	  && ! isNan(gene.GetExplevel(subgroup2, idx_explevel)));
+      else // used in ShowPairs() below
+	present_in_s2 = (
+	  GetIndexGenotype(idx_all, subgroup2) != string::npos
+	  && idx_explevel != string::npos);
+      
       if (present_in_s1 && present_in_s2)
 	inds_s1s2.push_back(idx_all);
       else if (present_in_s1 && ! present_in_s2)
@@ -181,7 +201,7 @@ namespace quantgen {
       for(size_t s2 = s1 + 1; s2 < subgroup_names.size(); ++s2){
 	subgroup2 = subgroup_names[s2];
 	GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
-	  subgroup1, subgroup2, inds_s1s2, inds_s1, inds_s2);
+	  subgroup1, subgroup2, Gene(), inds_s1s2, inds_s1, inds_s2);
 	os << subgroup1 << "-" << subgroup2 << ": "
 	   << inds_s1s2.size() << " in both, "
 	   << inds_s1.size() << " in " << subgroup1 << ", "

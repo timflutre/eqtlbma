@@ -844,7 +844,7 @@ namespace quantgen {
     vector<size_t> inds_s1s2, inds_s1, inds_s2;
     inds_s1s2.clear(); inds_s1.clear(); inds_s2.clear();
     samples.GetCommonAndUniqueIndividualsBetweenPairOfSubgroups(
-      subgroup1, subgroup2, inds_s1s2, inds_s1, inds_s2);
+      subgroup1, subgroup2, gene, inds_s1s2, inds_s1, inds_s2);
     if(inds_s1s2.empty()){
       cerr << "ERROR: subgroup " << subgroup1 << " and subgroup "
 	   << subgroup2 << " have no individuals in common" << endl;
