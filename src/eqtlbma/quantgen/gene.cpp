@@ -107,14 +107,12 @@ namespace quantgen {
     bool any_missing_value = false;
     for(vector<string>::const_iterator it = begin; it != end; ++it){
       if(it->compare("NA") == 0 || it->compare("na") == 0
-	 || it->compare("NaN") == 0 || it->compare("nan") == 0){
-	cerr << "WARNING: skip gene " << name_ << " in subgroup " << subgroup
-	     << " because of missing value" << endl;
-	any_missing_value = true;
-	break;
+	 || it->compare("NaN") == 0 || it->compare("nan") == 0)
+	++i;
+      else{
+	explevels[i] = atof(it->c_str());
+	++i;
       }
-      explevels[i] = atof(it->c_str());
-      ++i;
     }
     if(! any_missing_value)
       subgroup2explevels_.insert(make_pair(subgroup, explevels));

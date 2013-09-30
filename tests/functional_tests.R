@@ -36,6 +36,7 @@ help <- function(){
   txt <- paste0(txt, "      --cvrt\tuse covariates\n")
   txt <- paste0(txt, "      --mvlr\tuse multivariate model\n")
   txt <- paste0(txt, "      --ris\tremove some individuals from some subgroups\n")
+  txt <- paste0(txt, "      --rgsi\tremove some exp levels in some subgroups for some individuals\n")
   txt <- paste0(txt, "      --lik\tlikelihood (default=norm/pois/qpois)\n")
   message(txt)
 }
@@ -89,6 +90,10 @@ parseCmdLine <- function(params){
     }
     else if(args[i] == "--ris"){
       params$rmvIndsFromSbgrp <- TRUE
+      i <- i + 1
+    }
+    else if(args[i] == "--rgsi"){
+      params$rmvExpFromSbgrpsInds <- TRUE
       i <- i + 1
     }
     else if(args[i] == "--lik"){
@@ -183,7 +188,8 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
 }
 
 getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
-                             lik="norm", verbose=0){
+                             rmvExpFromSbgrpsInds=FALSE, lik="norm",
+                             verbose=0){
   if(verbose > 0)
     message("simulate data with R ...")
   
@@ -344,6 +350,10 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
   ## rmv some individuals from s3
   if(rmvIndsFromSbgrp)
     phenos[["s3"]] <- phenos[["s3"]][,1:100]
+  
+  ## rmv some exp levels for gene9, s3, ind25
+  if(rmvExpFromSbgrpsInds)
+    phenos[["s3"]][9,25] <- NA
   
   return(list(inds=inds,
               gene.coords=gene.coords,
@@ -506,6 +516,7 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
   stopifnot(! is.null(data))
   if(verbose > 0)
     message("calculate the summary statistics in each tissue ...")
+  
   sstats <- lapply(data$phenos, function(x){
     tmp <- data.frame(gene=rep(NA, data$params$nb.pairs), snp=NA, maf=NA, n=NA,
                       pve=NA, sigmahat=NA, betahat.geno=NA, sebetahat.geno=NA,
@@ -517,9 +528,10 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
     }
     tmp
   })
+  
   i <- 0
-  for(g in 1:nrow(data$gene.coords)){
-    for(p in 1:nrow(data$snp.coords)){
+  for(g in 1:nrow(data$gene.coords)){ # loop over genes
+    for(p in 1:nrow(data$snp.coords)){ # loop over snps
       if(data$snp.coords$chr[p] != data$gene.coords$chr[g] ||
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
@@ -528,23 +540,30 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
         message(paste(data$gene.coords$id[g], data$snp.coords$id[p]))
       i <- i + 1
       gene <- data$gene.coords$id[g]
-      for(s in 1:length(data$phenos)){
+      
+      for(s in 1:length(data$phenos)){ # loop over subgroups
         snp <- data$snp.coords$id[p]
         sstats[[s]]$gene[i] <- gene
         sstats[[s]]$snp[i] <- snp
         sstats[[s]]$maf[i] <- sum(as.numeric(data$geno.counts[p,])) /
           (2 * length(as.numeric(data$geno.counts[p,])))
         if(gene %in% rownames(data$phenos[[s]])){
-          sstats[[s]]$n[i] <- length(data$phenos[[s]][g,])
           common.inds.idx <- which(data$inds$id %in% colnames(data$phenos[[s]]))
-          if(length(grep("pois", lik)) == 0){
+          inds.with.exp.idx <- which(! is.na(data$phenos[[s]][g,])) # handle rmvExpFromSbgrpsInds
+          inds.tokeep.idx <- c()
+          for(idx in 1:length(data$inds$id))
+            if(idx %in% common.inds.idx & idx %in% inds.with.exp.idx)
+              inds.tokeep.idx <- append(inds.tokeep.idx, idx)
+          sstats[[s]]$n[i] <- length(inds.tokeep.idx)
+          
+          if(length(grep("pois", lik)) == 0){ # Normal likelihood
             if(! (withCovars && "sex" %in% names(data$inds))){
-              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                                as.numeric(data$geno.counts[p,common.inds.idx])))
+              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,inds.tokeep.idx]) ~
+                                as.numeric(data$geno.counts[p,inds.tokeep.idx])))
             } else{
-              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                                as.numeric(data$geno.counts[p,common.inds.idx]) +
-                                as.numeric(data$inds$sex[common.inds.idx])))
+              tmp <- summary(lm(as.numeric(data$phenos[[s]][g,inds.tokeep.idx]) ~
+                                as.numeric(data$geno.counts[p,inds.tokeep.idx]) +
+                                as.numeric(data$inds$sex[inds.tokeep.idx])))
             }
             sstats[[s]]$pve[i] <- tmp$r.squared
             sstats[[s]]$sigmahat[i] <- tmp$sigma
@@ -554,12 +573,12 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
           } else{
             
             if(lik == "pois"){
-              fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                         as.numeric(data$geno.counts[p,common.inds.idx]),
+              fit <- glm(as.numeric(data$phenos[[s]][g,inds.tokeep.idx]) ~
+                         as.numeric(data$geno.counts[p,inds.tokeep.idx]),
                          family=poisson(link="log"))
             } else # lik == "qpois"
-              fit <- glm(as.numeric(data$phenos[[s]][g,common.inds.idx]) ~
-                         as.numeric(data$geno.counts[p,common.inds.idx]),
+              fit <- glm(as.numeric(data$phenos[[s]][g,inds.tokeep.idx]) ~
+                         as.numeric(data$geno.counts[p,inds.tokeep.idx]),
                          family=quasipoisson(link="log"))
             tmp <- summary(fit)
             sstats[[s]]$sigmahat[i] <- sqrt(tmp$dispersion) # diff than 1 if qpois
@@ -571,12 +590,12 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
               sstats[[s]]$betapval.geno[i] <- tmp$coefficients[2,"Pr(>|t|)"]
             
             ## if(lik == "pois"){
-            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
-            ##               X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
+            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,inds.tokeep.idx]),
+            ##               X=cbind(rep(1,length(inds.tokeep.idx)), as.numeric(data$geno.counts[p,inds.tokeep.idx])),
             ##               threshold=1e-6, family="poisson")
             ## } else
-            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,common.inds.idx]),
-            ##               X=cbind(rep(1,length(common.inds.idx)), as.numeric(data$geno.counts[p,common.inds.idx])),
+            ##   tmp <- irls(y=as.numeric(data$phenos[[s]][g,inds.tokeep.idx]),
+            ##               X=cbind(rep(1,length(inds.tokeep.idx)), as.numeric(data$geno.counts[p,inds.tokeep.idx])),
             ##               threshold=1e-6, family="quasipoisson",
             ##               verbose=ifelse(gene == "gene1" & snp == "snp1" & s == 1, 1, 0))
             ## sstats[[s]]$sigmahat[i] <- sqrt(tmp$sigma2)
@@ -584,12 +603,15 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
             ## sstats[[s]]$sebetahat.geno[i] <- tmp$se.beta.hat[2]
             ## sstats[[s]]$betapval.geno[i] <- tmp$pval.beta.hat[2]
             
-          }
+          } # end if pois or qpois
+          
         } else # case where gene is absent in subgroup
           sstats[[s]]$n[i] <- 0
-      }
-    }
-  }
+        
+      } # end of for loop over subgroups
+    } # end of for loop over snps
+  } # end of for loop over genes
+  
   return(sstats)
 }
 
@@ -1302,7 +1324,8 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
 
 getResultsOnSimulatedData <- function(data=NULL, grids=NULL, withCovars=FALSE,
                                       mvlr=FALSE, rmvIndsFromSbgrp=FALSE,
-                                      lik="norm", verbose=0){
+                                      rmvExpFromSbgrpsInds=FALSE, lik="norm",
+                                      verbose=0){
   stopifnot(! is.null(data), ! is.null(grids))
   if(verbose > 0)
     message("get results on simulated data with R ...")
@@ -1344,8 +1367,8 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
     write.table(x=tmp, file=gzfile(paste0("exp_bf_sumstats_",s,".txt.gz")),
                 quote=FALSE, row.names=FALSE, sep="\t", na="nan")
   }
-  
-  if(! is.na(res$l10abfs.raw)){
+
+  if(is.data.frame(res$l10abfs.raw)){
     tmp <- res$l10abfs.raw[,1:3]
     for(j in 4:ncol(res$l10abfs.raw))
       tmp <- cbind(tmp, gsub("NA", "nan", sprintf(fmt="%.06e", res$l10abfs.raw[,j])))
@@ -1365,13 +1388,15 @@ writeResultsOnSimulatedData <- function(res=NULL, verbose=0){
 run <- function(params){
   setwd(params$dir.name)
   data <- getSimulatedData(params$rmvGenesFromSbgrp, params$rmvIndsFromSbgrp,
-                           params$lik, params$verbose)
+                           params$rmvExpFromSbgrpsInds, params$lik,
+                           params$verbose)
   writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$withCovars,
                                    params$mvlr, params$rmvIndsFromSbgrp,
-                                   params$lik, params$verbose)
+                                   params$rmvExpFromSbgrpsInds, params$lik,
+                                   params$verbose)
   writeResultsOnSimulatedData(res, params$verbose)
 }
 
@@ -1382,6 +1407,7 @@ main <- function(){
                  withCovars=FALSE,
                  mvlr=FALSE,
                  rmvIndsFromSbgrp=FALSE,
+                 rmvExpFromSbgrpsInds=FALSE,
                  lik="norm")
   params <- parseCmdLine(params)
   checkParams(params)

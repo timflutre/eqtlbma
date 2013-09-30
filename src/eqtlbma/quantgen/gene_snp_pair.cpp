@@ -88,7 +88,8 @@ namespace quantgen {
 	  idx_all = gsl_permutation_get(perm, it_all - samples.begin());
 	idx_explevel = samples.GetIndexExplevel(idx_all, subgroup);
 	idx_genotype = samples.GetIndexGenotype(it_all - samples.begin(), subgroup);
-	if(idx_explevel != string::npos && idx_genotype != string::npos){
+	if(idx_explevel != string::npos && idx_genotype != string::npos
+	   && ! isNan(gene.GetExplevel(subgroup, idx_explevel))){
 	  Y_tmp.push_back(gene.GetExplevel(subgroup, idx_explevel));
 	  Xg_tmp.push_back(snp.GetGenotype(subgroup, idx_genotype));
 	  indices_all.push_back(it_all - samples.begin());

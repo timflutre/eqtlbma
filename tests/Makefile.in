@@ -408,6 +408,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 TESTS = test_basic.bash \
 	test_genes-absent-in-some-subgroups.bash \
+	test_genes-absent-in-some-subgroups-and-individuals.bash \
 	test_with-covariates.bash \
 	test_mvlr.bash \
 	test_common-uniq-inds.bash \
@@ -417,6 +418,7 @@ TESTS = test_basic.bash \
 EXTRA_DIST = functional_tests.R \
 	test_basic.bash \
 	test_genes-absent-in-some-subgroups.bash \
+	test_genes-absent-in-some-subgroups-and-individuals.bash \
 	test_with-covariates.bash \
 	test_mvlr.bash \
 	test_common-uniq-inds.bash \
@@ -629,6 +631,13 @@ test_basic.bash.log: test_basic.bash
 test_genes-absent-in-some-subgroups.bash.log: test_genes-absent-in-some-subgroups.bash
 	@p='test_genes-absent-in-some-subgroups.bash'; \
 	b='test_genes-absent-in-some-subgroups.bash'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_genes-absent-in-some-subgroups-and-individuals.bash.log: test_genes-absent-in-some-subgroups-and-individuals.bash
+	@p='test_genes-absent-in-some-subgroups-and-individuals.bash'; \
+	b='test_genes-absent-in-some-subgroups-and-individuals.bash'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

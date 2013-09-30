@@ -1,3 +1,5 @@
 * create a data/ directory with example files
 * use tabix library when parsing genotype files in VCF and IMPUTE formats
 * think about using HDF5 files to efficiently store and retrieve results
+* explain eqtlbma_avg_bfs in manual
+* add tutorials with common cases
