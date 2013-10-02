@@ -1606,7 +1606,7 @@ void parseCmdLine(
     help(argv);
     exit(1);
   }
-  if(model == "type"){
+  if(model == "types"){
     configs_tokeep.clear(); // ignore --configs if model = "type"
     for(size_t s = 0; s < nb_subgroups; ++s)
       configs_tokeep.push_back(toString(s));
