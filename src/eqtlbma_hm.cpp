@@ -245,7 +245,7 @@ void Controller::load_data_one_file(
     snp_id = string(pch);
     pch = strtok(NULL, " \t,");
     config = string(pch);
-    if(config.find("gen") != string::npos
+    if(config.find("gen") != string::npos // skip meta-analysis BFs
        || (! configs_tokeep.empty()
 	   && find(configs_tokeep.begin(), configs_tokeep.end(), config)
 	   == configs_tokeep.end()))
@@ -1607,8 +1607,8 @@ void parseCmdLine(
     exit(1);
   }
   if(model == "types"){
-    configs_tokeep.clear(); // ignore --configs if model = "type"
-    for(size_t s = 0; s < nb_subgroups; ++s)
+    configs_tokeep.clear(); // ignore --configs if model is "type"
+    for(size_t s = 1; s <= nb_subgroups; ++s)
       configs_tokeep.push_back(toString(s));
   }
 }

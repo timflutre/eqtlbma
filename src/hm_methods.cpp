@@ -48,6 +48,11 @@ snp_eQTL::snp_eQTL(const string & name,
   }
   else{
     nb_subgroups_ = nb_subgroups;
+    if(raw_log10_bfs_.size() != nb_subgroups_){
+      cerr << "ERROR: snp " << name_ << " has BFs for "
+	   << raw_log10_bfs_.size() << " subgroups" << endl;
+      exit(1);
+    }
     subgroup_tmp_.assign(nb_subgroups_, NaN);
     dim_ = nb_types;
     dim_tmp_.assign(dim_, NaN);
