@@ -1045,7 +1045,6 @@ void Controller::estimate_profile_ci_configs(const double & tick,
 void Controller::estimate_profile_ci_types(const double & tick,
 					   const double & max_l10_obs_lik)
 {
-  double curr_log10_obs_lik;
   vector<double> type_mle(type_prior_);
   
   for(size_t k = 0 ; k < dim_; ++k){
@@ -1059,7 +1058,6 @@ void Controller::estimate_profile_ci_types(const double & tick,
 void Controller::estimate_profile_ci_subgroups(const double & tick,
 					       const double & max_l10_obs_lik)
 {
-  double curr_log10_obs_lik;
   vector<vector<double> > subgroup_mle(dim_, vector<double>(nb_subgroups_, NaN));
   for(size_t k = 0; k < dim_; ++k)
     subgroup_mle[k] = subgroup_prior_[k];
