@@ -39,7 +39,12 @@ namespace utils {
   bool isNonNpos(size_t i) { return (i != string::npos); };
 
 // http://www.johndcook.com/IEEE_exceptions_in_cpp.html
-  bool isNan(double i) { return (! (i == i)); };
+  bool isNan(double x) { return (! (x == x)); };
+
+// http://www.johndcook.com/IEEE_exceptions_in_cpp.html
+  bool isFinite(double x) { return (x <= DBL_MAX && x >= -DBL_MAX); };
+
+  bool isInfinite(double x) { return (! isFinite(x)); };
 
 /** \brief Return a seed based on microseconds since epoch.
  *  \note http://www.guyrutenberg.com/2007/09/03/seeding-srand/
@@ -111,8 +116,14 @@ namespace utils {
       sum += weights[i] * pow(10, vec[i] - max);
     free(weights);
     res = max + log10(sum);
-    if (abs(res) <= GSL_DBL_EPSILON)
+    
+    if (abs(res) <= DBL_EPSILON)
       res = 0.0;
+    // else if (res < DBL_MIN)
+    //   res = DBL_MIN;
+    // else if (res > DBL_MAX)
+    //   res = DBL_MAX;
+    
     return res;
   }
 
@@ -130,8 +141,14 @@ namespace utils {
     for (i = 0; i < size; ++i)
       sum += weights[i] * pow(10, vec[i] - max);
     res = max + log10(sum);
-    if (abs(res) <= GSL_DBL_EPSILON)
+    
+    if (abs(res) <= DBL_EPSILON)
       res = 0.0;
+    // else if (res < DBL_MIN)
+    //   res = DBL_MIN;
+    // else if (res > DBL_MAX)
+    //   res = DBL_MAX;
+    
     return res;
   }
 

@@ -39,7 +39,11 @@ namespace utils {
 
   bool isNonNpos(size_t i);
 
-  bool isNan(double i);
+  bool isNan(double x);
+
+  bool isFinite(double x);
+
+  bool isInfinite(double x);
 
   size_t getSeed(void);
 
