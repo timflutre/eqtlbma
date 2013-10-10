@@ -434,7 +434,8 @@ void Controller::init_params(const string & init_file)
       cout << "parameters to update:";
       for(map<string,bool>::const_iterator it = param2fixed_.begin();
 	  it != param2fixed_.end(); ++it){
-	if(model_ == "configs" && it->first == "types")
+	if(model_ == "configs" && (it->first == "types"
+				   || it->first == "subgroups-per-type"))
 	  continue;
 	else if(model_ == "types" && it->first == "configs")
 	  continue;
@@ -554,6 +555,15 @@ double Controller::compute_log10_obs_lik(
     for(int g = 0; g < (int)geneVec_.size(); ++g)
       l10_sum += geneVec_[g].compute_log10_obs_lik(pi0, grid_wts, type_prior,
 						   subgroup_prior, keep);
+  }
+  
+  if(isNan(l10_sum)){
+    cerr << "ERROR: log10(obslik) is NaN" << endl;
+    exit(1);
+  }
+  if(isInfinite(l10_sum)){
+    cerr << "ERROR: log10(obslik) is +-Inf" << endl;
+    exit(1);
   }
   
   return l10_sum;
@@ -845,10 +855,6 @@ void Controller::run_EM()
 					 type_prior_, subgroup_prior_, true);
   if(verbose_)
     show_state_EM(iter);
-  if(isNan(log10_obs_lik_)){
-    cerr << "ERROR: log10(obslik) is NaN" << endl;
-    exit(1);
-  }
   
   while(true){
     ++iter;
@@ -1662,6 +1668,9 @@ void run(
 
 int main(int argc, char **argv)
 {
+#ifdef DEBUG
+  cout << "DEBUG" << endl;
+#endif
   int verbose = 1, nb_threads = 1;
   string file_pattern, model = "configs", out_file, file_init, file_ci;
   size_t nb_subgroups = string::npos, dim = string::npos,
