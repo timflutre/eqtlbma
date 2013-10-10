@@ -936,7 +936,6 @@ namespace quantgen {
   {
     gsl_matrix * tmp_inv = gsl_matrix_alloc(X_s1s2->size2, X_s1s2->size2);
     gsl_permutation * perm = gsl_permutation_alloc(X_s1s2->size2);
-    int signum;
   
     if(X_us == NULL){ // if subgroup has no unique individuals
       mygsl_linalg_pseudoinverse(tXs1s2Xs1s2, tmp_inv);

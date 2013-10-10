@@ -230,7 +230,7 @@ namespace quantgen {
     // To use OpenMP here, need to have a temporary vector shared between all
     // threads, replacing gene_snp_pairs_ inside the loop.
     // As this requires more memory, I prefer not to use OpenMP here.
-    for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+    for(size_t idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
     
       Snp * pt_snp = snps_[idx_snp];
       if(verbose > 0)
@@ -361,7 +361,7 @@ namespace quantgen {
       pval_perm_min = 1;
 
 #pragma omp parallel for shared(pvals_perm)
-      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+      for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
 	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(HasExplevels(subgroup) && pt_snp->HasGenotypes(subgroup)){
@@ -471,7 +471,7 @@ namespace quantgen {
       pval_perm_min = 1;
     
 #pragma omp parallel for shared(pvals_perm)
-      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+      for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
 	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	double pval_perm_sbgrp, pval_perm_min_sbgrp = 1;
@@ -586,7 +586,7 @@ namespace quantgen {
 	l10_abf_perm_avg = NaN;
     
 #pragma omp parallel for shared(l10_abfs_perm_snps)
-      for(int idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
+      for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
 	Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(type_errors.compare("uvlr") == 0){
