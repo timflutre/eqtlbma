@@ -98,8 +98,6 @@ public:
 			      const std::vector<double> & type_prior,
 			      const std::vector<std::vector<double> > & subgroup_prior,
 			      const double & log10_obs_lik_gene);
-  
-  void print_result(const std::vector<double> & grid_wts);
 };
 
 class gene_eQTL {
@@ -177,8 +175,6 @@ public:
   void compute_posterior(const double & pi0,
 			 const std::vector<double> & grid_wts,
 			 const std::vector<double> & config_prior);
-  
-  void print_result(const std::vector<double> & grid_wts);
 };
 
 #endif

@@ -590,7 +590,8 @@ void Controller::em_update_pi0()
   else
     new_pi0_ = pi0_;
 #ifdef DEBUG
-  cout << "pi_0 old=" << pi0_ << " new=" << new_pi0_ << endl << flush;
+  fprintf(stdout, "pi_0 old=%.4e new=%.4e\n", pi0_, new_pi0_);
+  fflush(stdout);
 #endif
 }
 
@@ -630,7 +631,8 @@ void Controller::em_update_config()
   
 #ifdef DEBUG
   for(size_t k = 0; k < dim_; ++k)
-    cout << "eta_" << k+1 << " old=" << config_prior_[k] << " new=" << new_config_prior_[k] << endl << flush;
+    fprintf(stdout, "eta_%zu old=%.4e new=%.4e\n", k+1, config_prior_[k], new_config_prior_[k]);
+  fflush(stdout);
 #endif
 }
 
@@ -674,7 +676,8 @@ void Controller::em_update_type()
   
 #ifdef DEBUG
   for(size_t k = 0; k < dim_; ++k)
-    cout << "pi_" << k+1 << " old=" << type_prior_[k] << " new=" << new_type_prior_[k] << endl << flush;
+    fprintf(stdout, "pi_%zu old=%.4e new=%.4e\n", k+1, type_prior_[k], new_type_prior_[k]);
+  fflush(stdout);
 #endif
 }
 
@@ -720,7 +723,8 @@ void Controller::em_update_subgroup()
 #ifdef DEBUG
   for(size_t k = 0; k < dim_; ++k)
     for(size_t s = 0; s < nb_subgroups_; ++s)
-      cout << "q_" << k+1 << s+1 << " old=" << subgroup_prior_[k][s] << " new=" << new_subgroup_prior_[k][s] << endl << flush;
+      fprintf(stdout, "q_%zu%zu old=%.4e new=%.4e\n", k+1, s+1, subgroup_prior_[k][s], new_subgroup_prior_[k][s]);
+  fflush(stdout);
 #endif
 }
 

@@ -39,6 +39,21 @@ snp_eQTL::snp_eQTL(const string & name,
   name_ = name;
   raw_log10_bfs_ = raw_log10_bfs;
   
+#ifdef DEBUG
+  for(size_t k = 0; k < raw_log10_bfs_.size(); ++k){
+    for(size_t l = 0; l < raw_log10_bfs_[k].size(); ++l){
+      if(isNan(raw_log10_bfs_[k][l])){
+	cerr << "ERROR: raw log10(BF)[" << (k+1) << "," << (l+1) << "] of snp " << name_ << " is NaN" << endl;
+	exit(1);
+      }
+      if(isInfinite(raw_log10_bfs_[k][l])){
+	cerr << "ERROR: raw log10(BF)[" << (k+1) << "," << (l+1) << "] of snp " << name_ << " is +-Inf" << endl;
+	exit(1);
+      }
+    }
+  }
+#endif
+  
   grid_size_ = raw_log10_bfs_[0].size();
   
   if(nb_types == 0){ // i.e. model == "config"
@@ -67,14 +82,43 @@ double snp_eQTL::compute_log10_BF(
 {
   double log10_BF;
   
-  for(size_t i = 0; i < dim_; ++i)
-    dim_tmp_[i] = log10_weighted_sum(&(raw_log10_bfs_[i][0]),
-					&(grid_wts[0]),
-					grid_size_);
+  // for each config, average BFs over grid
+  for(size_t j = 0; j < dim_; ++j){
+    dim_tmp_[j] = log10_weighted_sum(&(raw_log10_bfs_[j][0]),
+				     &(grid_wts[0]),
+				     grid_size_);
+#ifdef DEBUG
+    if(isNan(dim_tmp_[j])){
+      cerr << "ERROR: log10(BF)[" << (j+1) << "] avg over grid of snp "
+	   << name_ << " is NaN" << endl;
+      exit(1);
+    }
+    if(isInfinite(dim_tmp_[j])){
+      cerr << "ERROR: log10(BF)[" << (j+1) << "] avg over grid of snp "
+	   << name_ << " is +-Inf" << endl;
+      exit(1);
+    }
+#endif
+  }
   
+  // average over configs
   log10_BF = log10_weighted_sum(&(dim_tmp_[0]),
-				&(config_prior[0]),
-				dim_);
+  				&(config_prior[0]),
+  				dim_);
+  
+#ifdef DEBUG
+  if(isNan(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over grid and configs"
+	 << " of snp " << name_ << " is NaN" << endl;
+    exit(1);
+  }
+  if(isInfinite(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over grid and configs"
+	 << " of snp " << name_ << " is +-Inf" << endl;
+    exit(1);
+  }
+#endif
+  
   if(keep)
     log10_BF_ = log10_BF;
   
@@ -87,24 +131,60 @@ double snp_eQTL::compute_log10_BF(
   const vector<vector<double> > & subgroup_prior,
   const bool & keep)
 {
-  double log10_BF;
+  double log10_BF, tmp;
   
+  // for each type, average BFs over grid
   for(size_t k = 0; k < dim_; ++k){
+    
     for(size_t l = 0; l < grid_size_; ++l){
       grid_tmp_[l] = 0.0;
-      for(size_t s = 0; s < nb_subgroups_; ++s)
-	grid_tmp_[l] += log10(subgroup_prior[k][s]
-			      * pow(10, raw_log10_bfs_[s][l])
-			      + 1 - subgroup_prior[k][s]);
+      
+      for(size_t s = 0; s < nb_subgroups_; ++s){
+	tmp = log10(subgroup_prior[k][s]
+		    * pow(10, raw_log10_bfs_[s][l])
+		    + 1 - subgroup_prior[k][s]);
+#ifdef DEBUG
+	if(isNan(tmp)){
+	  cerr << "ERROR: log10(BF) for subgroup " << (s+1)
+	       << " in grid " << (l+1) << " and type " << (k+1)
+	       << " of snp " << name_ << " is NaN" << endl;
+	  exit(1);
+	}
+	if(isInfinite(tmp)){
+	  cerr << "ERROR: log10(BF) for subgroup " << (s+1)
+	       << " in grid " << (l+1) << " and type " << (k+1)
+	       << " of snp " << name_ << " is +-Inf" << endl;
+	  exit(1);
+	}
+#endif
+	
+	grid_tmp_[l] += tmp;
+      }
     }
+    
     dim_tmp_[k] = log10_weighted_sum(&(grid_tmp_[0]),
 				     &(grid_wts[0]),
 				     grid_size_);
   }
   
+  // average over types
   log10_BF = log10_weighted_sum(&(dim_tmp_[0]),
 				&(type_prior[0]),
 				dim_);
+  
+#ifdef DEBUG
+  if(isNan(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over grid and types"
+	 << " of snp " << name_ << " is NaN" << endl;
+    exit(1);
+  }
+  if(isInfinite(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over grid and types"
+	 << " of snp " << name_ << " is +-Inf" << endl;
+    exit(1);
+  }
+#endif
+  
   if(keep)
     log10_BF_ = log10_BF;
   
@@ -262,23 +342,6 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
 			    grid_size_);
 }
 
-void snp_eQTL::print_result(const vector<double> & grid_wts)
-{
-  printf("%12s\t%9.4f\t\t", name_.c_str(), log10_BF_);
-  
-  for(size_t i = 0; i < dim_; ++i)
-    dim_tmp_[i] = log10_weighted_sum(&(raw_log10_bfs_[i][0]),
-					&(grid_wts[0]), grid_size_); 
-  
-  //double *cprob = new double[dim_];
-  for(size_t i = 0; i < dim_; ++i){
-    //cprob[i] = pow(10, (log10(global_config_prior[i])+rst[i]-log10_BF)); 
-    //if(cprob[i]>1)
-    //  cprob[i] = 1.0;   
-    printf("%7.4f\t", dim_tmp_[i]);
-  }
-}
-
 void gene_eQTL::init()
 {
   grid_size_ = snpVec[0].grid_size_;
@@ -318,6 +381,17 @@ double gene_eQTL::compute_log10_BF(const vector<double> & grid_wts,
   log10_BF = log10_weighted_sum(&(snp_log10_bfs_[0]),
 				&(snp_wts_[0]),
 				snpVec.size());
+#ifdef DEBUG
+  if(isNan(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
+    exit(1);
+  }
+  if(isInfinite(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is +-Inf" << endl;
+    exit(1);
+  }
+#endif
+  
   if(keep)
     log10_BF_ = log10_BF;
   
@@ -343,6 +417,17 @@ double gene_eQTL::compute_log10_BF(
   log10_BF = log10_weighted_sum(&(snp_log10_bfs_[0]),
 				&(snp_wts_[0]),
 				snpVec.size());
+#ifdef DEBUG
+  if(isNan(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
+    exit(1);
+  }
+  if(isInfinite(log10_BF)){
+    cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is +-Inf" << endl;
+    exit(1);
+  }
+#endif
+  
   if(keep)
     log10_BF_ = log10_BF;
   
@@ -604,14 +689,5 @@ void gene_eQTL::compute_posterior(const double & pi0,
     if(prob > 1.0)
       prob = 1.0;
     post_prob_config_.push_back(config_prob(i+1, prob));
-  }
-}
-
-void gene_eQTL::print_result(const vector<double> & grid_wts)
-{
-  for(size_t i = 0; i < snpVec.size(); ++i){
-    printf("%12s\t%7.3f\t%9.3f\t\t", name_.c_str(), post_prob_gene_, log10_BF_);
-    snpVec[i].print_result(grid_wts);
-    printf("\n");
   }
 }
