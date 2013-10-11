@@ -74,6 +74,7 @@ void help(char ** argv)
        << "      --nsubgrp\tnumber of subgroups" << endl
        << "      --dim\tdimension of the model (nb of configs or types)" << endl
        << "      --cwts\tfile with configuration weights (one per line, name<sep>value)" << endl
+       << "\t\tonly a subset of the configs can be given, in agreement with --nsubgrp and --dim" << endl
        << "      --tswts\tfile with type and subgroup weights (one per line, name<sep>value)" << endl
        << "      --save\tprecise what to save (bf/post/bf+post)" << endl
        << "\t\t'post' requires also options --pi0 and --post" << endl
@@ -443,19 +444,19 @@ void Snp::avg_raw_bfs(const vector<double> & grid_weights,
   dim_log10_bfs_ = vector<double>(config_weights.size(), NaN);
   
   // for each config, average BFs over grid
-  for(size_t i = 0; i < config_weights.size(); ++i){
+  for(size_t j = 0; j < config_weights.size(); ++j){
     log10_grid_values_tmp.assign(grid_idx_to_keep.size(), NaN);
     grid_weights_tmp.assign(grid_idx_to_keep.size(), NaN);
-    for(size_t j = 0; j < grid_idx_to_keep.size(); ++j){
-      log10_grid_values_tmp[j] = raw_log10_bfs_[i][grid_idx_to_keep[j]];
-      grid_weights_tmp[j] = grid_weights[grid_idx_to_keep[j]];
+    for(size_t l = 0; l < grid_idx_to_keep.size(); ++l){
+      log10_grid_values_tmp[l] = raw_log10_bfs_[j][grid_idx_to_keep[l]];
+      grid_weights_tmp[l] = grid_weights[grid_idx_to_keep[l]];
     }
-    dim_log10_bfs_[i] = log10_weighted_sum(&(log10_grid_values_tmp[0]),
+    dim_log10_bfs_[j] = log10_weighted_sum(&(log10_grid_values_tmp[0]),
 					   &(grid_weights_tmp[0]),
 					   log10_grid_values_tmp.size());
     if(best_dim_idx_ == string::npos
-       || dim_log10_bfs_[i] > dim_log10_bfs_[best_dim_idx_])
-      best_dim_idx_ = i;
+       || dim_log10_bfs_[j] > dim_log10_bfs_[best_dim_idx_])
+      best_dim_idx_ = j;
   }
   
   // average BFs over configs
@@ -562,9 +563,9 @@ void Gene::avg_raw_bfs(const vector<double> & grid_weights,
 		       const vector<double> & config_weights)
 {
   vector<double> snp_log10_bfs(snps_.size(), NaN);
-  for(size_t i = 0; i < snps_.size(); ++i){
-    snps_[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
-    snp_log10_bfs[i] = snps_[i].log10_bf_;
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snps_[p].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
+    snp_log10_bfs[p] = snps_[p].log10_bf_;
   }
   log10_bf_ = log10_weighted_sum(&(snp_log10_bfs[0]), snp_log10_bfs.size());
 }
@@ -575,9 +576,9 @@ void Gene::avg_raw_bfs(const vector<double> & grid_weights,
 		       const vector<vector<double> > & subgroup_weights)
 {
   vector<double> snp_log10_bfs(snps_.size(), NaN);
-  for(size_t i = 0; i < snps_.size(); ++i){
-    snps_[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, type_weights, subgroup_weights);
-    snp_log10_bfs[i] = snps_[i].log10_bf_;
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snps_[p].avg_raw_bfs(grid_weights, grid_idx_to_keep, type_weights, subgroup_weights);
+    snp_log10_bfs[p] = snps_[p].log10_bf_;
   }
   log10_bf_ = log10_weighted_sum(&(snp_log10_bfs[0]), snp_log10_bfs.size());
 }
@@ -639,20 +640,20 @@ void Gene::calc_cond_snp_posteriors_an_eQTL(void)
   }
 }
 
-// Pr(c_gpk = 1 | Y, X, Theta, z_g = 1, v_gp = 1)
+// Pr(c_gpj = 1 | Y, X, Theta, z_g = 1, v_gp = 1)
 void Gene::calc_cond_snp_posteriors_config(const vector<double> & config_weights)
 {
   for(size_t p = 0; p < snps_.size(); ++p){
     snps_[p].post_dims_ = vector<double>(config_weights.size(), NaN);
-    for(size_t k = 0; k < config_weights.size(); ++k){
-      snps_[p].post_dims_[k] = pow(10, log10(config_weights[k])
-				   + snps_[p].dim_log10_bfs_[k]
+    for(size_t j = 0; j < config_weights.size(); ++j){
+      snps_[p].post_dims_[j] = pow(10, log10(config_weights[j])
+				   + snps_[p].dim_log10_bfs_[j]
 				   - snps_[p].log10_bf_);
-      if(snps_[p].post_dims_[k] > 1.0)
-	snps_[p].post_dims_[k] = 1.0;
-      if(k == 0
-	 || snps_[p].post_dims_[k] > snps_[p].post_dims_[snps_[p].best_dim_idx_])
-	snps_[p].best_dim_idx_ = k;
+      if(snps_[p].post_dims_[j] > 1.0)
+	snps_[p].post_dims_[j] = 1.0;
+      if(j == 0
+	 || snps_[p].post_dims_[j] > snps_[p].post_dims_[snps_[p].best_dim_idx_])
+	snps_[p].best_dim_idx_ = j;
     }
   }
 }
@@ -684,19 +685,19 @@ void Gene::calc_cond_snp_posteriors_subgroup(
   size_t nb_subgroups = (size_t) log2(config_names.size() + 1);
   
   stringstream subgroup_id;
-  for(size_t i = 0; i < snps_.size(); ++i){
-    snps_[i].post_subgroups_ = vector<double>(nb_subgroups, NaN);
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snps_[p].post_subgroups_ = vector<double>(nb_subgroups, NaN);
     
     for(size_t s = 0; s < nb_subgroups; ++s){
       subgroup_id.str("");
       subgroup_id << s+1;
-      snps_[i].post_subgroups_[s] = 0.0;
+      snps_[p].post_subgroups_[s] = 0.0;
       for(size_t j = 0; j < config_names.size(); ++j)
       	if(find(config2subgroups[j].begin(), config2subgroups[j].end(), subgroup_id.str())
       	   != config2subgroups[j].end())
-      	  snps_[i].post_subgroups_[s] += snps_[i].post_dims_[j];
-      if(snps_[i].post_subgroups_[s] > 1.0)
-	snps_[i].post_subgroups_[s] = 1.0;
+      	  snps_[p].post_subgroups_[s] += snps_[p].post_dims_[j];
+      if(snps_[p].post_subgroups_[s] > 1.0)
+	snps_[p].post_subgroups_[s] = 1.0;
     } // end of "for each subgroup"
   } // end of "for each SNP"
 }
@@ -764,10 +765,10 @@ void Gene::identify_best_snps(const int & save_best_snps){
       // find the min nb of SNP(s) such that sum of their proba 
       // of being the eQTL exceeds 0.95
       double cum_sum = 0.0;
-      for(size_t i = 0; i < snps_.size(); ++i){
-	cum_sum += snps_[i].post_the_eQTL_;
+      for(size_t p = 0; p < snps_.size(); ++p){
+	cum_sum += snps_[p].post_the_eQTL_;
 	if(cum_sum >= 0.95){
-	  idx_last_best_snp_ = i;
+	  idx_last_best_snp_ = p;
 	  break;
 	}
       }
@@ -994,7 +995,7 @@ void averageRawBFsOverGrid(const vector<string> & files_bf_out,
 			   const int & verbose)
 {
   if(verbose > 0)
-    cout << "average raw BFs over grid ..." << endl;
+    cout << "average raw BFs over grid only and save them ..." << endl;
   
   gzFile stream_hm;
   openFile(file_hm, stream_hm, "wb");
@@ -1010,15 +1011,26 @@ void averageRawBFsOverGrid(const vector<string> & files_bf_out,
   vector<string> lines;
   vector<BayesFactor> bfs;
   for(size_t f = 0; f < files_bf_out.size(); ++f){
-    if(verbose > 0)
+    if(verbose == 1)
       progressBar("", f+1, files_bf_out.size());
+    
+    if(verbose > 1)
+      cout << "read file " << files_bf_out[f] << endl << flush;
+    clock_t startTime = clock();
     readFile(files_bf_out[f], lines);
+    if(verbose > 1)
+      cout << "nb of lines: " << lines.size() << " (loaded in "
+	   << fixed << setprecision(2) << getElapsedTime(startTime) << " sec)"
+	   << endl << flush;
+    
     averageBFs(files_bf_out[f], lines, grid_weights, grid_idx_to_keep, bfs);
+    
     saveAvgBFs(bfs, file_hm, stream_hm, txt, nb_lines_hm);
+    
     lines.clear();
     bfs.clear();
   }
-  if(verbose > 0)
+  if(verbose == 1)
     cerr << endl << flush;
   
   closeFile(file_hm, stream_hm);
@@ -1029,6 +1041,7 @@ void parseLines(const string & file_bf_out,
 		const vector<string> & lines,
 		const vector<string> & genes_to_keep,
 		const vector<double> & grid_weights,
+		const vector<string> & config_names,
 		vector<Gene> & genes)
 {
   vector<string> tokens;
@@ -1047,8 +1060,10 @@ void parseLines(const string & file_bf_out,
   for(size_t i = 1; i < lines.size(); ++i){
     split(lines[i], " \t,", tokens);
     
-    if(tokens[2].find("gen") != string::npos)
-      continue; // skip if "meta-analysis BF"
+    // skip if "meta-analysis BF" (also useful when HM fitted only on pairs of subgroups)
+    if(find(config_names.begin(), config_names.end(), tokens[2])
+       == config_names.end())
+      continue;
     if(! genes_to_keep.empty() 
        && find(genes_to_keep.begin(), genes_to_keep.end(), tokens[0])
        == genes_to_keep.end())
@@ -1099,13 +1114,13 @@ void averageBFs(const vector<double> & grid_weights,
 		vector<Gene> & genes)
 {
 #pragma omp parallel for num_threads(nb_threads)
-  for(int i = 0; i < (int) genes.size(); ++i){
+  for(int g = 0; g < (int) genes.size(); ++g){
     
     // average BFs
     if(model == "configs")
-      genes[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
+      genes[g].avg_raw_bfs(grid_weights, grid_idx_to_keep, config_weights);
     else if(model == "types")
-      genes[i].avg_raw_bfs(grid_weights, grid_idx_to_keep, type_weights, subgroup_weights);
+      genes[g].avg_raw_bfs(grid_weights, grid_idx_to_keep, type_weights, subgroup_weights);
     
     // calculate posteriors
     if(find(quantities_to_save.begin(), quantities_to_save.end(), "post")
@@ -1113,40 +1128,40 @@ void averageBFs(const vector<double> & grid_weights,
       
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "a")
 	 != post_probas_to_save.end())
-	genes[i].calc_posterior(pi0);
+	genes[g].calc_posterior(pi0);
       
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "b")
 	 != post_probas_to_save.end())
-	genes[i].calc_cond_snp_posteriors_the_eQTL();
+	genes[g].calc_cond_snp_posteriors_the_eQTL();
       
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "c")
 	 != post_probas_to_save.end())
-	genes[i].calc_cond_snp_posteriors_an_eQTL();
+	genes[g].calc_cond_snp_posteriors_an_eQTL();
       
       if(save_best_dim || save_all_dims){
 	if(model == "configs")
-	  genes[i].calc_cond_snp_posteriors_config(config_weights);
+	  genes[g].calc_cond_snp_posteriors_config(config_weights);
 	else if(model == "types")
-	  genes[i].calc_cond_snp_posteriors_type(type_weights);
+	  genes[g].calc_cond_snp_posteriors_type(type_weights);
       }
       
       if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "d")
 	 != post_probas_to_save.end()){
 	if(model == "configs"){
 	  if(! (save_best_dim || save_all_dims))
-	    genes[i].calc_cond_snp_posteriors_config(config_weights);
-	  genes[i].calc_cond_snp_posteriors_subgroup(config_names,
+	    genes[g].calc_cond_snp_posteriors_config(config_weights);
+	  genes[g].calc_cond_snp_posteriors_subgroup(config_names,
 						     config2subgroups);
 	}
 	else if(model == "types")
-	  genes[i].calc_cond_snp_posteriors_subgroup(type_weights,
+	  genes[g].calc_cond_snp_posteriors_subgroup(type_weights,
 						     subgroup_weights,
 						     grid_weights,
 						     grid_idx_to_keep);
       }
     } // end of "if save posteriors"
     
-    genes[i].identify_best_snps(save_best_snps);
+    genes[g].identify_best_snps(save_best_snps);
     
   } // end of "for each gene"
 }
@@ -1164,21 +1179,21 @@ void saveAvgBFs(const size_t & nb_subgroups,
 		stringstream & txt,
 		size_t & nb_lines_hm)
 {
-  for(size_t i = 0; i < genes.size(); ++i){
-    for(size_t j = 0; j <= genes[i].idx_last_best_snp_; ++j){
+  for(size_t g = 0; g < genes.size(); ++g){
+    for(size_t p = 0; p <= genes[g].idx_last_best_snp_; ++p){
       txt.str("");
       txt << setprecision(4) << scientific
-	  << genes[i].name_
-	  << "\t" << genes[i].snps_[j].name_;
+	  << genes[g].name_
+	  << "\t" << genes[g].snps_[p].name_;
       
       // save averaged BFs
       if(find(quantities_to_save.begin(), quantities_to_save.end(), "bf")
       	 != quantities_to_save.end()){
-      	txt << "\t" << genes[i].log10_bf_
-      	    << "\t" << genes[i].snps_[j].log10_bf_;
+      	txt << "\t" << genes[g].log10_bf_
+      	    << "\t" << genes[g].snps_[p].log10_bf_;
       	if(save_all_dims)
-      	  for(size_t k = 0; k < genes[i].snps_[j].dim_log10_bfs_.size(); ++k)
-      	    txt << "\t" << genes[i].snps_[j].dim_log10_bfs_[k];
+      	  for(size_t k = 0; k < genes[g].snps_[p].dim_log10_bfs_.size(); ++k)
+      	    txt << "\t" << genes[g].snps_[p].dim_log10_bfs_[k];
       }
       
       // save posteriors
@@ -1186,29 +1201,29 @@ void saveAvgBFs(const size_t & nb_subgroups,
       	 != quantities_to_save.end()){
       	if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "a")
       	   != post_probas_to_save.end())
-      	  txt << "\t" << genes[i].post_;
+      	  txt << "\t" << genes[g].post_;
       	if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "b")
       	   != post_probas_to_save.end())
-      	  txt << "\t" << genes[i].snps_[j].post_the_eQTL_;
+      	  txt << "\t" << genes[g].snps_[p].post_the_eQTL_;
       	if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "c")
       	   != post_probas_to_save.end())
-      	  txt << "\t" << genes[i].snps_[j].post_an_eQTL_;
+      	  txt << "\t" << genes[g].snps_[p].post_an_eQTL_;
       	if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "d")
       	   != post_probas_to_save.end()){
       	  for(size_t s = 0; s < nb_subgroups; ++s)
-      	    txt << "\t" << genes[i].snps_[j].post_subgroups_[s];
+      	    txt << "\t" << genes[g].snps_[p].post_subgroups_[s];
       	}
       	if(save_all_dims)
-      	  for(size_t k = 0; k < genes[i].snps_[j].post_dims_.size(); ++k)
-      	    txt << "\t" << genes[i].snps_[j].post_dims_[k];
+      	  for(size_t k = 0; k < genes[g].snps_[p].post_dims_.size(); ++k)
+      	    txt << "\t" << genes[g].snps_[p].post_dims_[k];
       }
       
       if(save_best_dim){
 	if(model == "configs")
-	  txt << "\t" << config_names[genes[i].snps_[j].best_dim_idx_];
+	  txt << "\t" << config_names[genes[g].snps_[p].best_dim_idx_];
 	else if(model == "types")
-	  txt << "\t" << genes[i].snps_[j].best_dim_idx_ + 1;
-	txt << "\t" << genes[i].snps_[j].post_dims_[genes[i].snps_[j].best_dim_idx_];
+	  txt << "\t" << genes[g].snps_[p].best_dim_idx_ + 1;
+	txt << "\t" << genes[g].snps_[p].post_dims_[genes[g].snps_[p].best_dim_idx_];
       }
       
       txt << "\n";
@@ -1242,7 +1257,7 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
 				    const int & verbose)
 {
   if(verbose > 0)
-    cout << "average raw BFs over hyperparameters ..." << endl;
+    cout << "average raw BFs over hyperparameters and save them ..." << endl;
   
   gzFile stream_hm;
   openFile(file_hm, stream_hm, "wb");
@@ -1265,8 +1280,8 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
     txt << "\tgene.log10.bf\tsnp.log10.bf";
     if(save_all_dims){
       if(model == "configs")
-	for(size_t k = 0; k < dim; ++k)
-	  txt << "\tlog10.bf." << config_names[k];
+	for(size_t j = 0; j < dim; ++j)
+	  txt << "\tlog10.bf." << config_names[j];
       else if(model == "types")
 	for(size_t k = 0; k < dim; ++k)
 	  txt << "\tlog10.bf.type." << k+1;
@@ -1285,13 +1300,13 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
       txt << "\tsnp.post.an";
     if(find(post_probas_to_save.begin(), post_probas_to_save.end(), "d")
        != post_probas_to_save.end()){
-      for(size_t i = 0; i < nb_subgroups; ++i)
-	txt << "\tsnp.post.s" << i+1;
+      for(size_t s = 0; s < nb_subgroups; ++s)
+	txt << "\tsnp.post.s" << s+1;
     }
     if(save_all_dims){
       if(model == "configs")
-	for(size_t i = 0; i < config_names.size(); ++i)
-	  txt << "\tpost.config." << config_names[i];
+	for(size_t j = 0; j < dim; ++j)
+	  txt << "\tpost.config." << config_names[j];
       else if(model == "types")
 	for(size_t k = 0; k < dim; ++k)
 	  txt << "\tpost.type." << k+1;
@@ -1326,7 +1341,8 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
 	   << endl << flush;
     
     startTime = clock();
-    parseLines(files_bf_out[f], lines, genes_to_keep, grid_weights, genes);
+    parseLines(files_bf_out[f], lines, genes_to_keep, grid_weights,
+	       config_names, genes);
     if(verbose > 1){
       size_t nb_snps = 0;
       for(size_t g = 0; g < genes.size(); ++g)
