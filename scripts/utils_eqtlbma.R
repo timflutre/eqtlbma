@@ -212,6 +212,68 @@ CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
   return(pi1.marginal)
 }
 
+EstimatePi0WithEbf <- function(log10.bfs, verbose=0){
+  ## Estimate pi0 (proba for a null hypothesis to be true)
+  ## via the EBF procedure (Wen, in prep)
+  ##
+  ## Args:
+  ##  log10.bfs: vector containing the log10(BF) of each test
+  ##
+  ## Returns:
+  ##   pi0 (numeric)
+  
+  if(verbose > 0)
+    message(paste0("nb of tests: ", length(log10.bfs)))
+  
+  tmp <- log10.bfs[order(log10.bfs)] # sort in increasing order
+  
+  d0 <- which(cumsum(10^tmp) / seq_along(10^tmp) >= 1)[1]
+  if(verbose > 0)
+    message(paste0("cutoff at the ", d0, "-th BF"))
+  
+  pi0.ebf <- d0 / length(tmp)
+  if(verbose > 0)
+    message(paste0("estimate pi0-hat = ",
+                   format(x=pi0.ebf, scientific=TRUE, digits=6)))
+  
+  return(pi0.ebf)
+}
+
+ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=0){
+  ## Call significant hypotheses by controlling the Bayesian FDR
+  ## via the procedure from Newton et al (Biostatistics 2004)
+  ## also described in Muller et al (JASA 2006)
+  ##
+  ## Args:
+  ##  log10.bfs: vector containing the log10(BF) of each test
+  ##  pi0: estimate of the proba for a null hypothesis to be true
+  ##  fdr.level: threshold below which a null is rejected (default=0.05)
+  ##
+  ## Returns:
+  ##   vector of booleans, TRUE if null is rejected (thus called significant)
+  
+  if(verbose > 0)
+    message(paste0(length(log10.bfs), " tests and pi0-hat = ",
+                   format(x=pi0.ebf, scientific=TRUE, digits=6)))
+  
+  ## compute the posterior probability of each test being null
+  post.null <- pi0 / (pi0 + (1-pi0) * 10^log10.bfs)
+  
+  ## find the cutoff for which their cumulative mean is >= fdr.level
+  idx <- order(post.null)
+  post.null <- post.null[idx]
+  for(L in 1:length(post.null))
+    if(mean(post.null[1:L]) >= fdr.level)
+      break
+  log10.bf.L <- log10.bfs[idx[L]]
+  if(verbose > 0)
+    message(paste0(L, " significant tests, at cutoff log10(BF)=", log10.bf.L))
+  
+  significant <- log10.bfs >= log10.bf.L
+  
+  return(significant)
+}
+
 Log10WeightedSum <- function(x, weights=NULL){
   ## Compute log_{10}(\sum_i w_i 10^x_i) stably.
   ##
