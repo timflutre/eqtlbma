@@ -64,6 +64,7 @@ namespace quantgen {
       if (find(all_.begin(), all_.end(), *it) == all_.end())
 	all_.push_back(*it);
     }
+    sort(all_.begin(), all_.end());
   }
 
 /** \brief subgroup2genotypes_["s2"][0] = 5 means that the 1st sample in all_
@@ -112,8 +113,8 @@ namespace quantgen {
   {
     const vector<string> * pt_samples;
     vector<size_t> indices_of_all_in_subgroup;
-    for (map<string,vector<string> >::const_iterator it = 
-	   subgroup2samples.begin(); it != subgroup2samples.end(); ++it) {
+    for(map<string,vector<string> >::const_iterator it = 
+	  subgroup2samples.begin(); it != subgroup2samples.end(); ++it) {
       pt_samples = &(it->second);
       indices_of_all_in_subgroup = MapAllSamplesToTheGivenSubgroup(pt_samples);
       if(type_data.compare("genotype") == 0)

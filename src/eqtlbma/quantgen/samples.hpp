@@ -33,7 +33,7 @@ namespace quantgen {
   
   class Samples {
   private:
-    std::vector<std::string> all_;
+    std::vector<std::string> all_; // sorted alphabetically in AddSamplesIfNew()
     std::map<std::string,std::vector<bool> > subgroup2present_;
     std::map<std::string,std::vector<size_t> > subgroup2genotypes_;
     std::map<std::string,std::vector<size_t> > subgroup2explevels_;
