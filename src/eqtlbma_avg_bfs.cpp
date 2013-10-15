@@ -86,6 +86,10 @@ void help(char ** argv)
        << "\t\tc: the SNP is 'an' eQTL for the gene, in at least one subgroup, given that the gene contains at least one eQTL\n\t\tand that SNPs are independent" << endl
        << "\t\td: the SNP is an eQTL in subgroup s, given that it is 'the' eQTL for the gene, the configs/types being marginalized" << endl
        << "      --gene\tfile with subset of gene(s) to keep (one per line)" << endl
+       << "      --snp\tfile with subset of snp(s) to keep (one per line)" << endl
+       << "\t\tcaution, it can change the gene-level BFs and posteriors" << endl
+       << "      --gene-snp\tfile with subset of gene-snp pai(s) to keep (gene<tab>snp, one per line)" << endl
+       << "\t\tcaution, it can change the gene-level BFs and posteriors" << endl
        << "      --bestsnp\treport the best SNP(s) per gene" << endl
        << "\t\t0: report all SNPs (default)" << endl
        << "\t\t1: report only the single best SNP (pick one if tie)" << endl
@@ -133,6 +137,8 @@ parseCmdLine(
   double & pi0,
   vector<string> & post_probas_to_save,
   string & file_genes_to_keep,
+  string & file_snps_to_keep,
+  string & file_gene_snp_pairs_to_keep,
   int & save_best_snps,
   bool & save_best_dim,
   bool & save_all_dims,
@@ -157,6 +163,8 @@ parseCmdLine(
       {"pi0", required_argument, 0, 0},
       {"post", required_argument, 0, 0},
       {"gene", required_argument, 0, 0},
+      {"snp", required_argument, 0, 0},
+      {"gene-snp", required_argument, 0, 0},
       {"bestsnp", required_argument, 0, 0},
       {"bestdim", no_argument, 0, 0},
       {"alldim", no_argument, 0, 0},
@@ -222,6 +230,14 @@ parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "gene") == 0){
 	file_genes_to_keep = optarg;
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "snp") == 0){
+	file_snps_to_keep = optarg;
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "gene-snp") == 0){
+	file_gene_snp_pairs_to_keep = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "bestsnp") == 0){
@@ -360,6 +376,23 @@ parseCmdLine(
     help(argv);
     exit(1);
   }
+  if(! file_snps_to_keep.empty() && ! doesFileExist(file_snps_to_keep)){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: can't find file " << file_snps_to_keep << endl << endl;
+    help(argv);
+    exit(1);
+  }
+  if(! file_snps_to_keep.empty())
+    cout << "WARNING: using --snp can change the gene-level BFs and posteriors" << endl;
+  if(! file_gene_snp_pairs_to_keep.empty()
+     && ! doesFileExist(file_gene_snp_pairs_to_keep)){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: can't find file " << file_gene_snp_pairs_to_keep << endl << endl;
+    help(argv);
+    exit(1);
+  }
+  if(! file_gene_snp_pairs_to_keep.empty())
+    cout << "WARNING: using --gene-snp can change the gene-level BFs and posteriors" << endl;
 }
 
 class BayesFactor
@@ -577,6 +610,9 @@ void Gene::avg_raw_bfs(const vector<double> & grid_weights,
 {
   vector<double> snp_log10_bfs(snps_.size(), NaN);
   for(size_t p = 0; p < snps_.size(); ++p){
+#ifdef DEBUG
+    fprintf(stderr, "average BFs of %s\n", snps_[p].name_.c_str());
+#endif
     snps_[p].avg_raw_bfs(grid_weights, grid_idx_to_keep, type_weights, subgroup_weights);
     snp_log10_bfs[p] = snps_[p].log10_bf_;
   }
@@ -949,6 +985,37 @@ void loadFileTypeSubgroupWeights(const string & file_type_subgroup_weights,
   }
 }
 
+void loadFileGeneSnpPairsToKeep(
+  const string & file_gene_snp_pairs_to_keep,
+  const int & verbose,
+  map<string,vector<string> > & gene_snp_pairs_to_keep)
+{
+  if(! file_gene_snp_pairs_to_keep.empty()){
+    vector<string> lines;
+    readFile(file_gene_snp_pairs_to_keep, lines);
+    
+    size_t nb_gene_snp_pairs_to_keep = 0;
+    vector<string> tokens;
+    for(vector<string>::const_iterator it = lines.begin();
+	it != lines.end(); ++it){
+      split(*it, "\t", tokens);
+      if(tokens.size() < 2){
+	cerr << "ERROR: filw with gene-snp pairs to keep should have"
+	     << " two columns gene<tab>snp" << endl;
+	exit(1);
+      }
+      if(gene_snp_pairs_to_keep.find(tokens[0]) == gene_snp_pairs_to_keep.end())
+	gene_snp_pairs_to_keep.insert(make_pair(tokens[0], vector<string>()));
+      gene_snp_pairs_to_keep[tokens[0]].push_back(tokens[1]);
+      ++nb_gene_snp_pairs_to_keep;
+    }
+    
+    if(verbose > 0 && ! gene_snp_pairs_to_keep.empty())
+      cout << "nb of gene-snp pairs to keep: " << nb_gene_snp_pairs_to_keep
+	   << " (" << gene_snp_pairs_to_keep.size() << " genes)" << endl;
+  }
+}
+
 void averageBFs(const string & file_bf_out,
 		const vector<string> & lines,
 		const vector<double> & grid_weights,
@@ -1040,6 +1107,8 @@ void averageRawBFsOverGrid(const vector<string> & files_bf_out,
 void parseLines(const string & file_bf_out,
 		const vector<string> & lines,
 		const vector<string> & genes_to_keep,
+		const vector<string> & snps_to_keep,
+		const map<string,vector<string> > & gene_snp_pairs_to_keep,
 		const vector<double> & grid_weights,
 		const vector<string> & config_names,
 		vector<Gene> & genes)
@@ -1056,6 +1125,8 @@ void parseLines(const string & file_bf_out,
   string curr_gene, curr_snp;
   Gene gene;
   vector<vector<double> > log10_bfs; // dim1 is config, dim2 is grid
+  map<string,vector<string> >::const_iterator it_g;
+  vector<string>::const_iterator it_s;
   
   for(size_t i = 1; i < lines.size(); ++i){
     split(lines[i], " \t,", tokens);
@@ -1064,10 +1135,26 @@ void parseLines(const string & file_bf_out,
     if(find(config_names.begin(), config_names.end(), tokens[2])
        == config_names.end())
       continue;
+    
+    // skip genes, snps or gene-snp pairs if necessary
     if(! genes_to_keep.empty() 
        && find(genes_to_keep.begin(), genes_to_keep.end(), tokens[0])
        == genes_to_keep.end())
       continue;
+    if(! snps_to_keep.empty() 
+       && find(snps_to_keep.begin(), snps_to_keep.end(), tokens[1])
+       == snps_to_keep.end())
+      continue;
+    if(! gene_snp_pairs_to_keep.empty()){
+      it_g = gene_snp_pairs_to_keep.find(tokens[0]);
+      if(it_g == gene_snp_pairs_to_keep.end())
+	continue;
+      else{
+	it_s = find(it_g->second.begin(), it_g->second.end(), tokens[1]);
+	if(it_s == it_g->second.end())
+	  continue;
+      }
+    }
     
     if(tokens[0].compare(curr_gene) != 0){ // if first or new gene
       if(! gene.name_.empty()){ // if new gene
@@ -1092,8 +1179,10 @@ void parseLines(const string & file_bf_out,
       log10_bfs[config_idx][j] = atof(tokens[3+j].c_str());
   } // end of "for each line"
   
-  gene.snps_.push_back(Snp(curr_snp, log10_bfs));
-  genes.push_back(gene);
+  if(! gene.name_.empty() && ! curr_snp.empty()){
+    gene.snps_.push_back(Snp(curr_snp, log10_bfs));
+    genes.push_back(gene);
+  }
 }
 
 void averageBFs(const vector<double> & grid_weights,
@@ -1115,6 +1204,9 @@ void averageBFs(const vector<double> & grid_weights,
 {
 #pragma omp parallel for num_threads(nb_threads)
   for(int g = 0; g < (int) genes.size(); ++g){
+#ifdef DEBUG
+    fprintf(stderr, "average BFs of %s\n", genes[g].name_.c_str());
+#endif
     
     // average BFs
     if(model == "configs")
@@ -1234,27 +1326,30 @@ void saveAvgBFs(const size_t & nb_subgroups,
   } // end of "for each gene"
 }
 
-void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
-				    const vector<double> & grid_weights,
-				    const vector<size_t> & grid_idx_to_keep,
-				    const string & model,
-				    const size_t & nb_subgroups,
-				    const size_t & dim,
-				    const vector<string> & config_names,
-				    const vector<double> & config_weights,
-				    const vector<vector<string> > & config2subgroups,
-				    const vector<double> & type_weights,
-				    const vector<vector<double> > & subgroup_weights,
-				    const vector<string> & quantities_to_save,
-				    const double & pi0,
-				    const vector<string> & post_probas_to_save,
-				    const vector<string> & genes_to_keep,
-				    const int & save_best_snps,
-				    const bool & save_best_dim,
-				    const bool & save_all_dims,
-				    const string & file_hm,
-				    const int & nb_threads,
-				    const int & verbose)
+void averageRawBFsOverGridAndOthers(
+  const vector<string> & files_bf_out,
+  const vector<double> & grid_weights,
+  const vector<size_t> & grid_idx_to_keep,
+  const string & model,
+  const size_t & nb_subgroups,
+  const size_t & dim,
+  const vector<string> & config_names,
+  const vector<double> & config_weights,
+  const vector<vector<string> > & config2subgroups,
+  const vector<double> & type_weights,
+  const vector<vector<double> > & subgroup_weights,
+  const vector<string> & quantities_to_save,
+  const double & pi0,
+  const vector<string> & post_probas_to_save,
+  const vector<string> & genes_to_keep,
+  const vector<string> & snps_to_keep,
+  const map<string,vector<string> > & gene_snp_pairs_to_keep,
+  const int & save_best_snps,
+  const bool & save_best_dim,
+  const bool & save_all_dims,
+  const string & file_hm,
+  const int & nb_threads,
+  const int & verbose)
 {
   if(verbose > 0)
     cout << "average raw BFs over hyperparameters and save them ..." << endl;
@@ -1341,8 +1436,8 @@ void averageRawBFsOverGridAndOthers(const vector<string> & files_bf_out,
 	   << endl << flush;
     
     startTime = clock();
-    parseLines(files_bf_out[f], lines, genes_to_keep, grid_weights,
-	       config_names, genes);
+    parseLines(files_bf_out[f], lines, genes_to_keep, snps_to_keep,
+	       gene_snp_pairs_to_keep, grid_weights, config_names, genes);
     if(verbose > 1){
       size_t nb_snps = 0;
       for(size_t g = 0; g < genes.size(); ++g)
@@ -1384,6 +1479,8 @@ void run(const string & file_pattern,
 	 const double & pi0,
 	 const vector<string> & post_probas_to_save,
 	 const string & file_genes_to_keep,
+	 const string & file_snps_to_keep,
+	 const string & file_gene_snp_pairs_to_keep,
 	 const int & save_best_snps,
 	 const bool & save_best_dim,
 	 const bool & save_all_dims,
@@ -1417,6 +1514,17 @@ void run(const string & file_pattern,
       cout << "genes to keep: " << genes_to_keep.size() << endl;
   }
   
+  vector<string> snps_to_keep;
+  if(! file_snps_to_keep.empty()){
+    readFile(file_snps_to_keep, snps_to_keep);
+    if(! snps_to_keep.empty())
+      cout << "snps to keep: " << snps_to_keep.size() << endl;
+  }
+  
+  map<string,vector<string> > gene_snp_pairs_to_keep;
+  loadFileGeneSnpPairsToKeep(file_gene_snp_pairs_to_keep, verbose,
+			     gene_snp_pairs_to_keep);
+  
   vector<string> files_bf_out = glob(file_pattern);
   if(verbose > 0)
     cerr << "nb of files with raw BFs: " << files_bf_out.size()
@@ -1435,6 +1543,7 @@ void run(const string & file_pattern,
 				   subgroup_weights,
 				   quantities_to_save, pi0,
 				   post_probas_to_save, genes_to_keep,
+				   snps_to_keep, gene_snp_pairs_to_keep,
 				   save_best_snps, save_best_dim,
 				   save_all_dims, file_hm, nb_threads,
 				   verbose);
@@ -1442,11 +1551,14 @@ void run(const string & file_pattern,
 
 int main(int argc, char ** argv)
 {
+#ifdef DEBUG
+  fprintf(stderr, "DEBUG\n");
+#endif
   int verbose = 1, nb_threads = 1, save_best_snps = 0;
   size_t nb_subgroups = string::npos, dim = string::npos;
   string file_pattern, file_grid_weights, model = "configs",
     file_config_weights, file_type_subgroup_weights, file_hm,
-    file_genes_to_keep;
+    file_genes_to_keep, file_snps_to_keep, file_gene_snp_pairs_to_keep;
   double pi0 = NaN;
   vector<size_t> grid_idx_to_keep;
   vector<string> quantities_to_save, post_probas_to_save;
@@ -1456,8 +1568,8 @@ int main(int argc, char ** argv)
 	       grid_idx_to_keep, model, nb_subgroups, dim,
 	       file_config_weights, file_type_subgroup_weights,
 	       quantities_to_save, pi0, post_probas_to_save,
-	       file_genes_to_keep, save_best_snps, save_best_dim,
-	       save_all_dims, file_hm, nb_threads);
+	       file_genes_to_keep, file_snps_to_keep, file_gene_snp_pairs_to_keep,
+	       save_best_snps, save_best_dim, save_all_dims, file_hm, nb_threads);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -1473,8 +1585,8 @@ int main(int argc, char ** argv)
   run(file_pattern, file_grid_weights, grid_idx_to_keep, model,
       nb_subgroups, dim, file_config_weights, file_type_subgroup_weights,
       quantities_to_save, pi0, post_probas_to_save, file_genes_to_keep,
-      save_best_snps, save_best_dim, save_all_dims, file_hm, nb_threads,
-      verbose);
+      file_snps_to_keep, file_gene_snp_pairs_to_keep, save_best_snps,
+      save_best_dim, save_all_dims, file_hm, nb_threads, verbose);
   
   if(verbose > 0){
     time(&time_end);
