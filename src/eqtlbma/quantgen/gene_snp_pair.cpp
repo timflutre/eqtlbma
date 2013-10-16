@@ -135,6 +135,16 @@ namespace quantgen {
       subgroup2pve_.insert(make_pair(subgroup, NaN));
       subgroup2sigmahat_.insert(make_pair(subgroup, NaN));
       subgroup2sstats_.insert(make_pair(subgroup, vector<double>(3,NaN)));
+    
+#ifdef DEBUG
+      fprintf(stderr, "sum of Y (%zu): %e\n", Y_tmp.size(),
+	      accumulate(Y_tmp.begin(), Y_tmp.end(), 0.0));
+      fprintf(stderr, "sum of Xg (%zu): %e\n", Xg_tmp.size(),
+	      accumulate(Xg_tmp.begin(), Xg_tmp.end(), 0.0));
+      for(size_t c = 0; c < Xc_tmp.size(); ++c)
+	fprintf(stderr, "sum of Xc[%zu] (%zu): %e\n", c+1, Xc_tmp[c].size(),
+		accumulate(Xc_tmp[c].begin(), Xc_tmp[c].end(), 0.0));
+#endif
     }
   }
 
@@ -1120,7 +1130,10 @@ namespace quantgen {
   {
     double log10_abf = NaN;
 #ifdef DEBUG
-    if(debug){fprintf(stderr, "phi2=%.6e oma2=%.6e\n", phi2, oma2);}
+    if(debug){
+      fprintf(stderr, "phi2=%e oma2=%e\n", phi2, oma2);
+      gsl_vector_fprintf(stderr, gamma, "%f");
+    }
 #endif
   
     size_t S = gamma->size; // nb of subgroups
@@ -1150,7 +1163,7 @@ namespace quantgen {
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, tmp1, Wg, 0.0, tmp2);
     gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, tmp2, tmp1, 0.0, Wg);
 #ifdef DEBUG
-    if(debug){cerr<<"Wg="<<endl;print_matrix(Wg, 4, 4);}
+    if(debug){cerr<<"Wg="<<endl;print_matrix(Wg, Wg->size1, Wg->size2);}
 #endif
   
     gsl_matrix * tmp3 = gsl_matrix_alloc(S, S);
@@ -1178,7 +1191,7 @@ namespace quantgen {
   
     log10_abf /= log(10);
 #ifdef DEBUG
-    if(debug){cerr<<"log10_abf="<<log10_abf<<endl;}
+    if(debug){fprintf(stderr, "log10_abf=%e\n", log10_abf);}
 #endif
   
     gsl_matrix_free(Wg);
