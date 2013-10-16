@@ -3,3 +3,4 @@
 * think about using HDF5 files to efficiently store and retrieve results
 * explain eqtlbma_avg_bfs in manual
 * add tutorials with common cases
+* handle categorical covariates with more than 2 levels in eqtlbma_bf
