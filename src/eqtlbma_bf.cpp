@@ -148,7 +148,7 @@ void help(char ** argv)
        << "\t\t'all': compute also the BFs for all configurations (costly if many subgroups)" << endl
        << "\t\t all BFs use the small grid (BF_BMA is also reported)" << endl
        << "      --error\tmodel for the errors" << endl
-       << "\t\t'uvlr': errors are not correlated between subgroups (different individuals)" << endl
+       << "\t\t'uvlr': default, errors are not correlated between subgroups (different individuals)" << endl
        << "\t\t'mvlr': errors can be correlated between subgroups (same individuals)" << endl
        << "\t\t'hybrid': errors can be correlated between pairs of subgroups (common individuals)" << endl
        << "      --fiterr\tparam used when estimating the variance of the errors (only with 'mvlr' or 'hybrid')" << endl
