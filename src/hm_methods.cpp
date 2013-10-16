@@ -140,8 +140,8 @@ double snp_eQTL::compute_log10_BF(
       grid_tmp_[l] = 0.0;
       
       for(size_t s = 0; s < nb_subgroups_; ++s){
-	tmp = log10(subgroup_prior[k][s]
-		    * pow(10, raw_log10_bfs_[s][l])
+	tmp = log10(pow(10, log10(subgroup_prior[k][s])
+			+ raw_log10_bfs_[s][l])
 		    + 1 - subgroup_prior[k][s]);
 #ifdef DEBUG
 	if(isNan(tmp)){
@@ -208,8 +208,8 @@ void snp_eQTL::em_update_type(const vector<double> & grid_wts,
     for(size_t l = 0; l < grid_size_; ++l){
       grid_tmp_[l] = 0.0;
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	grid_tmp_[l] += log10(subgroup_prior[k][s]
-			      * pow(10, raw_log10_bfs_[s][l])
+	grid_tmp_[l] += log10(pow(10, log10(subgroup_prior[k][s])
+				  + raw_log10_bfs_[s][l])
 			      + 1 - subgroup_prior[k][s]);
     }
     new_type_prior[k] = log10_weighted_sum(&(grid_tmp_[0]),
@@ -231,8 +231,8 @@ void snp_eQTL::em_update_subgroup(const vector<double> & grid_wts,
 	grid_tmp_[l] = raw_log10_bfs_[s][l];
 	for(size_t s2 = 0; s2 < nb_subgroups_; ++s2)
 	  if(s2 != s)
-	    grid_tmp_[l] += log10(subgroup_prior[k][s2]
-				  * pow(10, raw_log10_bfs_[s2][l])
+	    grid_tmp_[l] += log10(pow(10, log10(subgroup_prior[k][s2])
+				      + raw_log10_bfs_[s2][l])
 				  + 1 - subgroup_prior[k][s2]);
       }
       exp_gpkls_snp[k][s] = log10_weighted_sum(&(grid_tmp_[0]),
@@ -244,8 +244,8 @@ void snp_eQTL::em_update_subgroup(const vector<double> & grid_wts,
     for(size_t l = 0; l < grid_size_; ++l){
       grid_tmp_[l] = 0.0;
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	grid_tmp_[l] += log10(subgroup_prior[k][s]
-			      * pow(10, raw_log10_bfs_[s][l])
+	grid_tmp_[l] += log10(pow(10, log10(subgroup_prior[k][s])
+				  + raw_log10_bfs_[s][l])
 			      + 1 - subgroup_prior[k][s]);
     }
     exp_gpkl_snp[k] = log10_weighted_sum(&(grid_tmp_[0]),
@@ -274,8 +274,8 @@ void snp_eQTL::em_update_grid(const vector<double> & type_prior,
     for(size_t k = 0; k < dim_; ++k){
       dim_tmp_[k] = 0.0;
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	dim_tmp_[k] += log10(subgroup_prior[k][s]
-			     * pow(10, raw_log10_bfs_[s][l])
+	dim_tmp_[k] += log10(pow(10, log10(subgroup_prior[k][s])
+				 + raw_log10_bfs_[s][l])
 			     + 1 - subgroup_prior[k][s]);
     }
     new_grid_wts[l] = log10_weighted_sum(&(dim_tmp_[0]),
@@ -304,7 +304,8 @@ double snp_eQTL::compute_log10_aug_BF(const double & pi0,
 	
 	double log10_p_gpks = log10(subgroup_prior[k][s])
 	  + raw_log10_bfs_[s][l]
-	  - log10(subgroup_prior[k][s] * pow(10, raw_log10_bfs_[s][l])
+	  - log10(pow(10, log10(subgroup_prior[k][s])
+		      + raw_log10_bfs_[s][l])
 		  + (1-subgroup_prior[k][s]));
 	
 	if(pow(10, log10_p_gpks) >= 0.5)
@@ -332,8 +333,8 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
   for(size_t l = 0; l < grid_size_; ++l){
     grid_tmp_[l] = 0.0;
     for(size_t s = 0; s < nb_subgroups_; ++s)
-      grid_tmp_[l] += log10(subgroup_prior[type_idx][s]
-			    * pow(10, raw_log10_bfs_[s][l])
+      grid_tmp_[l] += log10(pow(10, log10(subgroup_prior[type_idx][s])
+				+ raw_log10_bfs_[s][l])
 			    + 1 - subgroup_prior[type_idx][s]);
   }
   

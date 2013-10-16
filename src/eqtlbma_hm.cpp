@@ -800,9 +800,9 @@ void Controller::show_state_EM(const size_t & iter)
   fprintf(stdout, "iter %4zu", iter);
   
   if(iter == 0)
-    fprintf(stdout, "  loglik %.4f", log10_obs_lik_);
+    fprintf(stdout, "  loglik %7.4e", log10_obs_lik_);
   else
-    fprintf(stdout, "  loglik %.4f", new_log10_obs_lik_);
+    fprintf(stdout, "  loglik %7.4e", new_log10_obs_lik_);
   
   fprintf(stdout, "  pi0 %7.4e", pi0_);
   
@@ -865,39 +865,43 @@ void Controller::run_EM()
     
     em_update_pi0();
 #ifdef DEBUG
-    cout << "log obslik after pi0: "
-	 << compute_log10_obs_lik(new_pi0_, grid_wts_,
-    				  config_prior_,
-    				  type_prior_,
-    				  subgroup_prior_, false) << endl;
+    fprintf(stdout, "log obslik after pi0: %7.4e\n",
+	    compute_log10_obs_lik(new_pi0_, grid_wts_,
+				  config_prior_,
+				  type_prior_,
+				  subgroup_prior_, false));
+    fflush(stdout);
 #endif
     
     if(model_ == "configs"){
       em_update_config();
 #ifdef DEBUG
-      cout << "log obslik after configs: "
-	   << compute_log10_obs_lik(new_pi0_, grid_wts_,
-      				    new_config_prior_,
-      				    type_prior_,
-      				    subgroup_prior_, false) << endl;
+      fprintf(stdout, "log obslik after configs: %7.4e\n",
+	      compute_log10_obs_lik(new_pi0_, grid_wts_,
+				    new_config_prior_,
+				    type_prior_,
+				    subgroup_prior_, false));
+      fflush(stdout);
 #endif
     }
     else if(model_ == "types"){
       em_update_type();
 #ifdef DEBUG
-      cout << "log obslik after types: "
-	   << compute_log10_obs_lik(new_pi0_, grid_wts_,
-      				    config_prior_,
-      				    new_type_prior_,
-      				    subgroup_prior_, false) << endl;
+      fprintf(stdout, "log obslik after types: %7.4e\n",
+	      compute_log10_obs_lik(new_pi0_, grid_wts_,
+				    config_prior_,
+				    new_type_prior_,
+				    subgroup_prior_, false));
+      fflush(stdout);
 #endif
       em_update_subgroup();
 #ifdef DEBUG
-      cout << "log obslik after subgroups-per-type: "
-	   << compute_log10_obs_lik(new_pi0_, grid_wts_,
-      				    config_prior_,
-      				    new_type_prior_,
-      				    new_subgroup_prior_, false) << endl;
+      fprintf(stdout, "log obslik after subgroups-per-type: %7.4e\n",
+	      compute_log10_obs_lik(new_pi0_, grid_wts_,
+				    config_prior_,
+				    new_type_prior_,
+				    new_subgroup_prior_, false));
+      fflush(stdout);
 #endif
     }
     
@@ -912,8 +916,8 @@ void Controller::run_EM()
       show_state_EM(iter);
     
     if(new_log10_obs_lik_ < log10_obs_lik_){
-      cerr << "ERROR: observed log-likelihood is decreasing (" 
-	   << new_log10_obs_lik_ << " < " << log10_obs_lik_ << ")" << endl;
+      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%7.4e < %7.4e)\n" ,
+	      new_log10_obs_lik_, log10_obs_lik_);
       exit(1);
     }
     if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_)
