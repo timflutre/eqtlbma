@@ -865,6 +865,7 @@ void loadFileGridWeights(const string & file_grid_weights,
 }
 
 void loadFileConfigWeights(const string & file_config_weights,
+			   const size_t & nb_subgroups,
 			   const size_t & dim,
 			   const int & verbose,
 			   vector<string> & config_names,
@@ -909,6 +910,10 @@ void loadFileConfigWeights(const string & file_config_weights,
 	cout << "config weight " << k+1 << " (" << config_names[k] << "): "
 	     << setprecision(4) << scientific
 	     << config_weights[k] << endl;
+  }
+  else{ // if "types" model
+    for(size_t s = 0; s < nb_subgroups; ++s)
+      config_names.push_back(toString(s+1));
   }
 }
 
@@ -1131,7 +1136,8 @@ void parseLines(const string & file_bf_out,
   for(size_t i = 1; i < lines.size(); ++i){
     split(lines[i], " \t,", tokens);
     
-    // skip if "meta-analysis BF" (also useful when HM fitted only on pairs of subgroups)
+    // skip if "meta-analysis BF"
+    // and, for "types" model, only load subgroup-specific configs
     if(find(config_names.begin(), config_names.end(), tokens[2])
        == config_names.end())
       continue;
@@ -1498,9 +1504,8 @@ void run(const string & file_pattern,
   vector<string> config_names;
   vector<double> config_weights;
   vector<vector<string> > config2subgroups;
-  loadFileConfigWeights(file_config_weights, dim, verbose,
-			config_names, config_weights,
-			config2subgroups);
+  loadFileConfigWeights(file_config_weights, nb_subgroups, dim, verbose,
+			config_names, config_weights, config2subgroups);
   
   vector<double> type_weights;
   vector<vector<double> > subgroup_weights;
