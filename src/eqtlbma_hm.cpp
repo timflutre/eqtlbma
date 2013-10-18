@@ -865,43 +865,63 @@ void Controller::run_EM()
     
     em_update_pi0();
 #ifdef DEBUG
-    fprintf(stdout, "log obslik after pi0: %7.4e\n",
-	    compute_log10_obs_lik(new_pi0_, grid_wts_,
-				  config_prior_,
-				  type_prior_,
-				  subgroup_prior_, false));
+    double tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
+						     config_prior_,
+						     type_prior_,
+						     subgroup_prior_, false);
+    fprintf(stdout, "log obslik after pi0: %f\n", tmp_log10_obs_lik);
     fflush(stdout);
+    if(tmp_log10_obs_lik < log10_obs_lik_){
+      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+	      tmp_log10_obs_lik, log10_obs_lik_);
+      exit(1);
+    }
 #endif
     
     if(model_ == "configs"){
       em_update_config();
 #ifdef DEBUG
-      fprintf(stdout, "log obslik after configs: %7.4e\n",
-	      compute_log10_obs_lik(new_pi0_, grid_wts_,
-				    new_config_prior_,
-				    type_prior_,
-				    subgroup_prior_, false));
+      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
+						new_config_prior_,
+						type_prior_,
+						subgroup_prior_, false);
+      fprintf(stdout, "log obslik after configs: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
+      if(tmp_log10_obs_lik < log10_obs_lik_){
+	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+		tmp_log10_obs_lik, log10_obs_lik_);
+	exit(1);
+      }
 #endif
     }
     else if(model_ == "types"){
       em_update_type();
 #ifdef DEBUG
-      fprintf(stdout, "log obslik after types: %7.4e\n",
-	      compute_log10_obs_lik(new_pi0_, grid_wts_,
-				    config_prior_,
-				    new_type_prior_,
-				    subgroup_prior_, false));
+      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
+						config_prior_,
+						new_type_prior_,
+						subgroup_prior_, false);
+      fprintf(stdout, "log obslik after types: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
+      if(tmp_log10_obs_lik < log10_obs_lik_){
+	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+		tmp_log10_obs_lik, log10_obs_lik_);
+	exit(1);
+      }
 #endif
       em_update_subgroup();
 #ifdef DEBUG
-      fprintf(stdout, "log obslik after subgroups-per-type: %7.4e\n",
-	      compute_log10_obs_lik(new_pi0_, grid_wts_,
-				    config_prior_,
-				    new_type_prior_,
-				    new_subgroup_prior_, false));
+      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
+						config_prior_,
+						new_type_prior_,
+						new_subgroup_prior_, false);
+      fprintf(stdout, "log obslik after subgroups-per-type: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
+      if(tmp_log10_obs_lik < log10_obs_lik_){
+	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+		tmp_log10_obs_lik, log10_obs_lik_);
+	exit(1);
+      }
 #endif
     }
     
