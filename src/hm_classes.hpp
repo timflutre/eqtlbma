@@ -55,10 +55,9 @@ public:
   // prior for snp-specific tissue specificity
   double * snp_config_prior; // not used yet
   
-  // useful data structures allocated only once
+  // data structures used internally
   std::vector<double> grid_tmp_; // used for any computation requiring a vector of length "grid_size_"
-  std::vector<double> dim_tmp_; // length "dim_"
-  std::vector<double> subgroup_tmp_; // length "nb_subgroups_"
+  std::vector<double> dim_tmp_; // idem, for length "dim_"
   
   snp_eQTL(const std::string & name,
 	   const std::vector<std::vector<double> > & raw_log10_bfs,
@@ -106,24 +105,27 @@ public:
   size_t nb_subgroups_;
   size_t dim_;
   size_t grid_size_;
-  std::vector<snp_eQTL> snpVec;
+  std::vector<snp_eQTL> snps_;
   double * pi0_;
   double log10_BF_;
   double log10_obs_lik_;
   double post_prob_gene_;
   std::vector<config_prob> post_prob_config_;
   
-  // useful data structures allocated only once
-  std::vector<double> snp_wts_; // snpVec.size
-  std::vector<double> snp_log10_bfs_; // snpVec.size
+  // data structures used internally
+  std::vector<double> snp_wts_; // snps_.size()
+  std::vector<double> snp_log10_bfs_; // snps_.size()
   std::vector<std::vector<double> > grid_snps_; // grids x snps
   std::vector<std::vector<double> > dim_snps_; // configs or types x snps
   std::vector<std::vector<std::vector<double> > > subgroup_num_snps_; // types x subgroups x snps
   std::vector<std::vector<double> > subgroup_denom_snps_; // types x snps
   
   gene_eQTL(){};
-  gene_eQTL(const std::string name, const size_t & nb_subgroups, double * pi0){name_ = name; nb_subgroups_ = nb_subgroups; pi0_ = pi0;};
-  void init(void);
+  gene_eQTL(const std::string name,
+	    const size_t & nb_subgroups,
+	    const size_t & dim,
+	    const size_t & grid_size,
+	    double * pi0);
   
   double compute_log10_BF(const std::vector<double> & grid_wts,
 			  const std::vector<double> & config_prior,

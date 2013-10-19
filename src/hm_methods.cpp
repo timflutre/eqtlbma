@@ -58,7 +58,6 @@ snp_eQTL::snp_eQTL(const string & name,
   
   if(nb_types == 0){ // i.e. model == "config"
     dim_ = raw_log10_bfs_.size();
-    dim_tmp_.assign(dim_, NaN);
     nb_subgroups_ = (size_t) log2(dim_ + 1);
   }
   else{
@@ -68,10 +67,7 @@ snp_eQTL::snp_eQTL(const string & name,
 	   << raw_log10_bfs_.size() << " subgroups" << endl;
       exit(1);
     }
-    subgroup_tmp_.assign(nb_subgroups_, NaN);
     dim_ = nb_types;
-    dim_tmp_.assign(dim_, NaN);
-    grid_tmp_.assign(grid_size_, NaN);
   }
 }
 
@@ -81,6 +77,8 @@ double snp_eQTL::compute_log10_BF(
   const bool & keep)
 {
   double log10_BF;
+  
+  dim_tmp_.assign(dim_, NaN);
   
   // for each config, average BFs over grid
   for(size_t j = 0; j < dim_; ++j){
@@ -122,6 +120,8 @@ double snp_eQTL::compute_log10_BF(
   if(keep)
     log10_BF_ = log10_BF;
   
+  vector<double>().swap(dim_tmp_); // free memory
+  
   return log10_BF;
 }
 
@@ -132,6 +132,9 @@ double snp_eQTL::compute_log10_BF(
   const bool & keep)
 {
   double log10_BF, tmp;
+  
+  grid_tmp_.assign(grid_size_, NaN);
+  dim_tmp_.assign(dim_, NaN);
   
   // for each type, average BFs over grid
   for(size_t k = 0; k < dim_; ++k){
@@ -188,6 +191,9 @@ double snp_eQTL::compute_log10_BF(
   if(keep)
     log10_BF_ = log10_BF;
   
+  vector<double>().swap(grid_tmp_);
+  vector<double>().swap(dim_tmp_);
+  
   return log10_BF;
 }
 
@@ -204,6 +210,8 @@ void snp_eQTL::em_update_type(const vector<double> & grid_wts,
 			      const vector<vector<double> > & subgroup_prior,
 			      vector<double> & new_type_prior)
 {
+  grid_tmp_.assign(grid_size_, NaN);
+  
   for(size_t k = 0; k < dim_; ++k){
     for(size_t l = 0; l < grid_size_; ++l){
       grid_tmp_[l] = 0.0;
@@ -216,6 +224,8 @@ void snp_eQTL::em_update_type(const vector<double> & grid_wts,
 					   &(grid_wts[0]),
 					   grid_size_);
   }
+  
+  vector<double>().swap(grid_tmp_);
 }
 
 void snp_eQTL::em_update_subgroup(const vector<double> & grid_wts,
@@ -223,6 +233,8 @@ void snp_eQTL::em_update_subgroup(const vector<double> & grid_wts,
 				  vector<vector<double> > & exp_gpkls_snp,
 				  vector<double> & exp_gpkl_snp)
 {
+  grid_tmp_.assign(grid_size_, NaN);
+  
   for(size_t k = 0; k < dim_; ++k){
     
     // compute the contribution of the SNP to the numerator of q_ks's update
@@ -252,11 +264,15 @@ void snp_eQTL::em_update_subgroup(const vector<double> & grid_wts,
 					 &(grid_wts[0]),
 					 grid_size_);
   }
+  
+  vector<double>().swap(grid_tmp_);
 }
 
 void snp_eQTL::em_update_grid(const vector<double> & config_prior,
 			      vector<double> & new_grid_wts)
 {
+  dim_tmp_.assign(dim_, NaN);
+  
   for(size_t l = 0; l < grid_size_; ++l){
     for(size_t k = 0; k < dim_; ++k)
       dim_tmp_[k] = raw_log10_bfs_[k][l];
@@ -264,12 +280,16 @@ void snp_eQTL::em_update_grid(const vector<double> & config_prior,
 					 &(config_prior[0]),
 					 dim_);
   }
+  
+  vector<double>().swap(dim_tmp_);
 }
 
 void snp_eQTL::em_update_grid(const vector<double> & type_prior,
 			      const vector<vector<double> > & subgroup_prior,
 			      vector<double> & new_grid_wts)
 {
+  dim_tmp_.assign(dim_, NaN);
+  
   for(size_t l = 0; l < grid_size_; ++l){
     for(size_t k = 0; k < dim_; ++k){
       dim_tmp_[k] = 0.0;
@@ -282,6 +302,8 @@ void snp_eQTL::em_update_grid(const vector<double> & type_prior,
 					 &(type_prior[0]),
 					 dim_);
   }
+  
+  vector<double>().swap(dim_tmp_);
 }
 
 double snp_eQTL::compute_log10_aug_BF(const double & pi0,
@@ -330,6 +352,8 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
 				       const vector<double> & grid_wts,
 				       const vector<vector<double> > & subgroup_prior)
 {
+  grid_tmp_.assign(grid_size_, NaN);
+  
   for(size_t l = 0; l < grid_size_; ++l){
     grid_tmp_[l] = 0.0;
     for(size_t s = 0; s < nb_subgroups_; ++s)
@@ -338,32 +362,30 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
 			    + 1 - subgroup_prior[type_idx][s]);
   }
   
+  vector<double>().swap(grid_tmp_);
+  
   return log10_weighted_sum(&(grid_tmp_[0]),
 			    &(grid_wts[0]),
 			    grid_size_);
 }
 
-void gene_eQTL::init()
+gene_eQTL::gene_eQTL(const std::string name,
+		     const size_t & nb_subgroups,
+		     const size_t & dim,
+		     const size_t & grid_size,
+		     double * pi0)
 {
-  grid_size_ = snpVec[0].grid_size_;
-  dim_ = snpVec[0].dim_;
-  snp_wts_.assign(snpVec.size(), NaN);
-  snp_log10_bfs_.assign(snpVec.size(), NaN);
-  grid_snps_.assign(grid_size_,
-		    vector<double>(snpVec.size(), NaN));
-  dim_snps_.assign(dim_,
-		   vector<double>(snpVec.size(), NaN));
-  subgroup_num_snps_.assign(dim_,
-			    vector<vector<double> >(nb_subgroups_,
-						    vector<double>(snpVec.size(), NaN)));
-  subgroup_denom_snps_.assign(dim_,
-			      vector<double>(snpVec.size(), NaN));
+  name_ = name;
+  nb_subgroups_ = nb_subgroups;
+  dim_ = dim;
+  grid_size_ = grid_size;
+  pi0_ = pi0;
 }
 
 void gene_eQTL::set_snp_prior()
 {
-  for(size_t p = 0; p < snpVec.size(); ++p)
-    snpVec[p].snp_prior = 1.0 / snpVec.size(); // for now
+  for(size_t p = 0; p < snps_.size(); ++p)
+    snps_[p].snp_prior = 1.0 / snps_.size(); // for now
 }
 
 double gene_eQTL::compute_log10_BF(const vector<double> & grid_wts,
@@ -372,16 +394,19 @@ double gene_eQTL::compute_log10_BF(const vector<double> & grid_wts,
 {
   double log10_BF;
   
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snp_log10_bfs_[p] = snpVec[p].compute_log10_BF(grid_wts,
+  snp_wts_.assign(snps_.size(), NaN);
+  snp_log10_bfs_.assign(snps_.size(), NaN);
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snp_log10_bfs_[p] = snps_[p].compute_log10_BF(grid_wts,
 						   config_prior,
 						   keep);
   }
   
   log10_BF = log10_weighted_sum(&(snp_log10_bfs_[0]),
 				&(snp_wts_[0]),
-				snpVec.size());
+				snps_.size());
 #ifdef DEBUG
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
@@ -395,6 +420,9 @@ double gene_eQTL::compute_log10_BF(const vector<double> & grid_wts,
   
   if(keep)
     log10_BF_ = log10_BF;
+  
+  vector<double>().swap(snp_wts_);
+  vector<double>().swap(snp_log10_bfs_);
   
   return log10_BF;
 }
@@ -407,9 +435,12 @@ double gene_eQTL::compute_log10_BF(
 {
   double log10_BF;
   
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snp_log10_bfs_[p] = snpVec[p].compute_log10_BF(grid_wts,
+  snp_wts_.assign(snps_.size(), NaN);
+  snp_log10_bfs_.assign(snps_.size(), NaN);
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snp_log10_bfs_[p] = snps_[p].compute_log10_BF(grid_wts,
 						   type_prior,
 						   subgroup_prior,
 						   keep);
@@ -417,7 +448,7 @@ double gene_eQTL::compute_log10_BF(
   
   log10_BF = log10_weighted_sum(&(snp_log10_bfs_[0]),
 				&(snp_wts_[0]),
-				snpVec.size());
+				snps_.size());
 #ifdef DEBUG
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
@@ -431,6 +462,9 @@ double gene_eQTL::compute_log10_BF(
   
   if(keep)
     log10_BF_ = log10_BF;
+  
+  vector<double>().swap(snp_wts_);
+  vector<double>().swap(snp_log10_bfs_);
   
   return log10_BF;
 }
@@ -454,6 +488,7 @@ double gene_eQTL::compute_log10_obs_lik(
   vec[1] = compute_log10_BF(grid_wts, config_prior, keep);
   
   log10_obs_lik = log10_weighted_sum(vec, wts, 2);
+  
   if(keep)
     log10_obs_lik_ = log10_obs_lik;
   
@@ -477,6 +512,7 @@ double gene_eQTL::compute_log10_obs_lik(
   vec[1] = compute_log10_BF(grid_wts, type_prior, subgroup_prior, keep);
   
   log10_obs_lik = log10_weighted_sum(vec, wts, 2);
+  
   if(keep)
     log10_obs_lik_ = log10_obs_lik;
   
@@ -491,39 +527,50 @@ double gene_eQTL::em_update_pi0(const double & pi0)
 // last to do
 void gene_eQTL::em_update_snp_prior()
 {
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snp_log10_bfs_[p] = snpVec[p].log10_BF_;
+  snp_wts_.assign(snps_.size(), NaN);
+  snp_log10_bfs_.assign(snps_.size(), NaN);
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snp_log10_bfs_[p] = snps_[p].log10_BF_;
   }
   
   double factor = log10_weighted_sum(&(snp_log10_bfs_[0]),
 				     &(snp_wts_[0]),
-				     snpVec.size());         
+				     snps_.size());         
   
-  for(size_t p = 0; p < snpVec.size(); ++p)
-    snpVec[p].new_snp_prior = pow(10, snpVec[p].log10_BF_ - factor) * snpVec[p].snp_prior;
+  for(size_t p = 0; p < snps_.size(); ++p)
+    snps_[p].new_snp_prior = pow(10, snps_[p].log10_BF_ - factor) * snps_[p].snp_prior;
+  
+  vector<double>().swap(snp_wts_);
+  vector<double>().swap(snp_log10_bfs_);
 }
 
 void gene_eQTL::update_snp_prior()
 {
   double sum = 0;
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    if(snpVec[p].new_snp_prior < 0.001)
-      snpVec[p].new_snp_prior = 0.001;
-    sum += snpVec[p].new_snp_prior;
+  for(size_t p = 0; p < snps_.size(); ++p){
+    if(snps_[p].new_snp_prior < 0.001)
+      snps_[p].new_snp_prior = 0.001;
+    sum += snps_[p].new_snp_prior;
   }
   
- for(size_t p = 0; p < snpVec.size(); ++p)
-    snpVec[p].snp_prior = snpVec[p].new_snp_prior / sum;
+ for(size_t p = 0; p < snps_.size(); ++p)
+    snps_[p].snp_prior = snps_[p].new_snp_prior / sum;
 }
 
 void gene_eQTL::em_update_config(const vector<double> & grid_wts,
 				 vector<double> & new_global_config_prior)
 {
   vector<double> new_global_config_prior_tmp(dim_, NaN);
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snpVec[p].em_update_config(grid_wts, new_global_config_prior_tmp);
+  
+  snp_wts_.assign(snps_.size(), NaN);
+  dim_snps_.assign(dim_,
+		   vector<double>(snps_.size(), NaN));
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snps_[p].em_update_config(grid_wts, new_global_config_prior_tmp);
     for(size_t k = 0; k < dim_; ++k)
       dim_snps_[k][p] = new_global_config_prior_tmp[k];
   }
@@ -531,8 +578,11 @@ void gene_eQTL::em_update_config(const vector<double> & grid_wts,
   for(size_t k = 0; k < dim_; ++k)
     new_global_config_prior[k] = log10_weighted_sum(&(dim_snps_[k][0]),
 						    &(snp_wts_[0]),
-						    snpVec.size())
+						    snps_.size())
       - log10_obs_lik_;
+  
+  vector<double>().swap(snp_wts_);
+  vector<vector<double> >().swap(dim_snps_);
 }
 
 void gene_eQTL::em_update_type(const vector<double> & grid_wts,
@@ -540,9 +590,14 @@ void gene_eQTL::em_update_type(const vector<double> & grid_wts,
 			       vector<double> & new_type_prior)
 {
   vector<double> new_type_prior_tmp(dim_, NaN);
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snpVec[p].em_update_type(grid_wts, subgroup_prior, new_type_prior_tmp);
+  
+  snp_wts_.assign(snps_.size(), NaN);
+  dim_snps_.assign(dim_,
+		   vector<double>(snps_.size(), NaN));
+  
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snps_[p].em_update_type(grid_wts, subgroup_prior, new_type_prior_tmp);
     for(size_t k = 0; k < dim_; ++k)
       dim_snps_[k][p] = new_type_prior_tmp[k];
   }
@@ -550,8 +605,11 @@ void gene_eQTL::em_update_type(const vector<double> & grid_wts,
   for(size_t k = 0; k < dim_; ++k)
     new_type_prior[k] = log10_weighted_sum(&(dim_snps_[k][0]),
 					   &(snp_wts_[0]),
-					   snpVec.size())
+					   snps_.size())
       - log10_obs_lik_;
+  
+  vector<double>().swap(snp_wts_); // free memory
+  vector<vector<double> >().swap(dim_snps_);
 }
 
 void gene_eQTL::em_update_subgroup(const vector<double> & grid_wts,
@@ -559,12 +617,19 @@ void gene_eQTL::em_update_subgroup(const vector<double> & grid_wts,
 				   vector<vector<double> > & exp_gpkls_gene,
 				   vector<double> & exp_gpkl_gene)
 {
+  snp_wts_.assign(snps_.size(), NaN);
+  subgroup_num_snps_.assign(dim_,
+			    vector<vector<double> >(nb_subgroups_,
+						    vector<double>(snps_.size(), NaN)));
+  subgroup_denom_snps_.assign(dim_,
+			      vector<double>(snps_.size(), NaN));
+  
   // compute the contribution of each SNP to each "subgroup per type" weight
-  for(size_t p = 0; p < snpVec.size(); ++p){
+  for(size_t p = 0; p < snps_.size(); ++p){
     vector<vector<double> > exp_gpkls_snp(dim_, vector<double>(nb_subgroups_, NaN));
     vector<double> exp_gpkl_snp(dim_, NaN);
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snpVec[p].em_update_subgroup(grid_wts, subgroup_prior, exp_gpkls_snp, exp_gpkl_snp);
+    snp_wts_[p] = snps_[p].snp_prior;
+    snps_[p].em_update_subgroup(grid_wts, subgroup_prior, exp_gpkls_snp, exp_gpkl_snp);
     for(size_t k = 0; k < dim_; ++k){
       subgroup_denom_snps_[k][p] = exp_gpkl_snp[k];
       for(size_t s = 0; s < nb_subgroups_; ++s)
@@ -577,25 +642,33 @@ void gene_eQTL::em_update_subgroup(const vector<double> & grid_wts,
     for(size_t s = 0; s < nb_subgroups_; ++s)
       exp_gpkls_gene[k][s] = log10_weighted_sum(&(subgroup_num_snps_[k][s][0]),
 						&(snp_wts_[0]),
-						snpVec.size())
+						snps_.size())
 	- log10_obs_lik_;
   
   // compute the normalization constant per type (same for all subgroups within a type)
   for(size_t k = 0; k < dim_; ++k)
     exp_gpkl_gene[k] = log10_weighted_sum(&(subgroup_denom_snps_[k][0]),
 					  &(snp_wts_[0]),
-					  snpVec.size())
+					  snps_.size())
       - log10_obs_lik_;
+  
+  vector<double>().swap(snp_wts_);
+  vector<vector<vector<double> > >().swap(subgroup_num_snps_);
+  vector<vector<double> >().swap(subgroup_denom_snps_);
 }
 
 void gene_eQTL::em_update_grid(const vector<double> & config_prior,
 			       vector<double> & new_grid_wts)
 {
+  snp_wts_.assign(snps_.size(), NaN);
+  grid_snps_.assign(grid_size_,
+   		    vector<double>(snps_.size(), NaN));
+  
   // compute the contribution of each SNP to each grid weight
   vector<double> new_grid_wts_tmp(grid_size_, NaN);
-  for(size_t p = 0; p < snpVec.size(); ++p){
-    snp_wts_[p] = snpVec[p].snp_prior;
-    snpVec[p].em_update_grid(config_prior, new_grid_wts_tmp);
+  for(size_t p = 0; p < snps_.size(); ++p){
+    snp_wts_[p] = snps_[p].snp_prior;
+    snps_[p].em_update_grid(config_prior, new_grid_wts_tmp);
     for(size_t l = 0; l < grid_size_; ++l)
       grid_snps_[l][p] = new_grid_wts_tmp[l];
   }
@@ -604,19 +677,26 @@ void gene_eQTL::em_update_grid(const vector<double> & config_prior,
   for(size_t l = 0; l < grid_size_; ++l)
     new_grid_wts[l] = log10_weighted_sum(&(grid_snps_[l][0]),
 					 &(snp_wts_[0]),
-					 snpVec.size())
+					 snps_.size())
       - log10_obs_lik_;
+  
+  vector<double>().swap(snp_wts_);
+  vector<vector<double> >().swap(grid_snps_);
 }
 
 void gene_eQTL::em_update_grid(const vector<double> & type_prior,
 			       const vector<vector<double> > & subgroup_prior,
 			       vector<double> & new_grid_wts)
 {
+  snp_wts_.assign(snps_.size(), NaN);
+  grid_snps_.assign(grid_size_,
+   		    vector<double>(snps_.size(), NaN));
+  
   // compute the contribution of each SNP to each grid weight
   vector<double> new_grid_wts_tmp(grid_size_, NaN);
-  for(size_t i = 0; i < snpVec.size(); ++i){
-    snp_wts_[i] = snpVec[i].snp_prior;
-    snpVec[i].em_update_grid(type_prior, subgroup_prior, new_grid_wts_tmp);
+  for(size_t i = 0; i < snps_.size(); ++i){
+    snp_wts_[i] = snps_[i].snp_prior;
+    snps_[i].em_update_grid(type_prior, subgroup_prior, new_grid_wts_tmp);
     for(size_t j = 0; j < grid_size_; ++j)
       grid_snps_[j][i] = new_grid_wts_tmp[j];
   }
@@ -625,8 +705,11 @@ void gene_eQTL::em_update_grid(const vector<double> & type_prior,
   for(size_t i = 0; i < grid_size_; ++i)
     new_grid_wts[i] = log10_weighted_sum(&(grid_snps_[i][0]),
 					 &(snp_wts_[0]),
-					 snpVec.size())
+					 snps_.size())
       - log10_obs_lik_;
+  
+  vector<double>().swap(snp_wts_);
+  vector<vector<double> >().swap(grid_snps_);
 }
 
 double gene_eQTL::compute_log10_aug_BF(const double & pi0,
@@ -636,9 +719,9 @@ double gene_eQTL::compute_log10_aug_BF(const double & pi0,
 {
   double log10_aug_BF = 0.0;
   
-  for(size_t p = 0; p < snpVec.size(); ++p)
-    log10_aug_BF += log10(snpVec[p].snp_prior)
-      + snpVec[p].compute_log10_aug_BF(pi0, grid_wts, type_prior,
+  for(size_t p = 0; p < snps_.size(); ++p)
+    log10_aug_BF += log10(snps_[p].snp_prior)
+      + snps_[p].compute_log10_aug_BF(pi0, grid_wts, type_prior,
 				       subgroup_prior, log10_obs_lik_);
   
   return log10_aug_BF;
@@ -672,18 +755,18 @@ void gene_eQTL::compute_posterior(const double & pi0,
     post_prob_gene_ = 1.0;
   
   // posterior for snp eQTL P(S = i, Z =1 | Y)
-  for(size_t i = 0; i < snpVec.size(); ++i){
-    snpVec[i].post_prob_snp_ = pow(10, log10(1-pi0) + log10(snpVec[i].snp_prior) + snpVec[i].log10_BF_ - log10_obs_lik_);
-    if(snpVec[i].post_prob_snp_ > 1.0)
-      snpVec[i].post_prob_snp_ = 1.0;
+  for(size_t i = 0; i < snps_.size(); ++i){
+    snps_[i].post_prob_snp_ = pow(10, log10(1-pi0) + log10(snps_[i].snp_prior) + snps_[i].log10_BF_ - log10_obs_lik_);
+    if(snps_[i].post_prob_snp_ > 1.0)
+      snps_[i].post_prob_snp_ = 1.0;
   }
   
   // posterior for configuration
   for(size_t i = 0; i < global_config_prior.size(); ++i){
     double prob = 0;
-    for(size_t j = 0; j < snpVec.size(); ++j){
-      double bfc = snpVec[j].compute_log10_config_BF(i, grid_wts);
-      double sprior = snpVec[j].snp_prior * (1-pi0) * global_config_prior[i];
+    for(size_t j = 0; j < snps_.size(); ++j){
+      double bfc = snps_[j].compute_log10_config_BF(i, grid_wts);
+      double sprior = snps_[j].snp_prior * (1-pi0) * global_config_prior[i];
       prob += sprior * pow(10, bfc - log10_obs_lik_);
     }
     

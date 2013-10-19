@@ -55,7 +55,7 @@ class Controller
 			  vector<string> & lines);
   
 public:
-  vector<gene_eQTL> geneVec_;
+  vector<gene_eQTL> genes_;
   size_t nb_subgroups_;
   size_t grid_size_;
   string model_; // configs or types
@@ -258,20 +258,19 @@ void Controller::load_data_one_file(
     
     if(gene_id.compare(curr_gene) != 0){ // if new gene
       if(! geq.name_.empty()){
-	geq.snpVec.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
+	geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
 				      nb_subgroups_,
 				      (model_ == "types" ? dim_ : 0)));
-	geq.init();
-	geneVec_.push_back(geq);
+	genes_.push_back(geq);
       }
       curr_gene = gene_id;
-      geq = gene_eQTL(curr_gene, nb_subgroups_, &pi0_);
+      geq = gene_eQTL(curr_gene, nb_subgroups_, dim_, grid_size_, &pi0_);
       raw_log10_bfs.clear();
     }
     
     if(snp_id.compare(curr_snp) != 0){ // if same gene but new snp
       if(! raw_log10_bfs.empty())
-	geq.snpVec.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
+	geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
 				      nb_subgroups_,
 				      (model_ == "types" ? dim_ : 0)));
       curr_snp = snp_id;
@@ -290,11 +289,10 @@ void Controller::load_data_one_file(
     }
   }
   
-  geq.snpVec.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
+  geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
 				nb_subgroups_,
 				(model_ == "types" ? dim_ : 0))); // last snp
-  geq.init();
-  geneVec_.push_back(geq); // last gene
+  genes_.push_back(geq); // last gene
 }
 
 void Controller::load_data(
@@ -331,45 +329,46 @@ void Controller::load_data(
     cout << endl << flush;
   
   // initialization of useful data structures for the EM
-  gene_wts_ones_.assign(geneVec_.size(), 1.0);
+  gene_wts_ones_.assign(genes_.size(), 1.0);
   grid_genes_ =
     vector<vector<double> >(grid_size_,
-			    vector<double>(geneVec_.size(), NaN));
+			    vector<double>(genes_.size(), NaN));
   if(model_ == "configs"){
     config_genes_ = 
       vector<vector<double> >(dim_,
-			      vector<double>(geneVec_.size(), NaN));
+			      vector<double>(genes_.size(), NaN));
   }
   else if(model_ == "types"){
     type_genes_ = 
       vector<vector<double> >(dim_,
-			      vector<double>(geneVec_.size(), NaN));
+			      vector<double>(genes_.size(), NaN));
     subgroup_num_genes_ =
       vector<vector<vector<double> > >(dim_,
 				       vector<vector<double> >(nb_subgroups_,
-							       vector<double>(geneVec_.size(), NaN)));
+							       vector<double>(genes_.size(), NaN)));
     subgroup_denom_genes_ =
       vector<vector<double> >(dim_,
-			      vector<double>(geneVec_.size(), NaN));;
+			      vector<double>(genes_.size(), NaN));;
   }
   
   if(verbose_ > 0){
     size_t nb_pairs = 0;
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:nb_pairs)
-    for(int g = 0; g < (int)geneVec_.size(); ++g)
-      nb_pairs += geneVec_[g].snpVec.size();
-    fprintf(stderr, "finish loading %zu genes and %zu gene-snp pairs (%f sec)\n",
-	    geneVec_.size(),
+    for(int g = 0; g < (int)genes_.size(); ++g)
+      nb_pairs += genes_[g].snps_.size();
+    fprintf(stderr, "finish loading %zu genes and %zu gene-snp pairs (%f sec, %s)\n",
+	    genes_.size(),
 	    nb_pairs,
-	    getElapsedTime(startTime));
+	    getElapsedTime(startTime),
+	    getMaxMemUsedByProcess2Str().c_str());
   }
 }
 
 void Controller::init_params(const string & init_file)
 {
 #pragma omp parallel for num_threads(nb_threads_)
-  for(int i = 0; i < (int) geneVec_.size(); ++i)
-    geneVec_[i].set_snp_prior();
+  for(int i = 0; i < (int) genes_.size(); ++i)
+    genes_[i].set_snp_prior();
   
   if(verbose_)
     cout << "loading initialization file " << init_file << " ..." << endl;
@@ -502,8 +501,8 @@ void Controller::randomize_parameter_sp(const size_t & seed)
 void Controller::init_params(const size_t & seed)
 {
 #pragma omp parallel for num_threads(nb_threads_)
-  for(int i = 0; i < (int)geneVec_.size(); ++i)
-    geneVec_[i].set_snp_prior();
+  for(int i = 0; i < (int)genes_.size(); ++i)
+    genes_[i].set_snp_prior();
   
   if(seed != string::npos){
     randomize_parameter_sp(seed);
@@ -547,14 +546,14 @@ double Controller::compute_log10_obs_lik(
   
   if(model_ == "configs"){
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:l10_sum)
-    for(int g = 0; g < (int)geneVec_.size(); ++g)
-      l10_sum += geneVec_[g].compute_log10_obs_lik(pi0, grid_wts,
+    for(int g = 0; g < (int)genes_.size(); ++g)
+      l10_sum += genes_[g].compute_log10_obs_lik(pi0, grid_wts,
 						   config_prior, keep);
   }
   else if(model_ == "types"){
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:l10_sum)
-    for(int g = 0; g < (int)geneVec_.size(); ++g)
-      l10_sum += geneVec_[g].compute_log10_obs_lik(pi0, grid_wts, type_prior,
+    for(int g = 0; g < (int)genes_.size(); ++g)
+      l10_sum += genes_[g].compute_log10_obs_lik(pi0, grid_wts, type_prior,
 						   subgroup_prior, keep);
   }
   
@@ -573,8 +572,8 @@ double Controller::compute_log10_obs_lik(
 void Controller::em_update_snp_prior()
 {
 #pragma omp parallel for num_threads(nb_threads_)
-  for (int i = 0; i < (int)geneVec_.size(); ++i)
-     geneVec_[i].em_update_snp_prior();
+  for (int i = 0; i < (int)genes_.size(); ++i)
+     genes_[i].em_update_snp_prior();
 }
 
 void Controller::em_update_pi0()
@@ -582,11 +581,11 @@ void Controller::em_update_pi0()
   if(! param2fixed_["pi0"]){
     double sum = 0;
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:sum)
-    for(int g = 0; g < (int)geneVec_.size(); ++g){
-      // geneVec_[g].update_snp_prior();
-      sum += geneVec_[g].em_update_pi0(pi0_);
+    for(int g = 0; g < (int)genes_.size(); ++g){
+      // genes_[g].update_snp_prior();
+      sum += genes_[g].em_update_pi0(pi0_);
     }
-    new_pi0_ = sum / geneVec_.size();
+    new_pi0_ = sum / genes_.size();
   }
   else
     new_pi0_ = pi0_;
@@ -604,9 +603,9 @@ void Controller::em_update_config()
   if(! param2fixed_["configs"]){
     // compute the contribution of each gene to each config weight
 #pragma omp parallel for num_threads(nb_threads_)
-    for(int g = 0; g < (int)geneVec_.size(); ++g){
+    for(int g = 0; g < (int)genes_.size(); ++g){
       vector<double> new_config_prior_tmp(dim_, NaN);
-      geneVec_[g].em_update_config(grid_wts_, new_config_prior_tmp);
+      genes_[g].em_update_config(grid_wts_, new_config_prior_tmp);
       for(size_t k = 0; k < dim_; ++k)
 	config_genes_[k][g] = new_config_prior_tmp[k];
     }
@@ -615,7 +614,7 @@ void Controller::em_update_config()
     for(size_t k = 0; k < dim_; ++k)
       new_config_prior_[k] = log10_weighted_sum(&(config_genes_[k][0]),
 						&(gene_wts_ones_[0]),
-						geneVec_.size())
+						genes_.size())
 	+ log10(config_prior_[k]);
     
     // compute the normalization constant (Lagrange multiplier)
@@ -642,16 +641,16 @@ void Controller::em_update_type()
   if(! param2fixed_["types"]){
     // compute the contribution of each gene to each type weight
 #pragma omp parallel for num_threads(nb_threads_)
-    for(int g = 0; g < (int)geneVec_.size(); ++g){
+    for(int g = 0; g < (int)genes_.size(); ++g){
       vector<double> new_type_prior_tmp(dim_, NaN);
-      geneVec_[g].em_update_type(grid_wts_, subgroup_prior_, new_type_prior_tmp);
+      genes_[g].em_update_type(grid_wts_, subgroup_prior_, new_type_prior_tmp);
       for(size_t k = 0; k < dim_; ++k)
 	type_genes_[k][g] = new_type_prior_tmp[k];
     }
 #ifdef DEBUG
     if(verbose_ > 1){
       for(size_t k = 0; k < dim_; ++k)
-	for(int g = 0; g < (int)geneVec_.size(); ++g)
+	for(int g = 0; g < (int)genes_.size(); ++g)
 	  cout << "type " << k+1 << " gene" << g+1 << " " << type_genes_[k][g] << endl;
     }
 #endif
@@ -660,7 +659,7 @@ void Controller::em_update_type()
     for(size_t k = 0; k < dim_; ++k)
       new_type_prior_[k] = log10_weighted_sum(&(type_genes_[k][0]),
 					      &(gene_wts_ones_[0]),
-					      geneVec_.size())
+					      genes_.size())
 	+ log10(type_prior_[k]);
     
     // compute the normalization constant (Lagrange multiplier)
@@ -687,10 +686,10 @@ void Controller::em_update_subgroup()
   if(! param2fixed_["subgroups-per-type"]){
     // compute the contribution of each gene to each "subgroup per type" weight
 #pragma omp parallel for num_threads(nb_threads_)
-    for(int g = 0; g < (int)geneVec_.size(); ++g){
+    for(int g = 0; g < (int)genes_.size(); ++g){
       vector<vector<double> > exp_gpkls_gene(dim_, vector<double>(nb_subgroups_, NaN));
       vector<double> exp_gpkl_gene(dim_, NaN);
-      geneVec_[g].em_update_subgroup(grid_wts_, subgroup_prior_, exp_gpkls_gene, exp_gpkl_gene);
+      genes_[g].em_update_subgroup(grid_wts_, subgroup_prior_, exp_gpkls_gene, exp_gpkl_gene);
       for(size_t k = 0; k < dim_; ++k){
 	subgroup_denom_genes_[k][g] = exp_gpkl_gene[k];
 	for(size_t s = 0; s < nb_subgroups_; ++s)
@@ -703,7 +702,7 @@ void Controller::em_update_subgroup()
       for(size_t s = 0; s < nb_subgroups_; ++s)
 	new_subgroup_prior_[k][s] = log10_weighted_sum(&(subgroup_num_genes_[k][s][0]),
 						       &(gene_wts_ones_[0]),
-						       geneVec_.size())
+						       genes_.size())
 	  + log10(subgroup_prior_[k][s]);
     
     // compute the normalization constant
@@ -711,7 +710,7 @@ void Controller::em_update_subgroup()
     for(size_t k = 0; k < dim_; ++k)
       l10_denom[k] = log10_weighted_sum(&(subgroup_denom_genes_[k][0]),
 					&(gene_wts_ones_[0]),
-					geneVec_.size());
+					genes_.size());
     
     // compute each new weight per "subgroup per type"
     for(size_t k = 0; k < dim_; ++k)
@@ -735,18 +734,18 @@ void Controller::em_update_grid()
     // compute the contribution of each gene to each grid weight
     if(model_ == "configs"){
 #pragma omp parallel for num_threads(nb_threads_)
-      for(int g = 0; g < (int)geneVec_.size(); ++g){
+      for(int g = 0; g < (int)genes_.size(); ++g){
 	vector<double> new_grid_wts_tmp(grid_size_, NaN);
-	geneVec_[g].em_update_grid(config_prior_, new_grid_wts_tmp);
+	genes_[g].em_update_grid(config_prior_, new_grid_wts_tmp);
 	for(size_t l = 0; l < grid_size_; ++l)
 	  grid_genes_[l][g] = new_grid_wts_tmp[l];
       }
     }
     else if(model_ == "types"){
 #pragma omp parallel for num_threads(nb_threads_)
-      for(int g = 0; g < (int)geneVec_.size(); ++g){
+      for(int g = 0; g < (int)genes_.size(); ++g){
 	vector<double> new_grid_wts_tmp(grid_size_, NaN);
-	geneVec_[g].em_update_grid(type_prior_, subgroup_prior_, new_grid_wts_tmp);
+	genes_[g].em_update_grid(type_prior_, subgroup_prior_, new_grid_wts_tmp);
 	for(size_t l = 0; l < grid_size_; ++l)
 	  grid_genes_[l][g] = new_grid_wts_tmp[l];
       }
@@ -756,7 +755,7 @@ void Controller::em_update_grid()
     for(size_t l = 0; l < grid_size_; ++l)
       new_grid_wts_[l] = log10_weighted_sum(&(grid_genes_[l][0]),
 					    &(gene_wts_ones_[0]),
-					    geneVec_.size())
+					    genes_.size())
 	+ log10(grid_wts_[l]);
     
     // compute the normalization constant (Lagrange multiplier)
@@ -792,8 +791,8 @@ void Controller::update_params()
   for(size_t l = 0; l < grid_size_; ++l)
     grid_wts_[l] = new_grid_wts_[l];
   
-  // for(size_t i = 0; i < geneVec_.size(); ++i)
-  //  geneVec_[i].update_snp_prior();
+  // for(size_t i = 0; i < genes_.size(); ++i)
+  //  genes_[i].update_snp_prior();
 }
 
 void Controller::show_state_EM(const size_t & iter)
@@ -1205,11 +1204,11 @@ void Controller::compute_log10_ICL()
     clock_t startTime = clock();
     
     double log10_icl = - (double)(1 + grid_size_ + dim_ * (nb_subgroups_ + 1)) / 2.0
-      * log10(geneVec_.size());
+      * log10(genes_.size());
     
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:log10_icl)
-    for(int g = 0; g < (int)geneVec_.size(); ++g)
-      log10_icl += geneVec_[g].compute_log10_aug_lik(pi0_, grid_wts_, 
+    for(int g = 0; g < (int)genes_.size(); ++g)
+      log10_icl += genes_[g].compute_log10_aug_lik(pi0_, grid_wts_, 
 						     type_prior_,
 						     subgroup_prior_);
     
@@ -1227,8 +1226,8 @@ void Controller::compute_posterior()
   clock_t startTime = clock();
   
 #pragma omp parallel for num_threads(nb_threads_)
-  for(int i = 0; i < (int)geneVec_.size(); ++i)
-    geneVec_[i].compute_posterior(pi0_, grid_wts_, config_prior_);
+  for(int i = 0; i < (int)genes_.size(); ++i)
+    genes_[i].compute_posterior(pi0_, grid_wts_, config_prior_);
   
   if(verbose_ > 0)
     cout << " (" << getElapsedTime(startTime) << " sec)" << endl;
@@ -1322,37 +1321,37 @@ void Controller::save_result(const string & out_file,
     ++nb_lines;
     gzwriteLine(stream, txt.str(), out_file, nb_lines);
     
-    for(size_t g = 0; g < geneVec_.size(); ++g){ // loop over gene
-      for(size_t p = 0; p < geneVec_[g].snpVec.size(); ++p){ // loop over snp
+    for(size_t g = 0; g < genes_.size(); ++g){ // loop over gene
+      for(size_t p = 0; p < genes_[g].snps_.size(); ++p){ // loop over snp
 	txt.str("");
 	txt << setprecision(4)
-	    << geneVec_[g].name_
+	    << genes_[g].name_
 	    << "\t"
-	    << geneVec_[g].post_prob_gene_;
+	    << genes_[g].post_prob_gene_;
 	
 	if(model_ == "configs")
 	  txt << "\t"
-	      << geneVec_[g].compute_log10_BF(grid_wts_, config_prior_, true);
+	      << genes_[g].compute_log10_BF(grid_wts_, config_prior_, true);
 	else if(model_ == "types")
 	  txt << "\t"
-	      << geneVec_[g].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
+	      << genes_[g].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
 	
 	txt << "\t"
-	    << geneVec_[g].snpVec[p].name_;
+	    << genes_[g].snps_[p].name_;
 	
 	if(model_ == "configs"){
 	  txt << "\t"
-	      << geneVec_[g].snpVec[p].compute_log10_BF(grid_wts_, config_prior_, true);
+	      << genes_[g].snps_[p].compute_log10_BF(grid_wts_, config_prior_, true);
 	  for(size_t k = 0; k < dim_; ++k) // loop over configs
 	    txt << "\t"
-		<< geneVec_[g].snpVec[p].compute_log10_config_BF(k, grid_wts_);
+		<< genes_[g].snps_[p].compute_log10_config_BF(k, grid_wts_);
 	}
 	else if(model_ == "types"){
 	  txt << "\t"
-	      << geneVec_[g].snpVec[p].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
+	      << genes_[g].snps_[p].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
 	  for(size_t k = 0; k < dim_; ++k) // loop over types
 	    txt << "\t"
-		<< geneVec_[g].snpVec[p].compute_log10_type_BF(k, grid_wts_, subgroup_prior_);
+		<< genes_[g].snps_[p].compute_log10_type_BF(k, grid_wts_, subgroup_prior_);
 	}
 	
 	txt << "\n";
