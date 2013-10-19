@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstring>
 #include <getopt.h>
+#include <libgen.h>
 
 #include <iostream>
 #include <iomanip>

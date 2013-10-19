@@ -357,7 +357,7 @@ namespace utils {
 /** \brief Used by scandir.
  *  \note unused parameter, see http://stackoverflow.com/q/1486904/597069
  */
-  static int dummy_selector (const struct dirent * /*dir_entry*/)
+  static int dummy_selector (CONST_DIRENT_T * /*dir_entry*/)
   {
     return 1;
   }
@@ -699,34 +699,36 @@ namespace utils {
     double vmHWM = 0.0;
     string pathToFile = "/proc/self/status";
   
-    if (! doesFileExist (pathToFile))
+    if (! doesFileExist (pathToFile)) // in other OS than Linux
     {
       cerr << "WARNING: " << pathToFile << " doesn't exist,"
 	   << " can't track memory usage" << endl << flush;
     }
-  
-    string line;
-    ifstream stream;
-    vector<string> tokens;
-    openFile (pathToFile, stream);
-    while (getline (stream, line))
+    else
     {
-      if (line.find("VmHWM") != string::npos)
+      string line;
+      ifstream stream;
+      vector<string> tokens;
+      openFile (pathToFile, stream);
+      while (getline (stream, line))
       {
-	split (line, ":", tokens);
-	if (tokens.size() != 2)
+	if (line.find("VmHWM") != string::npos)
 	{
-	  cerr << "ERROR: file " << pathToFile
-	       << " has a different format" << endl;
-	  exit (1);
+	  split (line, ":", tokens);
+	  if (tokens.size() != 2)
+	  {
+	    cerr << "ERROR: file " << pathToFile
+		 << " has a different format" << endl;
+	    exit (1);
+	  }
+	  replaceAll (tokens[1], " ", "");
+	  replaceAll (tokens[1], "kB", "");
+	  vmHWM = atof (tokens[1].c_str());
+	  break;
 	}
-	replaceAll (tokens[1], " ", "");
-	replaceAll (tokens[1], "kB", "");
-	vmHWM = atof (tokens[1].c_str());
-	break;
       }
+      closeFile (pathToFile, stream);
     }
-    closeFile (pathToFile, stream);
   
     return vmHWM;
   }
