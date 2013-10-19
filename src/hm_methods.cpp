@@ -352,6 +352,8 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
 				       const vector<double> & grid_wts,
 				       const vector<vector<double> > & subgroup_prior)
 {
+  double log10_BF;
+  
   grid_tmp_.assign(grid_size_, NaN);
   
   for(size_t l = 0; l < grid_size_; ++l){
@@ -362,11 +364,13 @@ double snp_eQTL::compute_log10_type_BF(const size_t & type_idx,
 			    + 1 - subgroup_prior[type_idx][s]);
   }
   
+  log10_BF = log10_weighted_sum(&(grid_tmp_[0]),
+				&(grid_wts[0]),
+				grid_size_);
+  
   vector<double>().swap(grid_tmp_);
   
-  return log10_weighted_sum(&(grid_tmp_[0]),
-			    &(grid_wts[0]),
-			    grid_size_);
+  return log10_BF;
 }
 
 gene_eQTL::gene_eQTL(const std::string name,
