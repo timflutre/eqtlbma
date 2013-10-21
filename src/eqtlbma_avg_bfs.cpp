@@ -788,14 +788,15 @@ void Gene::calc_cond_snp_posteriors_subgroup(const vector<double> & type_weights
   } // end of "for each SNP"
 }
 
-void Gene::identify_best_snps(const int & save_best_snps){
-  if(save_best_snps == 0)
+void Gene::identify_best_snps(const int & save_best_snps)
+{
+  // in all cases, sort vector "snps_" decreasingly w.r.t. their log10(BF)
+  sort(snps_.rbegin(), snps_.rend());
+  
+  if(save_best_snps == 0) // keep all SNPs
     idx_last_best_snp_ = snps_.size() - 1;
   else{
-    // sort vector "snps" decreasingly w.r.t. their log10(BF)
-    sort(snps_.rbegin(), snps_.rend());
-    
-    if(save_best_snps == 1)
+    if(save_best_snps == 1) // keep only the best SNP
       idx_last_best_snp_ = 0;
     else{
       // find the min nb of SNP(s) such that sum of their proba 
