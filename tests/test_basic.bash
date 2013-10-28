@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 
-set -o errexit -o pipefail
-
 # Aim: launch a basic functional test for eqtlbma_bf
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
+progVersion="1.0"
+
 #------------------------------------------------------------------------------
 
+# Display the help on stdout.
+# The format complies with help2man (http://www.gnu.org/s/help2man)
 function help () {
     msg="\`${0##*/}' launches a basic functional test for eqtlbma_bf.\n"
     msg+="\n"
@@ -17,14 +19,15 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
-    msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
-    msg+="      --noclean\tkeep temporary directory with all files\n"
+    msg+="  -e, --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
+    msg+="  -R, --p2R\tabsolute path to the 'functional_tests.R' script\n"
+    msg+="  -n, --noclean\tkeep temporary directory with all files\n"
     echo -e "$msg"
 }
 
+# Display version and license information on stdout.
 function version () {
-    msg="${0##*/} 1.0\n"
+    msg="${0##*/} ${progVersion}\n"
     msg+="\n"
     msg+="Written by Timothee Flutre.\n"
     msg+="\n"
@@ -49,29 +52,46 @@ function timer () {
     fi
 }
 
-function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2e:,p2R:,noclean \
+# Parse the command-line arguments.
+# http://stackoverflow.com/a/4300224/597069
+function parseCmdLine () {
+    getopt -T > /dev/null # portability check (say, Linux or Mac OS?)
+    if [ $? -eq 4 ]; then # GNU enhanced getopt is available
+	TEMP=`getopt -o hVv:e:R:n -l help,version,verbose:,p2e:,p2R:,noclean \
         -n "$0" -- "$@"`
-    if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
+    else # original getopt is available (no long options, whitespace, sorting)
+	TEMP=`getopt hVv:e:R:n "$@"`
+    fi
+    if [ $? -ne 0 ]; then
+	echo "ERROR: "$(which getopt)" failed"
+	getopt -T > /dev/null
+	if [ $? -ne 4 ]; then
+	    echo "did you use long options? they are not handled \
+on your system, use -h for help"
+	fi
+	exit 2
+    fi
     eval set -- "$TEMP"
-    while true; do
+    while [ $# -gt 0 ]; do
         case "$1" in
-            -h|--help) help; exit 0; shift;;
-            -V|--version) version; exit 0; shift;;
-            -v|--verbose) verbose=$2; shift 2;;
-            --p2e) pathToBf=$2; shift 2;;
-	    --p2R) pathToRscript=$2; shift 2;;
-	    --noclean) clean=false; shift;;
+            -h | --help) help; exit 0; shift;;
+            -V | --version) version; exit 0; shift;;
+            -v | --verbose) verbose=$2; shift 2;;
+            -e | --p2e) pathToBf=$2; shift 2;;
+	    -R | --p2R) pathToRscript=$2; shift 2;;
+	    -n | --noclean) clean=false; shift;;
             --) shift; break;;
-            *) echo "ERROR: options parsing failed"; exit 1;;
+            *) echo "ERROR: options parsing failed, use -h for help"; exit 1;;
         esac
     done
-    if [[ ! -f $pathToBf ]]; then
-	echo "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'"
+    if [ ! -f "${pathToBf}" ]; then
+	echo "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'\n"
+	help
 	exit 1
     fi
-    if [[ ! -f $pathToRscript ]]; then
-	echo "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'"
+    if [ ! -f "${pathToRscript}" ]; then
+	echo "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'\n"
+	help
 	exit 1
     fi
 }
@@ -132,7 +152,7 @@ verbose=1
 pathToBf=$bf_abspath
 pathToRscript=$Rscript_abspath
 clean=true
-parseArgs "$@"
+parseCmdLine "$@"
 
 if [ $verbose -gt "0" ]; then
     startTime=$(timer)
