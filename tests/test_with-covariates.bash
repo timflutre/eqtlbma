@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -o errexit -o pipefail
-
 # Aim: launch a functional test for eqtlbma with covariates
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
@@ -17,9 +15,9 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2e\tabsolute path to the 'eqtlbma' binary\n"
-    msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
-    msg+="      --noclean\tkeep temporary directory with all files\n"
+    msg+="  -e, --p2e\tabsolute path to the 'eqtlbma' binary\n"
+    msg+="  -R, --p2R\tabsolute path to the 'functional_tests.R' script\n"
+    msg+="  -n, --noclean\tkeep temporary directory with all files\n"
     echo -e "$msg"
 }
 
@@ -49,21 +47,31 @@ function timer () {
     fi
 }
 
+# http://stackoverflow.com/a/4300224/597069
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2e:,p2R:,noclean \
-        -n "$0" -- "$@"`
-    if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
-    eval set -- "$TEMP"
-    while true; do
+    getopt -T > /dev/null
+    if [ $? -eq 4 ]; then
+	# GNU enhanced getopt is available
+	TEMP=`getopt -o hVv:e:R:n -l help,version,verbose:,p2e:,p2R:,noclean -n "$0" -- "$@"`
+    else
+	# Original getopt is available (no long option names, no whitespace, no sorting)
+	TEMP=`getopt hVv:e:R:n "$@"`
+    fi
+    if [ $? -ne 0 ] ; then
+	echo "ERROR: getopt failed, use -h for help" >&2
+	exit 2
+    fi
+    eval set -- $TEMP
+    while [ $# -gt 0 ]; do
         case "$1" in
-            -h|--help) help; exit 0; shift;;
-            -V|--version) version; exit 0; shift;;
-            -v|--verbose) verbose=$2; shift 2;;
-            --p2e) pathToEqtlBma=$2; shift 2;;
-	    --p2R) pathToRscript=$2; shift 2;;
-	    --noclean) clean=false; shift;;
+            -h | --help) help; exit 0; shift;;
+            -V | --version) version; exit 0; shift;;
+            -v | --verbose) verbose=$2; shift 2;;
+            -e | --p2e) pathToEqtlBma=$2; shift 2;;
+	    -R | --p2R) pathToRscript=$2; shift 2;;
+	    -n | --noclean) clean=false; shift;;
             --) shift; break;;
-            *) echo "ERROR: options parsing failed"; exit 1;;
+            *) echo "ERROR: options parsing failed, use -h for help"; exit 1;;
         esac
     done
     if [[ ! -f $pathToEqtlBma ]]; then
