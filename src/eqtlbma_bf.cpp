@@ -748,7 +748,9 @@ void loadListsGenoExplevelAndCovarFiles(
   }
   
   if(verbose > 0)
-    cout << "analyze " << subgroups.size() << " subgroup (configuration identifiers):" << endl;
+    cout << "analyze " << subgroups.size() << " subgroup"
+	 << (subgroups.size() > 1 ? "s" : "")
+	 <<" (identifier):" << endl;
   for(vector<string>::const_iterator it = subgroups.begin();
        it != subgroups.end(); ++it)
     cout << *it << " (" << it - subgroups.begin() + 1 << ")" << endl;
