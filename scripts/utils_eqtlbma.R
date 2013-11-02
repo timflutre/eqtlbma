@@ -165,7 +165,7 @@ CalcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
 
 CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
                                             subgroups=NULL){
-  ## Calculate the pairwise eQTL sharing by marginalizing other subgroup
+  ## Calculate the pairwise eQTL sharing by marginalizing other subgroups
   ##
   ## Args:
   ##  configs: data.frame with configuration probabilities
@@ -210,6 +210,40 @@ CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
   }
   
   return(pi1.marginal)
+}
+
+ReformatPairwiseEqtlSharing <- function(dat){
+  ## After the EM has been fitted on each pair of subgroups, this function
+  ## can be used to reformat the results into a pairwise "eQTL sharing" matrix
+  ##
+  ## Args:
+  ##  dat: data.frame with 4 columns subgroup1|subgroup2<sep>proba<sep>subgroup2|subgroup1<sep>proba
+  ##   and S(S-1)/2 rows where S is the nb of subgroups
+  ##
+  ## Returns:
+  ##  matrix so that mat[i,j] corresponds to Pr(active in subgroup j | active in subgroup i)
+  stopifnot(ncol(dat) == 4)
+  
+  S <- (1 + sqrt(1 + 4 * 2 * nrow(dat))) / 2
+  message(paste0("nb of subgroups: ", S))
+  
+  subgroups <- unique(do.call(c, lapply(dat[,1], function(x){
+    strsplit(x, "\\|")[[1]]
+  })))
+  message(paste(subgroups, collapse="-"))
+  
+  mat <- matrix(nrow=S, ncol=S,
+                dimnames=list(subgroups, subgroups))
+  
+  diag(mat) <- 1
+  for(k in 1:nrow(dat)){
+    j <- strsplit(dat[k,1], "\\|")[[1]][1]
+    i <- strsplit(dat[k,1], "\\|")[[1]][2]
+    mat[i,j] <- as.numeric(dat[k,2])
+    mat[j,i] <- as.numeric(dat[k,4])
+  }
+  
+  return(mat)
 }
 
 EstimatePi0WithEbf <- function(log10.bfs, verbose=0){
