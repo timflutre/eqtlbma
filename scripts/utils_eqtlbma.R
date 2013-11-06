@@ -227,9 +227,9 @@ ReformatPairwiseEqtlSharing <- function(dat){
   S <- (1 + sqrt(1 + 4 * 2 * nrow(dat))) / 2
   message(paste0("nb of subgroups: ", S))
   
-  subgroups <- unique(do.call(c, lapply(dat[,1], function(x){
+  subgroups <- sort(unique(do.call(c, lapply(dat[,1], function(x){
     strsplit(x, "\\|")[[1]]
-  })))
+  }))))
   message(paste(subgroups, collapse="-"))
   
   mat <- matrix(nrow=S, ncol=S,
@@ -246,7 +246,7 @@ ReformatPairwiseEqtlSharing <- function(dat){
   return(mat)
 }
 
-EstimatePi0WithEbf <- function(log10.bfs, verbose=0){
+EstimatePi0WithEbf <- function(log10.bfs, verbose=1){
   ## Estimate pi0 (proba for a null hypothesis to be true)
   ## via the EBF procedure (Wen, in prep)
   ##
@@ -273,7 +273,30 @@ EstimatePi0WithEbf <- function(log10.bfs, verbose=0){
   return(pi0.ebf)
 }
 
-ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=0){
+EstimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
+  ## Estimate pi0 (proba for a null hypothesis to be true)
+  ## via the QBF procedure (Wen, in prep)
+  ##
+  ## Args:
+  ##  log10.bfs: matrix with tests in rows and two columns, the true log10(BF)
+  ##   and the gamma-quantile log10(BF) under the null
+  ##  gamma: level of the quantile (e.g. 0.5 for the median)
+  ##
+  ## Returns:
+  ##   pi0 (numeric)
+  
+  if(verbose > 0)
+    message(paste0("nb of tests: ", nrow(log10.bfs)))
+  
+  pi0.qbf <- sum(log10.bfs[,1] <= log10.bfs[,2]) / (nrow(log10.bfs) * gamma)
+  if(verbose > 0)
+    message(paste0("estimate pi0-hat = ",
+                   format(x=pi0.qbf, scientific=TRUE, digits=6)))
+  
+  return(pi0.qbf)
+}
+
+ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
   ## Call significant hypotheses by controlling the Bayesian FDR
   ## via the procedure from Newton et al (Biostatistics 2004)
   ## also described in Muller et al (JASA 2006)
@@ -288,7 +311,7 @@ ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=0){
   
   if(verbose > 0)
     message(paste0(length(log10.bfs), " tests and pi0-hat = ",
-                   format(x=pi0.ebf, scientific=TRUE, digits=6)))
+                   format(x=pi0, scientific=TRUE, digits=6)))
   
   ## compute the posterior probability of each test being null
   post.null <- pi0 / (pi0 + (1-pi0) * 10^log10.bfs)
