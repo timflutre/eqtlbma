@@ -86,7 +86,7 @@ Currently two main tools are available:
 @item
 @command{eqtlbma_bf} can compute summary statistics in each subgroup, 
 Bayes Factors for the joint analysis using default hyperparameters, 
-as well as perform permutations;
+as well as perform permutations at the gene-level;
 @item
 @command{eqtlbma_hm} can fit the hierarchical model via an EM algorithm (maximum likelihood),
 and thus provide ``empirical Bayes'' estimates of hyperparameters.
@@ -130,7 +130,7 @@ If you want to skip one subgroup, simply add a hashtag at the begining of the li
 @end verbatim
 
 The files containing the genotypes can be in three possible formats.
-Even though these formats can handle genetic variants other then SNPs,
+Even though these formats can handle genetic variants other than SNPs,
 we focus here on SNPs.
 Moreover, for each format, the names of the individuals have to be indicated 
 and they need to be the same as in the files containing the gene expression levels (see next section).
@@ -174,8 +174,7 @@ and use it to only load the SNPs in @emph{cis} of the genes specified by the opt
 If the index file is not present, all SNPs will be loaded which will be slower and use more memory.
 See the FAQ below to know how to build the index for the BED file.
 
-The option @option{--maf} allows to skip SNPs 
-if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
+The option @option{--maf} allows to skip SNPs if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
 
 The option @option{--covar} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.
@@ -190,7 +189,7 @@ covar2 -1.0 0.8 ...
 ...
 @end verbatim
 Note that this format is also read by the R package MatrixEQTL.
-Here again, no missing data is allowed.
+Here also, no missing covariate is allowed.
 
 
 @section Expression levels
@@ -220,14 +219,37 @@ gene1 2.0495 1.0947 1.9924 ...
 gene2 0.1928 -0.873 0.5284 ...
 ...
 @end verbatim
-Here again, this format is read by the R package MatrixEQTL and no missing data is allowed.
+Here again, this format is read by the R package MatrixEQTL.
+
+More importantly, the sample identifiers should be the same between genotype and expression files.
+The order of the columns is not important, but the fact that the identifiers 
+should be the same between files is an effort to avoid forgetting which column 
+correspond to which sample, as can easy happen when data sets are shared between collaborators.
+
+Note that, starting with version 1.3, missing expression levels are allowed.
+They should be encoded with ``NA'', ``na'', ``NaN'' or ``nan''.
+Missing data can arise from various reasons.
+The consequence can be that given individuals are completely missing from some subgroups,
+or only some genes from given individuals are missing in some subgroups.
+If the individuals are different in each subgroup, then one doesn't need to allow the errors
+in the multivariate regression to be correlated, and there is no problem.
+However, if the individuals are partially overlapping between subgroups, 
+we need to explicitly handle the missing data.
+In such a case, we assume that the data are ``missing at random'', that is, 
+the fact that a gene expression level is missing is a priori not associated 
+with the genotypes at any SNP.
+Then, the only issue is about estimating the covariance between the errors in 
+each pair of subgroups (off-diagonal elements of the covariance matrix).
+Our solution is straightforward: for a given pair of subgroup, we simply use 
+the individuals present in these two subgroups.
 
 As the files with phenotypes don't contain the gene coordinates, we also need to use the option
 @option{--gcoord} to specify gene coordinates in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
 Genes with no coordinates will be skipped (useful when launching the program in parallel, see below).
 
-The option @option{--qnorm} allows the program to transform the expression level of each gene
-into the quantiles of a standard Normal distribution.
+The option @option{--qnorm} allows the program to transform the expression 
+level of each gene into the quantiles of a standard Normal distribution.
+This is done just before performing the linear regressions.
 Otherwise, an FAQ entry at the end of this document indicates how to do this beforehand in R.
 
 
@@ -250,9 +272,9 @@ the definition of the @emph{cis} region uses <= and >= instead of < and >.
 
 @section Types of analysis
 
-The option @option{--out} requires a character string and will use it 
-as a prefix to name the output files.
+The option @option{--out} requires a character string which will be used as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
+That is, all output files are readable by @command{gzip} and @command{zcat}.
 
 The program @command{eqtlbma_bf} can perform several types of analysis.
 The option @option{--type sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
@@ -286,11 +308,13 @@ An FAQ entry below shows how to produce such files in R.
 The option @option{--bfs} allows to specify which Bayes Factors we want to compute.
 The acronym ``abf'' is used to mean ``approximated Bayes factor'' because the Bayes Factor
 can't be calculated analytically and therefore has to be approximated using Laplace's method.
-This approximation is very accurate, see the preprint by Wen & Stephens for more details.
+This approximation is very accurate, see the article by Wen & Stephens in 
+the Annals of Applied Statistics (2013) for more details.
 
 Specifying @option{--bfs gen} computes the ``general'' BF 
 corresponding to the consistent configuration using the large grid.
-This ``general'' BF is useful in a meta-analysis setting, and fixed-effect and maximum-heterogeneity BFs are also calculated (see Wen & Stephens).
+This ``general'' BF is useful in a meta-analysis setting, and fixed-effect 
+and maximum-heterogeneity BFs are also calculated (see Wen & Stephens).
 
 Specifying @option{--bfs sin} also computes the BF for each singleton, 
 that is for configurations (100), (010) and (001) if there are 3 subgroups.
@@ -305,7 +329,7 @@ Using @option{--bfs all} can be too costly when the number of subgroups exceeds 
 The model implemented in this package is based on a linear regression, and there are several ways of
 specifying the variance-covariance matrix of the errors.
 If the subgroups contain different individuals, we can choose @option{--error uvlr} (for univariate linear regression).
-If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr} (for multivariate linear regression, see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}).
+If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr} (for multivariate linear regression, see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}, accepted in Biometrics).
 If the subgroups contain some individuals in common and some not, we can choose @option{--error hybrid}.
 For the latter, the effect sizes and their variance are estimated using all individuals in each subgroup,
 whereas their covariance are estimated using each pair of subgroups with only individuals in common.
@@ -453,7 +477,7 @@ The @command{eqtlbma_hm} program can take several options, available in the comm
 The option @option{--data} requires the input file with the Bayes Factors,
 typically the output file from @command{eqtlbma_bf} with suffix ``_l10abfs_raw.txt.gz''.
 We can also give a file pattern (a @url{https://en.wikipedia.org/wiki/Glob_%28programming%29,glob}),
-such as @option{--data ``out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz''},
+such as @option{--data "out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz"},
 where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001, 002, ..., 100).
 
 The option @option{--nsubgrp} requires the number of subgroups, e.g. 3.
@@ -480,7 +504,7 @@ The second column should contain the value of the parameter.
 The third column should contain a boolean, encoded as TRUE or FALSE, indicating if the parameter should be kept fixed or not.
 Note that all parameters should be present in the file.
 
-The option @option{rand} can be used to randomly initialize the parameters at the beginning of the EM.
+The option @option{--rand} can be used to randomly initialize the parameters at the beginning of the EM.
 To make inference replicable, we can sue the option @option{seed}.
 
 The option @option{--tresh} can be given the threshold to terminate the EM algorithm.
@@ -492,7 +516,7 @@ a number of threads (the code uses @url{https://en.wikipedia.org/wiki/OpenMP,Ope
 
 If we want to fit the hierarchical model using only a pair of subgroups, we can use the option @option{--configs}.
 For instance, among 3 subgroups, to only load the Bayes Factors corresponding to subgroups 1 and 3,
-we would do @option{--configs ``1|3|1-3''}.
+we would do @option{--configs "1|3|1-3"}.
 
 The option @option{--getci} can be set in order to compute and return 95% confidence intervals 
 using the @url{https://en.wikipedia.org/wiki/Likelihood_function#Profile_likelihood,profile likelihood}.
@@ -507,7 +531,7 @@ We would hence surely prefer to use the @command{eqtlbma_avg_bfs} program (see b
 about which quantities to compute (averaged Bayes Factors, various posteriors).
 
 The gene-level @math{\pi_0} (the probability for a gene to have no eQTL) 
-is hard to estimate accurately, therefore it can be useful to estimate it by another method 
+is hard to estimate accurately, therefore it can be useful to estimate it by another method (e.g. permutations)
 and set it manually to see how it impacts the estimates of the other hyperparameters.
 We can easily do it using option @option{--pi0}, meaning that pi0 won't be updated by the EM algorithm.
 Another way is to use a file with @option{--init}, but in that case all other parameters should also be present in the file.
@@ -515,7 +539,7 @@ Another way is to use a file with @option{--init}, but in that case all other pa
 Finally, the command-line will typically look like this:
 @verbatim
 eqtlbma_hm \
---data ``out_eqtlbma_*_l10abfs_raw.txt.gz'' \
+--data "out_eqtlbma_*_l10abfs_raw.txt.gz" \
 --nsubgrp 7 \
 --ngrid 10 \
 --out out_hm.txt.gz \
@@ -526,6 +550,96 @@ After launching the @command{eqtlbma_hm} program, we can follow the EM iterating
 
 Then, if option @option{--getbf} was not given, we can use the @command{eqtlbma_avg_bfs} program 
 to compute the final quantities of interest, e.g. posteriors.
+
+@c=============================================================================
+
+@node Computing the posteriors
+@chapter Computing the posteriors
+
+@cindex posteriors
+
+The @command{eqtlbma_avg_bfs} program can take several options, available in the command line via @command{eqtlbma_avg_bfs -h}.
+
+The option @option{--in} requires the input file with the Bayes Factors,
+typically the output file from @command{eqtlbma_bf} with suffix ``_l10abfs_raw.txt.gz''.
+We can also give a file pattern (a @url{https://en.wikipedia.org/wiki/Glob_%28programming%29,glob}),
+such as @option{--data "out_eqtlbma_[0-9][0-9][0-9]_l10abfs_raw.txt.gz"},
+where ``[0-9][0-9][0-9]'' corresponds to the batch numbers (e.g. 001, 002, ..., 100).
+
+The option @command{--gwts} requires the path to a file containing the grid weights.
+There should be one value per line.
+For instance, with the default grid in file ``grid_phi2_oma2_with-configs.txt.gz'' 
+as generated by the R code in the FAQ, there are 10 lines.
+See the FAQ to know how to extract the grid weights from the output of @command{eqtlbma_hm}.
+
+If you want to only keep a subset of the Bayes factors, for instance only those corresponding to lines 1, 3 and 5 of the grid,
+you can use the option @command{--gtk}, such as @option{--gtk 1+3+5}.
+
+The option @command{--nsubgrp} requires the number of subgroups, and the option @command{--dim} requires the dimension of the model, that is the number of active configurations (7 if there are 3 subgroups).
+
+The option @command{--cwts} requires the path to a file containing the configuration weights.
+This file should have two columns, the identifier of the configuration and its probability.
+There should then be one configuration per line.
+In the end, the file should look like this:
+@verbatim
+1       0.13
+2       0.19
+1-2     0.68
+@end verbatim
+See the FAQ to know how to extract the configuration weights from the output of @command{eqtlbma_hm}.
+
+The option @option{--save} is used to indicate which quantity(ies) should be saved in the output file.
+Using @option{--save bf} means that only Bayes factors will be saved,
+@option{--save post} means that only posteriors will be saved,
+and @option{--save bf+post} means both.
+Note that saving the posteriors also requires specifying the options @option{--pi0} and @option{--post} (see below).
+
+The option @option{--pi0} requires the value of the probability for a gene to have no eQTL in any subgroup.
+If not provided, Bayes factors will be saved instead of posteriors.
+
+The option @option{--post} requires the kind(s) of posteriors to save.
+Using @option{--post a} corresponds to the posterior for a gene to have at least one eQTL in at least one subgroup,
+@option{--post b} corresponds to the posterior that the SNP is ''the'' eQTL for the gene (i.e. ``eQTN''), in at least one subgroup, given that the gene has exactly one eQTL and assuming all cis SNPs are equally likely;
+@option{--post c} corresponds to the posterior that the SNP is 'an' eQTL for the gene, in at least one subgroup, given that the gene contains at least one eQTL and that the SNPs are independent;
+and @option{--post d} corresponds to the posterior that the SNP is an eQTL in subgroup s, given that it is ``the'' eQTL for the gene (i.e. the configurations are marginalized).
+
+The option @option{--gene} requires the path to a file with a subset of gene(s) to keep.
+There should be one gene per line.
+
+The option @option{--snp} requires the path to a file with a subset of SNP(s) to keep.
+There should be one SNP per line.
+Caution about this option because, as not all cis SNPs are kept, this will change gene-level Bayes factors and posteriors.
+
+The option @option{--gene-snp} requires the path to a file with a subset of gene-SNP pair(s) to keep.
+There should be two columns, the first for the gene and the second for the SNP.
+As for @option{--snp}, as not all cis SNPs are kept, this will change gene-level Bayes factors and posteriors.
+
+The option @option{--bestsnp} requires the kind of best SNP(s) to save.
+The default, @option{--bestsnp 0} means that all cis SNPs will be saved.
+Using @option{--bestsnp 1} means only the best SNP is saved (pick one if tie), based on the proba for a SNP to be ``the'' eQTL.
+Using option @option{--bestsnp 2} means that, possibly several, best SNPs are reported so that the sum of their proba to be ``the'' eQTL just exceeds 0.95.
+
+The option @option{--bestdim} is used to report the best configuration per SNP, as well as its Bayes factor and/or posterior,
+whereas the option @option{--alldim} reports the Bayes factors and/or posteriors of all configurations (caution, this can be a lot).
+
+The option @option{--thread} requires the number of threads to use (default is 1).
+
+Finally, the command-line will typically look like this:
+@verbatim
+eqtlbma_avg_bfs \
+--in "out_eqtlbma_*_l10abfs_raw.txt.gz" \
+--gwts grid_weights.txt \
+--nsubgrp 3 \
+--dim 7 \
+--cwts config_weights.txt \
+--save bf+post \
+--pi0 0.783629 \
+--post a+b+c+d \
+--bestdim \
+--alldim \
+--out out_eqtlbma_avg_bfs.txt.gz \
+--thread 4
+@end verbatim
 
 @c=============================================================================
 
@@ -551,11 +665,11 @@ This article is freely available @url{http://dx.doi.org/10.1371/journal.pgen.100
 See the function @option{MakeGrid} in the file @command{scripts/utils_eqtlbma.R}.
 A typical code would look like this:
 @verbatim
-gridL <- MakeGrid(``general'')
-write.table(x=gridL, file=gzfile(``grid_phi2_oma2_general.txt.gz''),
+gridL <- MakeGrid("general")
+write.table(x=gridL, file=gzfile("grid_phi2_oma2_general.txt.gz"),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
-gridS <- MakeGrid(``configs'')
-write.table(x=gridS, file=gzfile(``grid_phi2_oma2_with-configs.txt.gz''),
+gridS <- MakeGrid("configs")
+write.table(x=gridS, file=gzfile("grid_phi2_oma2_with-configs.txt.gz"),
             quote=FALSE, row.names=FALSE, col.names=FALSE)
 @end verbatim
 
@@ -581,7 +695,7 @@ zcat ../gene_coords.bed.gz | cut -f1-4 | split \
 --filter='gzip > $FILE.gz' - list_genes_; cd ..
 @end verbatim
 
-This will create around 100 files in a directory, such as ``lists_genes/list_genes_001.bed.gz''.
+This will create around 100 files in a directory, such as "lists_genes/list_genes_001.bed.gz".
 
 @sp 1
 
@@ -647,13 +761,34 @@ gzip out_eqtlbma_sumstats_${sbgrp}.txt
 @sp 1
 
 @item
+@strong{How do I extract the grid weights from eqtlbma_hm's output?}
+
+Before using @command{eqtlbma_avg_bfs}, use the following command-line:
+@verbatim
+zcat out_eqtlbma_hm.txt.gz | grep "#grid" | cut -f2 > grid_weights.txt
+@end verbatim
+
+@sp 1
+
+@item
+@strong{How do I extract the configuration weights from eqtlbma_hm's output?}
+
+Before using @command{eqtlbma_avg_bfs}, use the following command-line:
+@verbatim
+zcat out_eqtlbma_hm.txt.gz | grep "#config'' \
+| awk '{split($1,a,"."); print a[2]"\t"$2}' > config_weights.txt
+@end verbatim
+
+@sp 1
+
+@item
 @strong{Is this packaged tested?}
 
 We implemented some R code in order to perform @url{https://en.wikipedia.org/wiki/Functional_testing,functional tests} on @command{eqtlbma_bf} and @command{eqtlbma_hm}.
 Launching them is automatized via @option{make check}.
 
 You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
-To compile it, enter into the @command{src/} directory and run @command{grep ``g++'' simul_flutre_et_al.cpp} 
+To compile it, enter into the @command{src/} directory and run @command{grep "g++" simul_flutre_et_al.cpp} 
 to see how to do it.
 As usual, a help message is available with the option @command{-h}.
 
