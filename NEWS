@@ -1,3 +1,19 @@
+2013-11-21 v.1.2.2
+==================
+
+Bug fixes
+* minor buffer overflow in getDateTime() (Ryan Welch. from the University of 
+Michigan, raised the issue on GitHub)
+
+
+2013-10-28 v.1.2.1
+==================
+
+New features
+* minor changes in utils.cpp to allow compilation on Mac OS X (however the 
+bash scripts still require GNU getopt, not available by default on Mac)
+
+
 2013-03-28 v1.2
 ===============
 
