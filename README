@@ -14,6 +14,8 @@ This library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
+See the wiki on GitHub: https://github.com/timflutre/eqtlbma/wiki
+
 
 Installation
 ============
@@ -37,5 +39,3 @@ or
    make html
 
 See the NEWS file for recent changes to the package.
-
-See also the wiki on GitHub: https://github.com/timflutre/eqtlbma/wiki

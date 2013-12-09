@@ -67,7 +67,7 @@ This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}).
 @chapter Overview
 
 In genetics, ``QTL'' stands for quantitative trait locus.
-It corresponds to a genotype-phenotype relationship in which variation in the genotype is associated with variation in the phenotype.
+It corresponds to a genotype-phenotype relationship for which a proportion of the variation in phenotype can be ascribed to deviation of the genotype from the mean genetic value (Lewontin, 2006).
 For the moment, this package focuses on the case where genotypes come from single nucleotide polymorphisms (SNP) 
 and phenotypes are gene expression levels, thus explaining the ``e'' in ``eQTL''.
 
@@ -92,10 +92,12 @@ as well as perform permutations at the gene-level;
 and thus provide ``empirical Bayes'' estimates of hyperparameters.
 @end itemize
 
-A third program, @command{eqtlbma_avg_bfs}, allows to average the raw Bayes Factors over
-the hyperparameters' estimates, and then to compute various posterior probabilities of interest.
+A third program, @command{eqtlbma_avg_bfs}, allows to average the raw Bayes Factors (from @command{eqtlbma_bf}) 
+over the hyperparameters' estimates (from @command{eqtlbma_hm}), 
+and then to compute various posterior probabilities of interest.
 
 The details of the model are freely available online in the @url{http://dx.doi.org/10.1371/journal.pgen.1003486,article} by Flutre @emph{et al} (PLoS Genetics, 2013).
+See also Wen's @url{http://stephenslab.uchicago.edu/MSpapers/WenThesis.pdf,PhD thesis} (2011), Wen & Stephens (Annals of Applied Statistics, 2013) and Wen (Biometrics, 2013).
 
 @c=============================================================================
 

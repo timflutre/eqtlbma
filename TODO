@@ -5,3 +5,4 @@
 * add tutorials with common cases
 * handle categorical covariates with more than 2 levels in eqtlbma_bf
 * check init parameters from file in eqtlbma_hm (e.g. sum to 1)
+* write a script to convert input files for use with "sbams" package
