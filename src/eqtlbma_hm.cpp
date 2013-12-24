@@ -1385,7 +1385,7 @@ void help(char ** argv)
        << "      --data\tinput data (usually output files from eqtlbma_bf)" << endl
        << "      --nsubgrp\tnumber of subgroups" << endl
        << "      --model\twhich model to fit (default=configs/types)" << endl
-       << "      --dim\tdimension of the model (nb of configs or types)" << endl
+       << "      --dim\tdimension of the model (nb of active configs or types)" << endl
        << "      --ngrid\tnumber of grid points" << endl
        << "      --out\toutput file (gzipped)" << endl
        << "      --init\tfile for initialization" << endl

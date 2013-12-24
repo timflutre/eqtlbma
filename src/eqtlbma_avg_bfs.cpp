@@ -72,7 +72,7 @@ void help(char ** argv)
        << "\t\te.g. '1+3+5+7+9' to keep only those with no heterogeneity" << endl
        << "      --model\twhich model (default=configs/types)" << endl
        << "      --nsubgrp\tnumber of subgroups" << endl
-       << "      --dim\tdimension of the model (nb of configs or types)" << endl
+       << "      --dim\tdimension of the model (nb of active configs or types)" << endl
        << "      --cwts\tfile with configuration weights (one per line, name<sep>value)" << endl
        << "\t\tonly a subset of the configs can be given, in agreement with --nsubgrp and --dim" << endl
        << "      --tswts\tfile with type and subgroup weights (one per line, name<sep>value)" << endl
