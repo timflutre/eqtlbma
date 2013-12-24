@@ -36,7 +36,7 @@ namespace quantgen {
   {
     name_ = name;
     chromosome_ = chromosome;
-    start_ = atol(start.c_str());
+    start_ = atol(start.c_str()) + 1; // in BED format, start starts at 0
     end_ = atol(end.c_str());
   }
   

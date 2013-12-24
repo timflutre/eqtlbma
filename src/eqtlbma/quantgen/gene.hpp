@@ -49,6 +49,7 @@ namespace quantgen {
     std::string chromosome_;
     size_t start_; // 1-based coordinate
     size_t end_; // idem
+    std::string strand_; // + or -, not always specified
     
     std::map<std::string,std::vector<double> > subgroup2explevels_;
     
@@ -85,11 +86,17 @@ namespace quantgen {
   public:
     Gene(void);
     Gene(const std::string & name, const std::string & chromosome,
-	 const std::string & start, const std::string & end);
+	 const std::string & start, const std::string & end); // from BED file
     std::string GetName(void) const { return name_; };
     std::string GetChromosome(void) const { return chromosome_; };
     size_t GetStart(void) const { return start_; };
     size_t GetEnd(void) const { return end_; };
+    std::string GetStrand(void) { return strand_; };
+    void SetName(const std::string & name) { name_ = name; };
+    void SetChromosome(const std::string & chr) { chromosome_ = chr; };
+    void SetStart(const size_t & start) { start_ = start; };
+    void SetEnd(const size_t & end) { end_ = end; };
+    void SetStrand(const std::string & strand) { strand_ = strand; };
     std::string GetRegionInTabixFormat(const std::string & anchor,
 				       const size_t & radius) const;
     size_t GetNbSubgroups(void) const { return subgroup2explevels_.size(); };
