@@ -23,7 +23,17 @@
 rm(list=ls())
 sink(file=stdout(), type="message")
 prog.name <- "functional_tests.R"
+prog.version <- "1.0"
 
+R.v.maj <- as.numeric(R.version$major)
+R.v.min.1 <- as.numeric(strsplit(R.version$minor, "\\.")[[1]][1])
+if(R.v.maj < 2 || (R.v.maj == 2 && R.v.min.1 < 15))
+    stop("require R >= 2.15 (for paste0)", call.=FALSE)
+
+##' Display the help on stdout
+##'
+##' The format complies with help2man (http://www.gnu.org/s/help2man)
+##' @title Help
 help <- function(){
   txt <- paste0("`", prog.name, "' simulates a typical eQTL data set in multiple tissues and analyzes it with R in order to test `bf'.\n")
   txt <- paste0(txt, "\nUsage: ", prog.name, " [OPTIONS] ...\n")
@@ -41,8 +51,12 @@ help <- function(){
   message(txt)
 }
 
+##' Display version and license information on stdout
+##'
+##' To comply with help2man (http://www.gnu.org/s/help2man)
+##' @title Version
 version <- function(){
-  txt <- paste0(prog.name, " 1.0\n")
+  txt <- paste0(prog.name, " ", prog.version, "\n")
   txt <- paste0(txt, "\n")
   txt <- paste0(txt, "Written by Timothee Flutre.\n")
   txt <- paste0(txt, "\n")
@@ -53,6 +67,12 @@ version <- function(){
   message(txt)
 }
 
+##' Parse the command-line arguments
+##'
+##' Allow short and long options
+##' @title Command-line
+##' @param params list of parameters initialized with default values
+##' @return List of parameters
 parseCmdLine <- function(params){
   args <- commandArgs(trailingOnly=TRUE)
   ## print(args)
@@ -113,6 +133,9 @@ parseCmdLine <- function(params){
   return(params)
 }
 
+##' Check the values of the command-line parameters
+##'
+##' @param params list of parameters
 checkParams <- function(params){
   stopifnot(! is.null(params$dir.name),
             file.exists(params$dir.name),
@@ -654,7 +677,7 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
   return(std.sstats.corr)
 }
 
-## Calculate the log10(ABF) of Wen & Stephens (arXiv 2011)
+## Calculate the log10(ABF) of Wen & Stephens (AOAS, 2013))
 calcL10Abf <- function(sstats, phi2, oma2){
   l10abf <- NA
   
@@ -752,7 +775,7 @@ calcL10AbfsRawAllGridS <- function(std.sstats.corr, gridS, configs){
   return(l10abfs)
 }
 
-## Return the log10(ABF) from Wen (arXiv 2012)
+## Return the log10(ABF) from Wen (Biometrics, accepted)
 ## using raw data or summary statistics
 ##
 ## betag.hat is a vector [SNP 1 in all tissues, SNP 2 in all tissues, etc]
