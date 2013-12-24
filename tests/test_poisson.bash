@@ -117,7 +117,7 @@ function calc_obs_res () {
     fi
     cmd="${pathToBf} --geno list_genotypes.txt --scoord snp_coords.bed.gz"
     cmd+=" --exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5"
-    cmd+=" --out obs_bf --outss --outraw --type join --bfs all"
+    cmd+=" --out obs_bf --outss --outw --type join --bfs all"
     cmd+=" --gridL grid_phi2_oma2_general.txt.gz"
     cmd+=" --gridS grid_phi2_oma2_with-configs.txt.gz"
     if ! $quasi; then

@@ -112,7 +112,7 @@ function calc_obs_res () {
     fi
     $pathToBf --geno list_genotypes.txt --scoord snp_coords.bed.gz \
 	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
-	--out obs_bf --outss --outraw --type join --bfs all \
+	--out obs_bf --outss --outw --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
 	--error hybrid --fiterr 0.0 \

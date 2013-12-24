@@ -115,9 +115,8 @@ void help(char ** argv)
        << "\t\t'sep': separate analysis of each subgroup" << endl
        << "\t\t'join': joint analysis of all subgroups" << endl
        << "      --outss\twrite the output file with all summary statistics" << endl
-       << "      --outraw\twrite the output file with all raw ABFs" << endl
-       << "\t\tby default, only the ABFs averaged over the grids are written" << endl
-       << "\t\twriting all raw ABFs can be too much if the number of subgroups is large" << endl
+       << "      --outw\twrite the output file with the ABFs averaged over the grid" << endl
+       << "\t\tgrid weights are uniformly equal" << endl
        << "      --qnorm\tquantile-normalize the exp levels to a N(0,1)" << endl
        << "      --maf\tminimum minor allele frequency (default=0.0)" << endl
        << "      --covar\tfile with absolute paths to covariate files" << endl
@@ -220,7 +219,7 @@ parseCmdLine(
   size_t & radius,
   string & out_prefix,
   bool & save_sstats,
-  bool & save_raw_abfs,
+  bool & save_weighted_abfs,
   string & likelihood,
   string & type_analysis,
   bool & need_qnorm,
@@ -257,7 +256,8 @@ parseCmdLine(
       {"cis", required_argument, 0, 0},
       {"out", required_argument, 0, 0},
       {"outss", no_argument, 0, 0},
-      {"outraw", no_argument, 0, 0},
+      {"outm", no_argument, 0, 0},
+      {"outw", no_argument, 0, 0},
       {"lik", required_argument, 0, 0},
       {"type", required_argument, 0, 0},
       {"qnorm", no_argument, 0, 0},
@@ -321,8 +321,8 @@ parseCmdLine(
 	save_sstats = true;
 	break;
       }
-      if(strcmp(long_options[option_index].name, "outraw") == 0){
-	save_raw_abfs = true;
+      if(strcmp(long_options[option_index].name, "outw") == 0){
+	save_weighted_abfs = true;
 	break;
       }
       if(strcmp(long_options[option_index].name, "lik") == 0){
@@ -978,6 +978,8 @@ void loadGeneInfo(const string & file_genecoords, const int & verbose,
     if(gene2object.find(tokens[3]) != gene2object.end())
       continue; // in case of redundancy
     Gene gene(tokens[3], tokens[0], tokens[1], tokens[2]);
+    if(tokens.size() >= 6)
+      gene.SetStrand(tokens[5]);
     gene2object.insert(make_pair(gene.GetName(), gene));
     if(mChr2VecPtGenes.find(gene.GetChromosome()) == mChr2VecPtGenes.end())
       mChr2VecPtGenes.insert(make_pair(gene.GetChromosome(),
@@ -2212,14 +2214,15 @@ void writeResAbfsRaw(
     for(vector<GeneSnpPair>::const_iterator it_pair
 	   = it_gene->second.BeginPair(); it_pair != it_gene->second.EndPair();
 	 ++it_pair){
+      
       // write gen BFs (large grid)
       ssTxt.str("");
       ssTxt << it_gene->first
 	    << sep << it_pair->GetSnpName()
 	    << sep << "gen";
       for(vector<double>::const_iterator it
-	     = it_pair->BeginUnweightedAbf("gen");
-	   it != it_pair->EndUnweightedAbf("gen"); ++it)
+	    = it_pair->BeginUnweightedAbf("gen");
+	  it != it_pair->EndUnweightedAbf("gen"); ++it)
 	ssTxt << sep << *it;
       ssTxt << "\n";
       ++nb_lines;
@@ -2231,8 +2234,8 @@ void writeResAbfsRaw(
 	    << sep << it_pair->GetSnpName()
 	    << sep << "gen-fix";
       for(vector<double>::const_iterator it
-	     = it_pair->BeginUnweightedAbf("gen-fix");
-	   it != it_pair->EndUnweightedAbf("gen-fix"); ++it)
+	    = it_pair->BeginUnweightedAbf("gen-fix");
+	  it != it_pair->EndUnweightedAbf("gen-fix"); ++it)
 	ssTxt << sep << *it;
       ssTxt << "\n";
       ++nb_lines;
@@ -2244,8 +2247,8 @@ void writeResAbfsRaw(
 	    << sep << it_pair->GetSnpName()
 	    << sep << "gen-maxh";
       for(vector<double>::const_iterator it
-	     = it_pair->BeginUnweightedAbf("gen-maxh");
-	   it != it_pair->EndUnweightedAbf("gen-maxh"); ++it)
+	    = it_pair->BeginUnweightedAbf("gen-maxh");
+	  it != it_pair->EndUnweightedAbf("gen-maxh"); ++it)
 	ssTxt << sep << *it;
       ssTxt << "\n";
       ++nb_lines;
@@ -2316,8 +2319,10 @@ void writeResAbfsAvgGrids(
   openFile(ssOutFile.str(), outStream, "wb");
   
   // write header line
-  ssTxt << "gene" << sep << "snp" << sep << "nb.subgroups" << sep
-	<< "l10abf.gen" << sep << "l10abf.gen.fix" << sep << "l10abf.gen.maxh";
+  ssTxt << "gene" << sep << "snp" << sep << "nb.subgroups";
+  ssTxt << sep << "l10abf.gen"
+	<< sep << "l10abf.gen.fix"
+	<< sep << "l10abf.gen.maxh";
   if(type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0)
     ssTxt << sep << "l10abf.gen.sin";
   if(type_bfs.compare("all") == 0)
@@ -2454,7 +2459,7 @@ void writeResJoinPermPval(
 void writeRes(
   const string & out_prefix,
   const bool & save_sstats,
-  const bool & save_raw_abfs,
+  const bool & save_weighted_abfs,
   const vector<string> & subgroups,
   const map<string, Gene> & gene2object,
   const map<string, Snp> & snp2object,
@@ -2484,11 +2489,11 @@ void writeRes(
   }
   
   if(type_analysis.compare("join") == 0){
-    if(save_raw_abfs)
-      writeResAbfsRaw(out_prefix, gene2object, subgroups.size(), iGridL, iGridS,
-		      type_bfs, verbose);
-    writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), type_bfs,
-			 type_errors, verbose);
+    writeResAbfsRaw(out_prefix, gene2object, subgroups.size(), iGridL, iGridS,
+		    type_bfs, verbose);
+    if(save_weighted_abfs)
+      writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), type_bfs,
+			   type_errors, verbose);
   }
   
   if(type_analysis.compare("join") == 0 && nb_permutations > 0)
@@ -2504,7 +2509,7 @@ void run(const string & file_genopaths,
 	 const size_t & radius,
 	 const string & out_prefix,
 	 const bool & save_sstats,
-	 const bool & save_raw_abfs,
+	 const bool & save_weighted_abfs,
 	 const string & likelihood,
 	 const string & type_analysis,
 	 const bool & need_qnorm,
@@ -2585,7 +2590,7 @@ void run(const string & file_genopaths,
 		     type_permbf, use_max_bf, verbose, gene2object);
   }
   
-  writeRes(out_prefix, save_sstats, save_raw_abfs, subgroups, gene2object,
+  writeRes(out_prefix, save_sstats, save_weighted_abfs, subgroups, gene2object,
 	   snp2object, type_analysis, iGridL, iGridS, type_bfs, nb_permutations,
 	   type_perm_sep, type_errors, seed, type_permbf, use_max_bf, verbose);
 }
@@ -2595,7 +2600,7 @@ int main(int argc, char ** argv)
   int verbose = 1, trick = 0, type_perm_sep = 0, nb_threads = 1;
   size_t radius = 100000, nb_permutations = 0, seed = string::npos, trick_cutoff = 10;
   float min_maf = 0.0, prop_cov_errors = 0.5;
-  bool save_sstats = false, save_raw_abfs = false, need_qnorm = false,
+  bool save_sstats = false, save_weighted_abfs = false, need_qnorm = false,
     use_max_bf = false;
   string file_genopaths, file_snpcoords, file_exppaths, file_genecoords,
     anchor = "TSS", out_prefix, likelihood = "normal", type_analysis,
@@ -2605,11 +2610,12 @@ int main(int argc, char ** argv)
   
   parseCmdLine(argc, argv, file_genopaths, file_snpcoords, file_exppaths,
 	       file_genecoords, anchor, radius, out_prefix, save_sstats,
-	       save_raw_abfs, likelihood, type_analysis, need_qnorm, min_maf,
-	       file_covarpaths, file_largegrid, file_smallgrid, type_bfs,
-	       type_errors, prop_cov_errors, nb_permutations, seed, trick,
-	       trick_cutoff, type_perm_sep, type_permbf, use_max_bf,
-	       nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
+	       save_weighted_abfs, likelihood, type_analysis,
+	       need_qnorm, min_maf, file_covarpaths, file_largegrid,
+	       file_smallgrid, type_bfs, type_errors, prop_cov_errors,
+	       nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
+	       type_permbf, use_max_bf, nb_threads, file_snpstokeep,
+	       subgroups_tokeep, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -2623,11 +2629,11 @@ int main(int argc, char ** argv)
   }
   
   run(file_genopaths, file_snpcoords, file_exppaths, file_genecoords, anchor,
-      radius, out_prefix, save_sstats, save_raw_abfs, likelihood,
-      type_analysis, need_qnorm, min_maf, file_covarpaths, file_largegrid,
-      file_smallgrid, type_bfs, type_errors, prop_cov_errors, nb_permutations,
-      seed, trick, trick_cutoff, type_perm_sep, type_permbf, use_max_bf,
-      nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
+      radius, out_prefix, save_sstats, save_weighted_abfs,
+      likelihood, type_analysis, need_qnorm, min_maf, file_covarpaths,
+      file_largegrid, file_smallgrid, type_bfs, type_errors, prop_cov_errors,
+      nb_permutations, seed, trick, trick_cutoff, type_perm_sep, type_permbf,
+      use_max_bf, nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
   
   if(verbose > 0){
     time (&time_end);
