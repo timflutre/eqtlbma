@@ -1,4 +1,4 @@
-##  `utils_eqtlbma.R' contains utility functions for the eQtlBma package.
+##  `utils_eqtlbma.R' contains utility functions for the eQtlBma package
 ##  Copyright (C) 2013 Timothee Flutre
 ##
 ##  This program is free software: you can redistribute it and/or modify
@@ -14,77 +14,76 @@
 ##  You should have received a copy of the GNU General Public License
 ##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-TransformGeneExpInStdNormal <- function(mat, break.ties.rand=TRUE,
+##' Transform gene expression levels into a N(0,1) via quantile normalization
+##' 
+##'
+##' Performed gene by gene, across samples
+##' @title Quantile normalization
+##' @param mat matrix with genes in rows and samples in columns
+##' @param break.ties.rand break ties randomly (default=TRUE)
+##' @param seed to make it reproducible
+##' @return Matrix with transformed genes in rows and samples in columns
+transformGeneExpInStdNormal <- function(mat, break.ties.rand=TRUE,
                                         seed=1859){
-  ## Transform gene expression levels into a N(0,1) via quantile normalization
-  ## (gene by gene, across samples).
-  ##
-  ## Args:
-  ##  mat: matrix with genes in rows and samples in columns
-  ##  break.ties.rand: should the ties be broken randomly? yes by default
-  ##  seed: to make it reproducible
-  ##
-  ## Returns:
-  ##  a matrix with transformed genes in rows and samples in columns
-  stopifnot(is.matrix(mat), is.logical(break.ties.rand))
-  if(nrow(mat) < ncol(mat))
-    warning("input matrix doesn't seem to have genes in rows and samples in columns")
-  if(break.ties.rand && ! is.null(seed))
-    set.seed(seed)
-  
-  mat.qn <- t(apply(mat, 1, function(exp.per.gene){
-    if(break.ties.rand){
-      idx <- sample(length(exp.per.gene))
-      tmp <- qqnorm(exp.per.gene[idx], plot.it=FALSE)$x
-      tmp[sort(idx, index.return=TRUE)$ix]
-    } else
-      qqnorm(exp.per.gene, plot.it=FALSE)$x
-  }))
-  colnames(mat.qn) <- colnames(mat)
-  
-  return(mat.qn)
+    stopifnot(is.matrix(mat), is.logical(break.ties.rand))
+    if(nrow(mat) < ncol(mat))
+        warning("input matrix doesn't seem to have genes in rows and samples in columns")
+    if(break.ties.rand && ! is.null(seed))
+        set.seed(seed)
+    
+    mat.qn <- t(apply(mat, 1, function(exp.per.gene){
+        if(break.ties.rand){
+            idx <- sample(length(exp.per.gene))
+            tmp <- qqnorm(exp.per.gene[idx], plot.it=FALSE)$x
+            tmp[sort(idx, index.return=TRUE)$ix]
+        } else
+            qqnorm(exp.per.gene, plot.it=FALSE)$x
+    }))
+    colnames(mat.qn) <- colnames(mat)
+    
+    return(mat.qn)
 }
 
-RemoveConfoundersFromGeneExp <- function(X, confounders){
-  ## Remove a set of confounders (e.g. PCs or PEER factors) from a matrix 
-  ## of gene expression levels (linear regression per gene).
-  ##
-  ## Args:
-  ##  X: matrix with samples in rows and genes in columns
-  ##     (it will be centered and scaled before PCs are removed)
-  ##  confounders: matrix with samples in rows and confounders in columns
-  ##
-  ## Returns:
-  ##  matrix of residuals
-  stopifnot(is.matrix(X),
-            is.matrix(confounders),
-            nrow(X) == nrow(confounders))
-  if(nrow(X) > ncol(X))
-    warning("input matrix doesn't seem to have samples in rows and genes in columns")
-  
-  res <- lm.fit(x=confounders, y=scale(X, center=TRUE, scale=TRUE))
-  return(t(res$residuals))
+##' Remove confounders from a matrix of gene expression levels
+##'
+##' Can be PCs, PEER factors, etc;  linear regression per gene
+##' @title Remove "expression" confounders
+##' @param X matrix with samples in rows and genes in columns,
+##'  will be centered and scaled before confounders are removed
+##' @param confounders matrix with samples in rows and confounders in columns
+##' @return Matrix of residuals
+removeConfoundersFromGeneExp <- function(X, confounders){
+    stopifnot(is.matrix(X),
+              is.matrix(confounders),
+              nrow(X) == nrow(confounders))
+    if(nrow(X) > ncol(X))
+        warning("input matrix doesn't seem to have samples in rows and genes in columns")
+    
+    res <- lm.fit(x=confounders, y=scale(X, center=TRUE, scale=TRUE))
+    
+    return(t(res$residuals))
 }
 
-MakeGrid <- function(grid.type="general", no.het=FALSE){
-  ## Make the grid used to compute Bayes Factors.
-  ##
-  ## Args:
-  ##  grid.type: "general" indicates the meta-analysis grid (large),
-  ##             otherwise the configuration grid (small) is returned
-  ##  no.het: if TRUE, the grid is built without heterogeneity
-  ##
-  ## Returns:
-  ##  matrix with the grid
+##' Make the grid used to compute Bayes Factors
+##'
+##' @title Grid
+##' @param grid.type "general" indicates the meta-analysis grid (large),
+##' otherwise the configuration grid (small) is returned
+##' @param no.het if TRUE, the grid is built without heterogeneity
+##' @return Matrix with the grid
+makeGrid <- function(grid.type="general", no.het=FALSE){
   stopifnot(is.character(grid.type), is.logical(no.het))
+  
   oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
   oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
+  
   if(grid.type != "general"){
     if(no.het){
       oma2.over.oma2.plus.phi2 <- c(1)
     } else
       oma2.over.oma2.plus.phi2 <- c(3/4, 1)
   }
+  
   grid <- matrix(NA, nrow=length(oma2.plus.phi2) *
                  length(oma2.over.oma2.plus.phi2), ncol=2)
   colnames(grid) <- c("phi2", "oma2")
@@ -96,24 +95,172 @@ MakeGrid <- function(grid.type="general", no.het=FALSE){
       i <- i + 1
     }
   }
+  
   return(grid)
 }
 
-CalcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
-                                          main=NULL){
-  ## Calculate the probability to be active in s subgroups
-  ## by summing configuration probabilities.
-  ##
-  ## Args:
-  ##  configs: data.frame with column "id" and column "proba"
-  ##           ("id" should be "1" or "1-3-4", etc)
-  ##
-  ## Returns:
-  ##  list with probas per subgroup
+##' Identify SNPs in cis of each gene
+##'
+##' Use findOverlaps() from GenomicRanges, TSS +- cis.radius
+##' @title SNPs in cis of genes
+##' @param gene.coords.bed data.frame in BED format
+##' @param snp.coords.bed data.frame in BED format
+##' @param anchor gene boundary(ies) for the cis region (TSS or TSS+TES)
+##' @param cis.radius.5p length of the 5' half of the cis region (in bp)
+##' @param cis.radius.3p length of the 3' half of the cis region (in bp)
+##' @param verbose verbosity level (0/default=1/2)
+##' @return List with gene names as components, each having a corresponding
+##' vector of SNP names (reported genes have at least one cis SNP)
+findCisSnpsPerGene <- function(gene.coords.bed, snp.coords.bed, anchor,
+                               cis.radius.5p, cis.radius.3p, verbose=1){
+    require("GenomicRanges") # from Bioconductor
+    stopifnot(anchor %in% c("TSS", "TSS+TES"))
+    
+    ## convert SNP coordinates from data.frame to GRanges structure
+    snp.coords.gr <-
+        GRanges(seqnames=Rle(snp.coords.bed$chr),
+                ranges=IRanges(start=as.numeric(snp.coords.bed$start) + 1,
+                    end=as.numeric(snp.coords.bed$end)))
+    names(snp.coords.gr) <- snp.coords.bed$name
+    
+    ## idem for genes, but now defined as cis regions
+    cis.regions.gr <-
+        GRanges(seqnames=Rle(gene.coords.bed$chr),
+                ranges=IRanges(start=as.numeric(gene.coords.bed$start) + 1,
+                    end=as.numeric(gene.coords.bed$end)))
+    names(cis.regions.gr) <- gene.coords.bed$name
+    strand(cis.regions.gr) <- gene.coords.bed$strand
+    
+    idx.strand.p <- which(strand(cis.regions.gr) == "+")
+    idx.strand.m <- which(strand(cis.regions.gr) == "-")
+    if(anchor == "TSS"){
+        end(cis.regions.gr[idx.strand.p]) <- start(cis.regions.gr[idx.strand.p])
+        start(cis.regions.gr[idx.strand.m]) <- end(cis.regions.gr[idx.strand.m])
+    }
+    
+    start(cis.regions.gr[idx.strand.p]) <-
+        ifelse(start(cis.regions.gr[idx.strand.p]) - cis.radius.5p > 0,
+               start(cis.regions.gr[idx.strand.p]) - cis.radius.5p, 1)
+    end(cis.regions.gr[idx.strand.p]) <- end(cis.regions.gr[idx.strand.p]) +
+        cis.radius.3p
+    
+    end(cis.regions.gr[idx.strand.m]) <- end(cis.regions.gr[idx.strand.m]) + cis.radius.5p
+    start(cis.regions.gr[idx.strand.m]) <-
+        ifelse(start(cis.regions.gr[idx.strand.m]) - cis.radius.3p > 0,
+               start(cis.regions.gr[idx.strand.m]) - cis.radius.3p, 1)
+    
+    idx.gs.pairs <- as.matrix(findOverlaps(cis.regions.gr, snp.coords.gr))
+    
+    gn2sn <- sapply(split(idx.gs.pairs[,2],
+                          names(cis.regions.gr)[idx.gs.pairs[,1]]),
+                    function(i) names(snp.coords.gr)[i])
+    ## summary(sapply(gn2sn, length))
+    
+    if(verbose > 0)
+        message("nb of gene-SNP pairs: ", sum(sapply(gn2sn, length)))
+    
+    return(gn2sn)
+}
+
+##' Plot the histogram of the number of cis SNPs per gene
+##'
+##' @title Histogram of cis SNPs
+##' @param nb.cis.snps.per.gene vector
+plotHistCisSnpsPerGene <- function(gn2sn){
+    nb.cis.snps.per.gene <- sapply(gn2sn, length)
+    tmp <- hist(x=nb.cis.snps.per.gene,
+                main=paste0(length(gn2sn), " genes and ",
+                    length(unique(do.call(c, gn2sn))), " SNPs"),
+                xlab="number of cis SNPs per gene",
+                col="grey", border="white")
+    x <- tmp$breaks[ceiling((3/4)*length(tmp$breaks))]
+    y <- max(tmp$counts) / 2
+    text(x=x, y=1.2*y, labels=paste0("minimum: ", min(nb.cis.snps.per.gene), " SNPs"))
+    text(x=x, y=y, labels=paste0("median: ", median(nb.cis.snps.per.gene), " SNPs"))
+    text(x=x, y=0.8*y, labels=paste0("maximum: ", max(nb.cis.snps.per.gene), " SNPs"))
+}
+
+##' Estimate kinship matrix K via the Balding-Nichols model
+##'
+##' eqn 2.2 of Astle & Nichols (Statistical Science, 2009)
+##' @title Balding-Nichols matrix
+##' @param genos.dose matrix with SNPs in rows and individuals in columns,
+##' and genotypes coded as allele dose (i.e. in [0,2]),
+##' but no missing data is allowed
+##' @return Kinship matrix
+estimKinshipBaldingNichols <- function(genos.dose){
+    allele.freqs <- apply(genos.dose, 1, function(x){
+        sum(x) / (2 * length(x))
+    })
+    tmp <- sweep(genos.dose, 1, 2 * allele.freqs, FUN="-")
+    tmp <- sweep(tmp, 1, 2 * sqrt(allele.freqs * (1 - allele.freqs)), FUN="/")
+    K <- (1/P) * crossprod(tmp, tmp)
+    return(K)
+}
+
+##' Get all binary configurations
+##'
+##' Done recursively
+##' @title Configurations
+##' @param nb.subgroups 
+##' @param verbose 
+##' @return Matrix with configurations in rows and subgroups in columns
+getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
+  if(verbose > 0)
+    cat("list all configurations for the effect of a SNP in each subgroup\n")
+  if(nb.subgroups >= 20)
+    warning("nb of subgroups may be too high, better to keep it below 20!",
+            call.=FALSE, immediate.=TRUE)
+  states <- c(0,1)  # must be sorted!
+  if(nb.subgroups == 1)
+    matrix(data=states, nrow=2, ncol=1)
+  else{
+    inner <- Recall(nb.subgroups-1)
+    cbind(rep(states, rep(nrow(inner), 2)),
+          matrix(t(inner), ncol=ncol(inner), nrow=nrow(inner)*2,
+                 byrow=TRUE))
+  }
+}
+
+##' Simulate from a matrix-variate Normal distribution
+##'
+##' @param n the number of samples required (default=1)
+##' @param M a matrix giving the means of the variables
+##' @param U a positive-definite symmetric matrix specifying the among-row
+##' covariance matrix of the variables
+##' @param V a positive-definite symmetric matrix specifying the among-column
+##' covariance matrix of the variables
+##' @return Array with samples in the third dimension
+matvrnorm <- function(n=1, M, U, V){
+    stopifnot(nrow(M) == nrow(U),
+              ncol(M) == nrow(V),
+              nrow(U) == ncol(U),
+              nrow(V) == ncol(V))
+    
+    tmp <- lapply(1:n, function(i){
+        matrix(data=mvrnorm(n=1, mu=c(M), Sigma=V %x% U),
+               nrow=nrow(M), ncol=ncol(M))
+    })
+    
+    return(array(data=do.call(c, tmp), dim=c(nrow(M), ncol(M), n)))
+}
+
+##' Calculate the probability to be active in s subgroups
+##' by summing configuration probabilities
+##'
+##' @title Activity probabilities
+##' @param configs data.frame with column "id" and column "proba"
+##' ("id" should be "1" or "1-2" or "1-3-4", etc)
+##' @param plot.it plot the probas (default=FALSE)
+##' @param main main title for the plot
+##' @return List with probas per subgroup
+calcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
+                                         main=NULL){
   stopifnot(is.data.frame(configs),
             "id" %in% colnames(configs),
             "proba" %in% colnames(configs),
             is.logical(plot.it))
+  
   if(plot.it && is.null(main))
     main <- "Estimates of configuration probabilities"
   
@@ -163,19 +310,18 @@ CalcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
   return(list(subgroups=probas1, configs=probas2))
 }
 
-CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
+##' Calculate the pairwise eQTL sharing by marginalizing other subgroups
+##'
+##' @title Pairwise eQTL sharing
+##' @param configs data.frame with configuration probabilities
+##' @param reformat if TRUE, configs should have a column "id" ("1", "1-3-4", etc)
+##' and column "proba"; else, configs should have one column
+##' per subgroup (with 0 or 1 per row) and a column  "proba"
+##' @param subgroups vector of names (otherwise "subgroup.s" will be used)
+##' @return Matrix with element i,j being
+##' Pr(eQTL in subgroup j | eQTL in subgroup i)
+calcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
                                             subgroups=NULL){
-  ## Calculate the pairwise eQTL sharing by marginalizing other subgroups
-  ##
-  ## Args:
-  ##  configs: data.frame with configuration probabilities
-  ##  reformat: if TRUE, configs should have a column "id" ("1", "1-3-4", etc)
-  ##            and column "proba"; else, configs should have one column
-  ##            per subgroup (with 0 or 1 per row) and a column  "proba"
-  ##  subgroups: vector of names (otherwise "subgroup.s" will be used)
-  ##
-  ## Returns:
-  ##  matrix with element i,j being Pr(eQTL in subgroup j | eQTL in subgroup i)
   stopifnot(is.data.frame(configs),
             is.logical(reformat))
   
@@ -212,16 +358,13 @@ CalcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
   return(pi1.marginal)
 }
 
-ReformatPairwiseEqtlSharing <- function(dat){
-  ## After the EM has been fitted on each pair of subgroups, this function
-  ## can be used to reformat the results into a pairwise "eQTL sharing" matrix
-  ##
-  ## Args:
-  ##  dat: data.frame with 4 columns subgroup1|subgroup2<sep>proba<sep>subgroup2|subgroup1<sep>proba
-  ##   and S(S-1)/2 rows where S is the nb of subgroups
-  ##
-  ## Returns:
-  ##  matrix so that mat[i,j] corresponds to Pr(active in subgroup j | active in subgroup i)
+##' After the EM has been fitted on each pair of subgroups, this function
+##' can be used to reformat the results into a pairwise "eQTL sharing" matrix
+##' 
+##' @param dat data.frame with 4 columns subgroup1|subgroup2<sep>proba<sep>subgroup2|subgroup1<sep>proba
+##' and S(S-1)/2 rows where S is the nb of subgroups
+##' @return Matrix so that mat[i,j] corresponds to Pr(active in subgroup j | active in subgroup i)
+reformatPairwiseEqtlSharing <- function(dat){
   stopifnot(ncol(dat) == 4)
   
   S <- (1 + sqrt(1 + 4 * 2 * nrow(dat))) / 2
@@ -246,16 +389,15 @@ ReformatPairwiseEqtlSharing <- function(dat){
   return(mat)
 }
 
-EstimatePi0WithEbf <- function(log10.bfs, verbose=1){
-  ## Estimate pi0 (proba for a null hypothesis to be true)
-  ## via the EBF procedure (Wen, in prep)
-  ##
-  ## Args:
-  ##  log10.bfs: vector containing the log10(BF) of each test
-  ##
-  ## Returns:
-  ##   pi0 (numeric)
-  
+##' Estimate pi0 (proba for a null hypothesis to be true)
+##' via the EBF procedure
+##'
+##' Wen, arXiv:1311.3981
+##' @title EBF procedure
+##' @param log10.bfs vector containing the log10(BF) of each test
+##' @param verbose verbosity level (0/default=1)
+##' @return Numeric
+estimatePi0WithEbf <- function(log10.bfs, verbose=1){
   if(verbose > 0)
     message(paste0("nb of tests: ", length(log10.bfs)))
   
@@ -273,18 +415,17 @@ EstimatePi0WithEbf <- function(log10.bfs, verbose=1){
   return(pi0.ebf)
 }
 
-EstimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
-  ## Estimate pi0 (proba for a null hypothesis to be true)
-  ## via the QBF procedure (Wen, in prep)
-  ##
-  ## Args:
-  ##  log10.bfs: matrix with tests in rows and two columns, the true log10(BF)
-  ##   and the gamma-quantile log10(BF) under the null
-  ##  gamma: level of the quantile (e.g. 0.5 for the median)
-  ##
-  ## Returns:
-  ##   pi0 (numeric)
-  
+##' Estimate pi0 (proba for a null hypothesis to be true)
+## via the QBF procedure
+##'
+##' Wen, arXiv:1311.3981
+##' @title QBF procedure
+##' @param log10.bfs matrix with tests in rows and two columns, the true log10(BF)
+##' and the gamma-quantile log10(BF) under the null
+##' @param gamma level of the quantile (e.g. 0.5 for the median)
+##' @param verbose verbosity level (0/default=1)
+##' @return Numeric
+estimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
   if(verbose > 0)
     message(paste0("nb of tests: ", nrow(log10.bfs)))
   
@@ -296,19 +437,17 @@ EstimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
   return(pi0.qbf)
 }
 
-ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
-  ## Call significant hypotheses by controlling the Bayesian FDR
-  ## via the procedure from Newton et al (Biostatistics 2004)
-  ## also described in Muller et al (JASA 2006)
-  ##
-  ## Args:
-  ##  log10.bfs: vector containing the log10(BF) of each test
-  ##  pi0: estimate of the proba for a null hypothesis to be true
-  ##  fdr.level: threshold below which a null is rejected (default=0.05)
-  ##
-  ## Returns:
-  ##   vector of booleans, TRUE if null is rejected (thus called significant)
-  
+##' Call significant tests by controlling the Bayesian FDR
+##' 
+##' procedure from Newton et al (Biostatistics, 2004) also described
+##' in Muller et al (JASA, 2006)
+##' @title Bayesian FDR control
+##' @param log10.bfs vector containing the log10(BF) of each test
+##' @param pi0 estimate of the proba for a null hypothesis to be true
+##' @param fdr.level threshold below which a null is rejected (default=0.05)
+##' @param verbose verbosity level (0/default=1)
+##' @return Vector of booleans, TRUE if null is rejected (thus called significant)
+controlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
   if(verbose > 0)
     message(paste0(length(log10.bfs), " tests and pi0-hat = ",
                    format(x=pi0, scientific=TRUE, digits=6)))
@@ -331,15 +470,12 @@ ControlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
   return(significant)
 }
 
-Log10WeightedSum <- function(x, weights=NULL){
-  ## Compute log_{10}(\sum_i w_i 10^x_i) stably.
-  ##
-  ## Args:
-  ##  x: vector of log10(values)
-  ##  weights: optional vector of weights (equal weights if not specified)
-  ##
-  ## Returns:
-  ##  log10(\sum_i weights[i] 10^x[i])
+##' Compute log_{10}(\sum_i w_i 10^x_i) stably
+##'
+##' @param x vector of log10(values)
+##' @param weights optional vector of weights (equal weights if not specified)
+##' @return Numeric
+log10WeightedSum <- function(x, weights=NULL){
   stopifnot(is.vector(x))
   if(! is.null(weights)){
     stopifnot(is.vector(weights))
@@ -349,21 +485,17 @@ Log10WeightedSum <- function(x, weights=NULL){
   max + log10(sum(weights * 10^(x - max)))
 }
 
-CalcAsymptoticBayesFactorWakefield <- function(theta.hat, V, W, log10=TRUE){
-  ## Calculate the asymptotic Bayes Factor proposed by Wakefield
-  ## in Genetic Epidemiology 33:79-86 (2009)
-  ##
-  ## Notes:
-  ##  ABF = (\int_theta p(theta.hat|theta) p(theta) dtheta) / p(theta.hat|theta=0)
-  ##
-  ## Args:
-  ##  theta.hat: MLE of the additive genetic effect
-  ##  V: variance of theta.hat
-  ##  W: variance of the prior on theta
-  ##  log10: return the log10 of the ABF is TRUE
-  ##
-  ## Returns:
-  ##  numeric
+##' Calculate the asymptotic Bayes Factor proposed by Wakefield
+##' in Genetic Epidemiology 33:79-86 (2009)
+##'
+##' http://dx.doi.org/10.1002/gepi.20359
+##' @title Asymptotic Bayes factor from Wakefield
+##' @param theta.hat MLE of the additive genetic effect
+##' @param V variance of theta.hat
+##' @param W variance of the prior on theta
+##' @param log10 to return the log10 of the ABF (default=TRUE)
+##' @return Numeric
+calcAsymptoticBayesFactorWakefield <- function(theta.hat, V, W, log10=TRUE){
   z2 <- theta.hat^2 / V # Wald statistic
   log10.ABF <- 0.5 * log10(V) - 0.5 * log10(V + W) +
     (0.5 * z2 * W / (V + W)) / log(10)
@@ -373,19 +505,18 @@ CalcAsymptoticBayesFactorWakefield <- function(theta.hat, V, W, log10=TRUE){
     return(10^log10.ABF)
 }
 
-CalcExactBayesFactorServinStephens <- function(G, Y, sigma.a, sigma.d, log10=TRUE){
-  ## Calculate the exact Bayes Factor proposed by Servin and Stephens
-  ## in PLoS Genetics 3 7 (2007)
-  ##
-  ## Args:
-  ##  G: vector of genotypes
-  ##  Y: vector of phenotypes
-  ##  sigma.a: variance of the prior on the additive genetic effect
-  ##  sigma.d: variance of the prior on the dominance genetic effect
-  ##  log10: return the log10 of the BF is TRUE
-  ##
-  ## Returns:
-  ##  numeric
+##' Calculate the exact Bayes Factor proposed by Servin and Stephens
+##' in PLoS Genetics 3,7 (2007)
+##'
+##' http://dx.doi.org/10.1371/journal.pgen.0030114
+##' @title Bayes factor from Servin and Stephens
+##' @param G vector of genotypes
+##' @param Y vector of phenotypes
+##' @param sigma.a variance of the prior on the additive genetic effect
+##' @param sigma.d variance of the prior on the dominance genetic effect
+##' @param log10 to return the log10 of the ABF (default=TRUE)
+##' @return Numeric
+calcExactBayesFactorServinStephens <- function(G, Y, sigma.a, sigma.d, log10=TRUE){
   stopifnot(is.vector(G), is.vector(Y))
   subset <- complete.cases(Y) & complete.cases(G)
   Y <- Y[subset]
