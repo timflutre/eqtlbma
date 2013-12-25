@@ -1756,7 +1756,7 @@ void testForAssociations(
 	 << " likelihood=" << likelihood;
     if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
       cout << " errors=" << type_errors << " prop_cov_errors=" << prop_cov_errors;
-    cout << " threads=1";
+    // cout << " threads=1";
     cout << endl << flush;
   }
   

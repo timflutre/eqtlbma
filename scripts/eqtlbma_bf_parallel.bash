@@ -38,7 +38,7 @@ function help () {
     msg+="      --type\ttype of analysis to perform (sep/join)\n"
     msg+="\t\tdefault=sep\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
-    msg+="      --outraw\twrite the output file with all raw ABFs\n"
+    msg+="      --outw\twrite the output file with the ABFs averaged over the grid\n"
     msg+="      --qnorm\tquantile-normalize the expression levels to a N(0,1)\n"
     msg+="      --maf\tminimum minor allele frequency\n"
     msg+="\t\tdefault=0\n"
@@ -100,7 +100,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outraw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -123,7 +123,7 @@ function parseArgs () {
 	    --out) out=$2; shift 2;;
 	    --type) type=$2; shift 2;;
 	    --outss) outss=true; shift;;
-	    --outraw) outraw=true; shift;;
+	    --outw) outw=true; shift;;
 	    --qnorm) qnorm=true; shift;;
 	    --maf) maf=$2; shift 2;;
 	    --covar) covar=$2; shift 2;;
@@ -198,7 +198,7 @@ cis=100000
 out="out_eqtlbma"
 type="sep"
 outss=false
-outraw=false
+outw=false
 qnorm=false
 maf=0
 covar=""
@@ -252,8 +252,8 @@ cmd+=" --type ${type}"
 if $outss; then
     cmd+=" --outss"
 fi
-if $outraw; then
-    cmd+=" --outraw"
+if $outw; then
+    cmd+=" --outw"
 fi
 if $qnorm; then
     cmd+=" --qnorm"
