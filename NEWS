@@ -5,14 +5,15 @@ New features
 * allow correlated errors when expression levels (some genes and/or some 
 individuals) are missing in some subgroups ("hybrid")
 * in 'eqtlbma_bf', use --fiterr 0.5 by default compare to 0 before (motivated 
-by Wen, Biometrics 2013), which can cause slitghly different values for the BFs
+by Wen, Biometrics), which can cause slitghly different values for the BFs
 * keep median of log10(ABF) from permutations for QBF procedure (Wen, arXiv)
+* add a tutorial with simulated data, see the manual
 * major refactoring (use multiple libraries, handled by libtool) which causes 
 some options to change for eqtlbma_bf and eqtlbma_hm, see the manual
 * add tests for the multivariate Bayes Factor and the EM algorithm
 * in 'eqtlbma_bf', skip SNPs with missing genotypes (with a warning)
 * add 'eqtlbma_avg_bfs' to compute final quantities with more flexibility
-* add 'utils_eqtlbma.R'
+* add 'utils_eqtlbma.R' in directory scripts/
 * implement Poisson likelihood and quasi-likelihood for single-tissue analysis
 but still beta (that is, users should not use it)
 * add "type" model but still beta (that is, users should not use it)
@@ -23,6 +24,7 @@ as well as to parallelize over SNPs in 'eqtlbma_bf' for permutations
 * in 'eqtlbma_bf', handle tabix-indexed BED file for SNP coordinates
 
 Bug fixes
+* in 'eqtlbma_bf', add +1 to the start of gene coordinates from BED files
 * in 'eqtlbma_hm', don't use underscore to split identifiers
 
 
