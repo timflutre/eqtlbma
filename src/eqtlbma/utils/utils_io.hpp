@@ -51,7 +51,7 @@ namespace utils {
   std::vector<std::string> split (const std::string & s, char delim);
 
   std::vector<std::string> & split (const std::string & s, const char * delim,
-			  std::vector<std::string> & tokens);
+				    std::vector<std::string> & tokens);
 
   std::vector<std::string> split (const std::string & s, const char * delim);
 
@@ -84,7 +84,7 @@ namespace utils {
 		    const std::string & pathToFile, const size_t & lineId);
 
   std::vector<size_t> getCounters (const size_t & nbIterations,
-			      const size_t & nbSteps);
+				   const size_t & nbSteps);
 
   void printCounter (const size_t & currentIter,
 		     const std::vector<size_t> & vCounters);
@@ -126,6 +126,8 @@ namespace utils {
   double getMaxMemUsedByProcess (void);
 
   std::string getMaxMemUsedByProcess2Str (void);
+
+  void clearFilesystemMemCache(void);
 
   std::string getCmdLine (int argc, char ** argv);
 
