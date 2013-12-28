@@ -1,7 +1,6 @@
 * allow 2 radii, one for TSS and one for TES, and handle gene strand (include BEDtools?)
 * add penalty to pi0 in EM
 * allow eqtlbma_bf to read summary stats in place of raw data
-* try gzread to speed-up reading large files
 * use tabix library when parsing genotype files in VCF and IMPUTE formats
 * make a real R package, at first only with all current R scripts
 * check init parameters from file in eqtlbma_hm (e.g. sum to 1)
