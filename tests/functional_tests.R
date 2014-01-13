@@ -242,6 +242,8 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
                             end=c(seq(30, 270, length.out=6),
                               seq(30, 180, length.out=4)),
                             id=paste0("gene", 1:nb.genes),
+                            score=rep(1000, nb.genes),
+                            strand=rep("+", nb.genes),
                             stringsAsFactors=FALSE)
   snp.coords <- data.frame(chr=c(rep("chr1", 11),
                              rep("chr2", 4)),

@@ -11,7 +11,7 @@
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
 
-Copyright @copyright{} 2012-2013 Timothee Flutre and Xiaoquan Wen.
+Copyright @copyright{} 2012-2014 Timothee Flutre and Xiaoquan Wen.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -54,9 +54,7 @@ This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}).
 @menu
 * Overview::
 * Tutorial::
-* Inputs and options::
-* Computing Bayes factors in parallel::
-* Reading the outputs::
+* Computing Bayes factors::
 * Fitting the hierarchical model::
 * Computing the posteriors::
 * Frequently asked questions::
@@ -82,12 +80,12 @@ to interpret them.
 @end itemize
 
 The implemented methods allow to jointly analyze data sets from multiple subgroups.
-Here subgroups can be different tissues, cell types, populations, platforms, etc.
+Here @emph{subgroups} can be different tissues, populations, platforms, treatments, etc.
 Currently three main tools are available:
 @itemize
 @item
 @command{eqtlbma_bf} can compute summary statistics in each subgroup, 
-Bayes factors for the joint analysis using default hyperparameters, 
+@url{https://en.wikipedia.org/wiki/Bayes_factor,Bayes factors} for the joint analysis using default hyperparameters, 
 as well as perform permutations at the gene-level;
 @item
 @command{eqtlbma_hm} can fit the hierarchical model via an EM algorithm (maximum likelihood),
@@ -154,7 +152,7 @@ You can track the progress of the program by looking into the file ``stdout_tuto
 Simulating data with R can be slow, but you can use option @option{--cores} to speed this up (adapt to the number of cores available on your machine).
 
 @c We generate SNP and gene coordinates in such a way that genes have an average length of 100 bp, they are separated from each other by an interval of 500 bp, and they have, on average, 10 SNPs in @emph{cis}.
-@c The @emph{cis} region is anchored at the transcription start site (TSS) with a radius of 10 bp.
+@c The @emph{cis} region is anchored at the transcription start site (TSS, assumed to be the start column in the BED file) with a radius of 10 bp.
 
 @c The genotypes are simulated with a minor allele frequency (MAF) of 0.3 and at Hardy-Weinberg equilibrium.
 @c With real data, the package will allow you to filter out SNPs based on their MAF (of course, you can do it by yourself beforehand).
@@ -170,7 +168,7 @@ Simulating data with R can be slow, but you can use option @option{--cores} to s
 @c Finally, we simulate the mRNA levels in all tissues by adding Normally-distributed errors.
 @c The errors are correlated with an average covariance between tissues of 0.2.
 
-As you can now see in the directory, several files were generated in such formats that it will be easy for you to prepare your own data similarly.
+As you can now see in the directory, several files were generated in such formats that it should be easy for you to prepare your own data similarly.
 
 We can now launch the first program, @command{eqtlbma_bf}, to compute the Bayes factors assessing the support in the data for each gene-SNP pair being an eQTL:
 
@@ -193,7 +191,7 @@ eqtlbma_bf \
 @end verbatim
 
 You can track the progress of the program by looking into the file ``stdout_eqtlbma_bf.txt''.
-Upon completion, the output file ``out_eqtlbma_l10abfs_raw.txt.gz'' contains the Bayes factor for each configuration of each gene-SNP pair (in rows) and each grid value (in columns):
+Upon completion, the output file ``out_eqtlbma_l10abfs_raw.txt.gz'' contains the Bayes factor for each configuration of each gene-SNP pair (in rows) and each grid point (in columns):
 @verbatim
 zcat out_eqtlbma_l10abfs_raw.txt.gz | head
 @end verbatim
@@ -222,9 +220,9 @@ zcat out_eqtlbma_hm.txt.gz | grep "#config" \
 @end verbatim
 
 Finally we can launch the third program, @command{eqtlbma_avg_bfs}.
-To obtain the posterior probabilities, we need an estimate of the probability for a gene to haven no eQTL in any tissue, @math{\pi_0}.
-As this quantity is hard to estimate accurately, we usually perform permutations using @command{eqtlbma_bf}.
-But for this tutorial, we will use its true value, 0.3:
+To obtain the posterior probabilities, we need an estimate of the probability for a gene to have no eQTL in any tissue, @math{\pi_0}.
+As this quantity is hard to estimate accurately with the EM algorithm, we usually perform permutations using @command{eqtlbma_bf}.
+As this can take some time, for the tutorial, we will use its true value, 0.3:
 
 @verbatim
 eqtlbma_avg_bfs \
@@ -246,20 +244,29 @@ Upon completion, the output file ``out_eqtlbma_avg_bfs.txt.gz'' contains the pos
 
 You should now be able to perform a similar analysis with your own data.
 Of course, you will surely need more details.
-See the next sections about inputs formats, output formats, launch programs in parallel, etc.
+See the next sections about input and output formats, program options, parallelization, etc.
 
 @c=============================================================================
 
-@node Inputs and options
-@chapter Inputs and options
+@node Computing Bayes factors
+@chapter Computing Bayes factors
 
-@cindex inputs
-@cindex options
+@cindex Bayes factors
+@cindex eqtlbma_bf
 
 Typing @command{eqtlbma_bf --help} or @command{eqtlbma_bf -h} gives the list of options.
 As the help message is long, we may prefer to type @command{eqtlbma_bf -h | less} instead.
 
-@section Genotypes
+Most importantly, for each gene-SNP pair, the @command{eqtlbma_bf} program can compute the Bayes factors (for each configuration and each grid point).
+Such Bayes factors can be computed from ``raw'' data or from ``summary statistics'' per subgroup.
+The @command{eqtlbma_bf} program can also perform permutations at the gene-level.
+
+@section Inputs and options
+
+@cindex inputs eqtlbma_bf
+@cindex options eqtlbma_bf
+
+@subsection Genotypes
 
 The option @option{--geno} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.
@@ -343,7 +350,7 @@ Note that this format is also read by the R package MatrixEQTL.
 Here also, no missing covariate is allowed.
 
 
-@section Expression levels
+@subsection Expression levels
 
 As for the option @option{--geno}, the option @option{--exp} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.
@@ -401,30 +408,31 @@ Genes with no coordinates will be skipped (useful when launching the program in 
 The option @option{--qnorm} allows the program to transform the expression 
 level of each gene into the quantiles of a standard Normal distribution.
 This is done just before performing the linear regressions.
-Otherwise, an FAQ entry at the end of this document indicates how to do this beforehand in R.
+Otherwise, an FAQ entry at the end of this document indicates how to do this beforehand in R (better because ties are randomly broken in the R code).
 
 
-@section @emph{Cis} region
+@subsection @emph{Cis} region
 
 The @command{eqtlbma_bf} program focuses on detecting associations between SNPs and genes,
 restricting itself to SNPs in a @emph{cis} candidate region of each gene.
-The option @option{--anchor} allows to specify the boundary(ies) of this region,
-with ``TSS'' for ``transcription start site'', ``TES'' for ``transcription end site'' and
-``TSS+TES'' for both.
+@c The option @option{--anchor} allows to specify the boundary(ies) of this region,
+@c with ``TSS'' for ``transcription start site'', ``TES'' for ``transcription end site'' and
+@c ``TSS+TES'' for both.
 The option @option{--cis} precises the length of half of the @emph{cis} region (i.e. the radius), in base pairs.
 
-As an example, @option{--anchor TSS --cis 100000} means that, for each gene, 
-we will test all SNPs falling in the interval [-100kb,+100kb] centered on the
-the start coordinate of the given gene as determined from the BED file given to option @option{--gcoord}.
+@c As an example, @option{--anchor TSS --cis 100000} means that, for each gene, 
+@c we will test all SNPs falling in the interval [-100kb,+100kb] centered on the
+@c the start coordinate of the given gene as determined from the BED file given to option @option{--gcoord}.
 
 Following the convention in @url{http://code.google.com/p/bedtools/,BEDTools}, 
 the definition of the @emph{cis} region uses <= and >= instead of < and >.
 
-Note that, for the moment, only the first four columns of the BED file are used.
+Note that, for the moment, only the first four columns of the BED file are used, 
+assuming that the start and end coordinates correspond to the TSS.
 At some point we will have to improve the code to also handle the strand, if specified.
 
 
-@section Types of analysis
+@subsection Types of analysis
 
 The option @option{--out} requires a character string which will be used as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
@@ -494,7 +502,35 @@ Also, with @option{--error mvlr}, the summary statistics per subgroup are not ex
 So in this case, if we want to make forest plots, we will have to also launch @command{eqtlbma_bf} with option @option{--error uvlr}.
 
 
-@section Permutations
+@subsection Summary statistics
+
+Sometimes it is not possible to access the ``raw'' data (say, confidential genotypes in human genetics).
+In such a case, @command{eqtlbma_bf} can still computes the Bayes factors using summary statistics.
+Note that, for the moment, it only works with @option{--error uvlr}.
+
+The option @option{--inss} requires a file as argument.
+This file has two columns separated by a space or a tabulation, and one line per subgroup.
+The first column is the identifier of the subgroup.
+The second column is the path to the file containing the summary statistics for this subgroup.
+Here is an example:
+@verbatim
+Fibroblasts /results/sstats_Fibroblasts.txt.gz
+LCLs /results/sstats_LCLs.txt.gz
+T-cells /results/sstats_T-cells.txt.gz
+@end verbatim
+
+The actual files containing the summary statistics need a header line containing the following words: gene, snp, n, sigmahat, betahat.geno and sebetahat.geno (in any order).
+Let's consider the following linear regression of mRNA levels at gene @math{g} in subgroup @math{s} on the genotypes at SNP @math{p}: @math{\forall i \in \{1,\ldots,n\}, \; y_{gsi} = \mu_{gs} + \beta_{gps} x_{psi} + \epsilon_{gpsi}} with @math{\epsilon_{gpsi} \sim N(0,\sigma_{gps}^2)}.
+As a result, the @emph{n} column should contain the number of samples in the linear regression; the @emph{sigmahat} column should contain the estimate of the standard deviation of the errors, @math{\sigma_{gps}}; the @emph{betahat.geno} column should contain the estimate of the effect size of the genotype, @math{\beta_{gps}}; and the @emph{sebetahat.geno} column should contain the standard error of this estimate.
+In the end, the file should have the following format:
+@verbatim
+gene    snp     n       sigmahat        betahat.geno    sebetahat.geno
+gene1   snp26   200     7.843116e-01    8.091162e-02    8.258911e-02
+...
+@end verbatim
+
+
+@subsection Permutations
 
 Genes having different numbers of SNPs in @emph{cis}, with different patterns of @url{https://en.wikipedia.org/wiki/Linkage_disequilibrium,linkage disequilibrium},
 we implemented a permutation procedure @emph{at the gene level} (see Flutre @emph{et al}).
@@ -528,18 +564,14 @@ Finally, the option @option{--pbf} specifies which BF is used as a test statisti
 The BF called ``BMA'' in Flutre @emph{et al} corresponds to @option{--pbf all},
 and the BF called ``BMAlite'' corresponds to @option{--pbf gen-sin}.
 
-@c=============================================================================
 
-@node Computing Bayes factors in parallel
-@chapter Computing Bayes factors in parallel
-
-@cindex analysis
+@section Computing in parallel
 
 For a small analysis, the command-line for @command{eqtlbma_bf} given in the tutorial is enough.
 However, when dealing with many genes (20,000) and SNPs (5 millions),
 we recommend to split the analysis in batches and launch them in parallel.
-To simplify this and avoid the burden of creating new input files,
-we can have several BED files with different subsets of genes.
+To simplify this and avoid the burden of creating new input files with genotypes and expression levels,
+we can simply have several BED files with different subsets of genes (one per batch).
 
 If we want 100 batches, we only need to split all the gene coordinates into 100 lists.
 An FAQ entry below indicates how to do this easily.
@@ -577,17 +609,15 @@ in the corresponding batch.
 An FAQ entry shows how to find SNPs in @emph{cis} for each gene.
 
 Another FAQ entry shows how to generate a file of seeds, 
-to make each batch reproducible.
+to make each batch reproducible when doing permutations.
 
-Once all batches finished, see the FAQ entry describing how to concatenate all output files of a given kind,
+Once all jobs are finished, see the FAQ entry describing how to concatenate all output files of a given kind,
 for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a single file.
 
-@c=============================================================================
 
-@node Reading the outputs
-@chapter Reading the outputs
+@section Reading the outputs
 
-@cindex outputs
+@cindex outputs eqtlbma_bf
 
 The program @command{eqtlbma_bf} creates several output files, all starting with 
 the character string given to option @option{--out}, e.g. ``out_eqtlbma''
@@ -603,11 +633,11 @@ For steps 2 and 5, there will also be file(s) with the results of the permutatio
 If @option{--permsep 1} was given, there will be one such file, with suffix ``_sepPermPvals.txt.gz''.
 If @option{--permsep 2} was given, there will be one file per subgroup, with suffix ``_sepPermPvals_<subgroup>.txt.gz''.
 
-One file contains all the BFs averaged over the grid, with suffix ``_l10abfs_avg-grids.txt.gz''.
-If option @option{--outraw} was given, there will also be one file with all the raw BFs,
-i.e. one per config per grid value, with suffix ``_l10abfs_raw.txt.gz''.
+One file will contain all the ``raw'' BFs, i.e. one per config per grid point, with suffix ``_l10abfs_raw.txt.gz''.
 Such files are necessary to run the hierarchical model with @command{eqtlbma_hm} (see below).
-For steps 4 and 5, there will also be a file with the results of the permutations,
+
+If option @option{--outw} was given, there will also be one file containing all the BFs averaged over the grid, with suffix ``_l10abfs_avg-grids.txt.gz''.
+Also, for steps 4 and 5, there will also be a file with the results of the permutations,
 with suffix ``_jointPermPvals.txt.gz''.
 
 @c=============================================================================
@@ -616,6 +646,7 @@ with suffix ``_jointPermPvals.txt.gz''.
 @chapter Fitting the hierarchical model
 
 @cindex hierarchical model
+@cindex eqtlbma_hm
 
 The @command{eqtlbma_hm} program can take several options, available in the command line via @command{eqtlbma_hm -h}.
 
@@ -704,6 +735,7 @@ to compute the final quantities of interest, e.g. posteriors.
 @chapter Computing the posteriors
 
 @cindex posteriors
+@cindex eqtlbma_avg_bfs
 
 The @command{eqtlbma_avg_bfs} program can take several options, available in the command line via @command{eqtlbma_avg_bfs -h}.
 
@@ -828,6 +860,7 @@ write.table(x=gridS, file=gzfile("grid_phi2_oma2_with-configs.txt.gz"),
 @strong{How do I transform my phenotypes beforehand into the quantiles of a standard Normal?}
 
 See the function @option{transformGeneExpInStdNormal} in the file @command{scripts/utils_eqtlbma.R}.
+Ties can be broken randomly (particularly useful with RNA-seq).
 
 @sp 1
 
@@ -881,7 +914,7 @@ cut -f8 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
 Change the "100000" into "1000000" if you want a 1Mb radius instead of a 100Kb radius for the @emph{cis} window.
-Note also that, if you want a @emph{cis} region centered on the TSS only (i.e. neglecting the TES), 
+Note also that, to have the @emph{cis} region centered on the TSS only (i.e. neglecting the TES), 
 you will first have to modify the file "gene_coords.bed.gz":
 
 @verbatim
@@ -953,12 +986,14 @@ zcat out_eqtlbma_hm.txt.gz | grep "#config'' \
 @strong{Is this packaged tested?}
 
 We implemented some R code in order to perform @url{https://en.wikipedia.org/wiki/Functional_testing,functional tests} on @command{eqtlbma_bf} and @command{eqtlbma_hm}.
-Launching them is automatized via @option{make check}.
+Launching them is automatized via @option{make check} (requires R >= 2.15).
 
-You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al}.
+You can also find in the @command{src/} directory the code used to simulate data as in Flutre @emph{et al} (2013).
 To compile it, enter into the @command{src/} directory and run @command{grep "g++" simul_flutre_et_al.cpp} 
 to see how to do it.
 As usual, a help message is available with the option @command{-h}.
+
+If you find a bug, please don't hesitate to contact us, thanks in advance!
 
 @sp 1
 

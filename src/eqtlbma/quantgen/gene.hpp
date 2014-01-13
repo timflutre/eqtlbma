@@ -53,7 +53,7 @@ namespace quantgen {
     
     std::map<std::string,std::vector<double> > subgroup2explevels_;
     
-    std::vector<Snp*> snps_; // cis snps
+    std::vector<const Snp*> snps_; // cis snps
     std::vector<GeneSnpPair> gene_snp_pairs_; // contain results
     
     // test statistic: min P-value over SNPs in each subgroup
@@ -85,6 +85,7 @@ namespace quantgen {
     
   public:
     Gene(void);
+    Gene(const std::string & name);
     Gene(const std::string & name, const std::string & chromosome,
 	 const std::string & start, const std::string & end); // from BED file
     std::string GetName(void) const { return name_; };
@@ -110,10 +111,19 @@ namespace quantgen {
 		     const std::vector<std::string>::const_iterator & begin,
 		     const std::vector<std::string>::const_iterator & end);
     void Show(std::ostream & os);
+    void AddCisSnp(const Snp * pt_snp);
     void SetCisSnps(const std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps,
 		    const std::string & anchor, const size_t & radius);
+    bool HasCisSnp(const Snp * pt_snp);
+    size_t FindIdxSnp(const Snp * pt_snp);
     double GetExplevel(const std::string & subgroup, const size_t & idx) const;
-    void TestForAssociations(const std::vector<std::string> & subgroups,
+    std::vector<GeneSnpPair>::iterator AddGeneSnpPair(
+      const std::string & snp_name,
+      const std::string & analysis_type);
+    std::vector<GeneSnpPair>::iterator FindGeneSnpPair(
+      const size_t & idx_snp);
+    void TestForAssociations(const bool & hasDataNotSstats,
+			     const std::vector<std::string> & subgroups,
 			     const Samples & samples,
 			     const std::string & likelihood,
 			     const std::string & type_analysis,

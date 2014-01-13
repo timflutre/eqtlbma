@@ -39,6 +39,25 @@ namespace quantgen {
     snp_name_ = snp_name;
   }
 
+  GeneSnpPair::GeneSnpPair(const string & gene_name, const string & snp_name,
+			   const string & analysis_type)
+  {
+    gene_name_ = gene_name;
+    snp_name_ = snp_name;
+    analysis_type_ = analysis_type;
+  }
+
+  bool operator==(const GeneSnpPair& lhs, const GeneSnpPair& rhs)
+  {
+    return(lhs.GetGeneName().compare(rhs.GetGeneName()) == 0
+	   && lhs.GetSnpName() == rhs.GetSnpName());
+  }
+
+  bool operator!=(const GeneSnpPair& lhs, const GeneSnpPair& rhs)
+  {
+    return !operator==(lhs,rhs);
+  }
+
   bool GeneSnpPair::HasResults(const string & subgroup) const
   {
     bool res = false;
@@ -108,24 +127,26 @@ namespace quantgen {
       if((! same_individuals) || (same_individuals && Xg.size() == 0)){
 	Xg.push_back(Xg_tmp);
       
-	for(map<string,vector<double> >::const_iterator it_covars
-	      = covariates.begin(subgroup);
-	    it_covars != covariates.end(subgroup); ++it_covars){
-	  vector<double> covar_values;
-	  for(vector<size_t>::const_iterator it_idx = indices_all.begin();
-	      it_idx != indices_all.end(); ++it_idx){
-	    idx_covar = samples.GetIndexCovariate(*it_idx, subgroup);
-	    if(idx_covar == string::npos){
-	      cerr << "ERROR: missing covariate " << it_covars->first
-		   << " of gene " << gene_name_ << " and snp " << snp_name_ 
-		   << " for sample " << samples.GetSample(*it_idx)
-		   << " from subgroup " << subgroup << endl;
-	      exit(1);
+	if(covariates.HasCovariates(subgroup)){
+	  for(map<string,vector<double> >::const_iterator it_covars
+		= covariates.begin(subgroup);
+	      it_covars != covariates.end(subgroup); ++it_covars){
+	    vector<double> covar_values;
+	    for(vector<size_t>::const_iterator it_idx = indices_all.begin();
+		it_idx != indices_all.end(); ++it_idx){
+	      idx_covar = samples.GetIndexCovariate(*it_idx, subgroup);
+	      if(idx_covar == string::npos){
+		cerr << "ERROR: missing covariate " << it_covars->first
+		     << " of gene " << gene_name_ << " and snp " << snp_name_ 
+		     << " for sample " << samples.GetSample(*it_idx)
+		     << " from subgroup " << subgroup << endl;
+		exit(EXIT_FAILURE);
+	      }
+	      covar_values.push_back(
+		covariates.GetCovariate(subgroup, it_covars->first, idx_covar));
 	    }
-	    covar_values.push_back(
-	      covariates.GetCovariate(subgroup, it_covars->first, idx_covar));
+	    Xc_tmp.push_back(covar_values);
 	  }
-	  Xc_tmp.push_back(covar_values);
 	}
 	Xc.push_back(Xc_tmp);
       }
@@ -217,6 +238,21 @@ namespace quantgen {
     }
   }
 
+  void GeneSnpPair::SetSstats(const std::string & subgroup,
+			      const size_t & n,
+			      const double & sigmahat,
+			      const double & betahatgeno,
+			      const double & sebetahatgeno)
+  {
+    subgroup2samplesize_.insert(make_pair(subgroup, n));
+    subgroup2sigmahat_.insert(make_pair(subgroup, sigmahat));
+    vector<double> sstats;
+    sstats.push_back(betahatgeno);
+    sstats.push_back(sebetahatgeno);
+    sstats.push_back(NaN);
+    subgroup2sstats_.insert(make_pair(subgroup, sstats));
+  }
+
   void GeneSnpPair::StandardizeSstatsAndCorrectSmallSampleSize(
     map<string,vector<double> > & subgroup2stdsstats)
   {
@@ -232,7 +268,7 @@ namespace quantgen {
 	sebhat = subgroup2sstats_[subgroup][1] / subgroup2sigmahat_[subgroup],
 	t = bhat / sebhat;
     
-      // apply quantile-quantile transformation (Wen and Stephens, arXiv 2011)
+      // apply quantile-quantile transformation (Wen and Stephens, AoAS 2013)
       double nu = N - 2 - subgroup2nbcovariates_[subgroup]; // degrees of freedom
       t = gsl_cdf_gaussian_Pinv(gsl_cdf_tdist_P(-fabs(bhat/sebhat), nu), 1.0);
     
@@ -253,7 +289,7 @@ namespace quantgen {
   }
 
 /** \brief Return the log10 of the approximate Bayes Factor 
- *  from Wen and Stephens (arXiv 2011)
+ *  from Wen and Stephens (AoAS 2013)
  *  \note this is the univariate version of the ABF
  *  \note gamma[s]=1 means the eQTL is present in subgroup s
  */
@@ -481,7 +517,7 @@ namespace quantgen {
 				    it - subgroups.begin() + 1);
       if(comb == NULL) {
 	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       while(true) {
 	prepare_config(comb, config_name, gamma);
@@ -545,7 +581,7 @@ namespace quantgen {
 				    it - subgroups.begin() + 1);
       if(comb == NULL) {
 	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       while(true) {
 	prepare_config(comb, config_name, gamma);
@@ -666,7 +702,7 @@ namespace quantgen {
       comb = gsl_combination_calloc(Y.size(), k);
       if(comb == NULL) {
 	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
     
       while(true) {
@@ -858,7 +894,7 @@ namespace quantgen {
     if(inds_s1s2.empty()){
       cerr << "ERROR: subgroup " << subgroup1 << " and subgroup "
 	   << subgroup2 << " have no individuals in common" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   
     size_t Q = covariates.GetNbCovariates(subgroup1);
@@ -880,14 +916,16 @@ namespace quantgen {
 		     snp.GetGenotype(subgroup1,
 				     samples.GetIndexGenotype(inds_s1s2[i],
 							      subgroup1)));
-      size_t j = 0;
-      for(map<string,vector<double> >::const_iterator it_covars
-	    = covariates.begin(subgroup1);
-	  it_covars != covariates.end(subgroup1); ++it_covars){
-	gsl_matrix_set(X_s1s2, i, 2 + j,
-		       covariates.GetCovariate(subgroup1,
-					       it_covars->first, inds_s1s2[i]));
-	++j;
+      if(Q > 0){
+	size_t j = 0;
+	for(map<string,vector<double> >::const_iterator it_covars
+	      = covariates.begin(subgroup1);
+	    it_covars != covariates.end(subgroup1); ++it_covars){
+	  gsl_matrix_set(X_s1s2, i, 2 + j,
+			 covariates.GetCovariate(subgroup1,
+						 it_covars->first, inds_s1s2[i]));
+	  ++j;
+	}
       }
     }
   
@@ -900,14 +938,16 @@ namespace quantgen {
 		       snp.GetGenotype(subgroup1,
 				       samples.GetIndexGenotype(inds_s1[i],
 								subgroup1)));
-	size_t j = 0;
-	for(map<string,vector<double> >::const_iterator it_covars
-	      = covariates.begin(subgroup1);
-	    it_covars != covariates.end(subgroup1); ++it_covars){
-	  gsl_matrix_set(X_s1, i, 2 + j,
-			 covariates.GetCovariate(subgroup1,
-						 it_covars->first, inds_s1[i]));
-	  ++j;
+	if(Q > 0){
+	  size_t j = 0;
+	  for(map<string,vector<double> >::const_iterator it_covars
+		= covariates.begin(subgroup1);
+	      it_covars != covariates.end(subgroup1); ++it_covars){
+	    gsl_matrix_set(X_s1, i, 2 + j,
+			   covariates.GetCovariate(subgroup1,
+						   it_covars->first, inds_s1[i]));
+	    ++j;
+	  }
 	}
       }
     }
@@ -923,14 +963,16 @@ namespace quantgen {
 		       snp.GetGenotype(subgroup1,
 				       samples.GetIndexGenotype(inds_s2[i],
 								subgroup1)));
-	size_t j = 0;
-	for(map<string,vector<double> >::const_iterator it_covars
-	      = covariates.begin(subgroup1);
-	    it_covars != covariates.end(subgroup1); ++it_covars){
-	  gsl_matrix_set(X_s2, i, 2 + j,
-			 covariates.GetCovariate(subgroup1,
-						 it_covars->first, inds_s2[i]));
-	  ++j;
+	if(Q > 0){
+	  size_t j = 0;
+	  for(map<string,vector<double> >::const_iterator it_covars
+		= covariates.begin(subgroup1);
+	      it_covars != covariates.end(subgroup1); ++it_covars){
+	    gsl_matrix_set(X_s2, i, 2 + j,
+			   covariates.GetCovariate(subgroup1,
+						   it_covars->first, inds_s2[i]));
+	    ++j;
+	  }
 	}
       }
     }
@@ -1318,7 +1360,7 @@ namespace quantgen {
 				    it_sbgrp - subgroups.begin() + 1);
       if(comb == NULL) {
 	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       while(true) {
 	prepare_config(comb, config_name, gamma);

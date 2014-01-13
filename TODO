@@ -1,4 +1,4 @@
-* allow 2 radii, one for TSS and one for TES, and handle gene strand (include BEDtools?)
+* allow 2 radii, one for TSS and one for TES, and handle gene strand (include BEDtools? or htslib?)
 * add penalty to pi0 in EM
 * allow eqtlbma_bf to read summary stats in place of raw data
 * use tabix library when parsing genotype files in VCF and IMPUTE formats
@@ -8,3 +8,4 @@
 * create a data/ directory with files from real data
 * think about using HDF5 files to efficiently store and retrieve results
 * handle categorical covariates with more than 2 levels in eqtlbma_bf
+* add unitary tests in C++ (include cppunit? or tpunitpp?)

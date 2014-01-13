@@ -68,7 +68,7 @@ namespace quantgen {
 	    || itV->compare("NaN") == 0 || itV->compare("nan") == 0) {
 	  cerr << "ERROR: no missing value allowed, see covariate " << itC->first
 	       << " in subgroup " << subgroup << endl;
-	  exit(1);
+	  exit(EXIT_FAILURE);
 	}
 	values[itV - itC->second.begin()] = atof(itV->c_str());
       }

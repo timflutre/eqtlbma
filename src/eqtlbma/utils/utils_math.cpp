@@ -82,7 +82,7 @@ namespace utils {
     size_t * order = (size_t*) calloc(n, sizeof(size_t));
     if (order == NULL) {
       fprintf(stderr, "ERROR: can't allocate memory for order in qqnorm\n");;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     gsl_sort_index(order, ptData, 1, n);
   
@@ -104,7 +104,7 @@ namespace utils {
     double * weights = (double*) calloc(size, sizeof(double));
     if (weights == NULL) {
       fprintf(stderr, "ERROR: can't allocate memory for weights\n");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     for (i = 0; i < size; ++i) {
       if (vec[i] > max)

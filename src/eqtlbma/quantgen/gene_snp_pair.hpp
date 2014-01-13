@@ -51,7 +51,7 @@ namespace quantgen {
   private:
     std::string gene_name_;
     std::string snp_name_;
-    std::string analysis_type_; // uvlr or mvlr
+    std::string analysis_type_; // uvlr or mvlr or hybrid (optional)
     
     std::map<std::string,size_t> subgroup2samplesize_;
     std::map<std::string,size_t> subgroup2nbcovariates_;
@@ -131,12 +131,16 @@ namespace quantgen {
       gsl_matrix * & Sigma_s1s2_hat_null);
   
   public:
-    GeneSnpPair();
+    GeneSnpPair(void);
     GeneSnpPair(const std::string & gene_name, const std::string & snp_name);
-    void SetGeneName(const std::string gene_name) { gene_name_ = gene_name; };
-    void SetSnpName(const std::string snp_name) { snp_name_ = snp_name; };
+    GeneSnpPair(const std::string & gene_name, const std::string & snp_name,
+		const std::string & analysis_type);
+    void SetGeneName(const std::string & gene_name) { gene_name_ = gene_name; };
+    void SetSnpName(const std::string & snp_name) { snp_name_ = snp_name; };
+    void SetAnalysisType(const std::string & analysis_type) { analysis_type_ = analysis_type; };
     std::string GetGeneName(void) const { return gene_name_; };
     std::string GetSnpName(void) const { return snp_name_; };
+    std::string GetAnalysisType(void) { return analysis_type_; };
     bool HasResults(const std::string & subgroup) const;
     void CalcSstatsOneSbgrp(
       const Samples & samples,
@@ -147,6 +151,11 @@ namespace quantgen {
       const std::string & likelihood,
       const bool & needQnorm,
       const gsl_permutation * perm);
+    void SetSstats(const std::string & subgroup,
+		   const size_t & n,
+		   const double & sigmahat,
+		   const double & betahatgeno,
+		   const double & sebetahatgeno);
     void StandardizeSstatsAndCorrectSmallSampleSize(
       std::map<std::string,std::vector<double> > & subgroup2stdsstats);
     void CalcAbfsUvlrForConsistentConfiguration(
@@ -267,6 +276,9 @@ namespace quantgen {
     const double phi2,
     const double oma2,
     const bool debug=false);
+
+  bool operator==(const GeneSnpPair& lhs, const GeneSnpPair& rhs);
+  bool operator!=(const GeneSnpPair& lhs, const GeneSnpPair& rhs);
 
 } // namespace quantgen
 

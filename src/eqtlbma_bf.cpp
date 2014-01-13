@@ -93,7 +93,6 @@ void help(char ** argv)
        << "\t\tif a tabix-indexed file is also present, it will be used" << endl
        << "      --exp\tfile with absolute paths to expression level files" << endl
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
-       << "\t\tcan be a single line (single subgroup)" << endl
        << "\t\tadd '#' at the beginning of a line to comment it" << endl
        << "\t\tsubgroup file: custom format, same as for MatrixEQTL" << endl
        << "\t\t row 1 for sample names, column 1 for gene names" << endl
@@ -103,9 +102,16 @@ void help(char ** argv)
        << "\t\tshould be in the BED format (delimiter: tab)" << endl
        << "\t\tgenes in the exp level files without coordinates are skipped" << endl
        << "      --anchor\tgene boundary(ies) for the cis region" << endl
-       << "\t\tdefault=TSS, can also be TSS+TES" << endl
+       << "\t\tdefault=TSS (assumed to be start in BED file)" << endl
+       // << "\t\tdefault=TSS, can also be TSS+TES" << endl
        << "      --cis\tlength of half of the cis region (radius, in bp)" << endl
        << "\t\tapart from the anchor(s), default=100000" << endl
+       << "      --inss\tfile with absolute paths to files with summary statistics" << endl
+       << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
+       << "\t\tadd '#' at the beginning of a line to comment it" << endl
+       << "\t\tsstats file: custom format, similar to the one from --outss (see below)" << endl
+       << "\t\t header should have gene, snp, n, sigmahat, betahat.geno and sebetahat.geno" << endl
+       << "\t\t order doesn't matter" << endl
        << "      --out\tprefix for the output files" << endl
        << "\t\tall output files are gzipped and have a header line" << endl
        << "      --lik\tlikelihood to use" << endl
@@ -138,7 +144,7 @@ void help(char ** argv)
        << "\t\trequired with --type join if --bfs is 'sin' or 'all'" << endl
        << "      --bfs\twhich Bayes Factors to compute for the joint analysis" << endl
        << "\t\teach BF for a given configuration is the average of the BFs over one of the grids, with equal weights" << endl
-       << "\t\tonly the Laplace-approximated BF from Wen and Stephens (arXiv 2011) is implemented" << endl
+       << "\t\tonly the Laplace-approximated BF from Wen and Stephens (AoAS 2013) is implemented" << endl
        << "\t\t'gen' (default): general way to capture any level of heterogeneity" << endl
        << "\t\t correspond to the consistent configuration with the large grid" << endl
        << "\t\t fixed-effect and maximum-heterogeneity BFs are also calculated" << endl
@@ -217,6 +223,7 @@ parseCmdLine(
   string & file_genecoords,
   string & anchor,
   size_t & radius,
+  string & file_sstats,
   string & out_prefix,
   bool & save_sstats,
   bool & save_weighted_abfs,
@@ -254,6 +261,7 @@ parseCmdLine(
       {"gcoord", required_argument, 0, 0},
       {"anchor", required_argument, 0, 0},
       {"cis", required_argument, 0, 0},
+      {"inss", required_argument, 0, 0},
       {"out", required_argument, 0, 0},
       {"outss", no_argument, 0, 0},
       {"outm", no_argument, 0, 0},
@@ -311,6 +319,10 @@ parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "cis") == 0){
 	radius = atol(optarg);
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "inss") == 0){
+	file_sstats = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "out") == 0){
@@ -422,65 +434,87 @@ parseCmdLine(
       abort();
     }
   }
-  if(file_genopaths.empty()){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --geno" << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(! doesFileExist(file_genopaths)){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_genopaths << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(! snpCoordsFile.empty() && ! doesFileExist(snpCoordsFile)){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << snpCoordsFile << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(file_exppaths.empty()){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --exp" << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(! doesFileExist(file_exppaths)){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_exppaths << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(file_genecoords.empty()){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --gcoord" << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(! doesFileExist(file_genecoords)){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_genecoords << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(anchor.empty()){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: SNPs in trans not yet implemented, see --anchor and --cis" << endl << endl;
-    help(argv);
-    exit(1);
-  }
-  if(anchor.compare("TSS") != 0 && anchor.compare("TSS+TES") != 0){
-    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --anchor should be TSS or TSS+TES" << endl << endl;
-    help(argv);
-    exit(1);
+  
+  if(file_sstats.empty()){
+    if(file_genopaths.empty()){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: missing compulsory option --geno" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(! doesFileExist(file_genopaths)){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: can't find " << file_genopaths << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(! snpCoordsFile.empty() && ! doesFileExist(snpCoordsFile)){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: can't find " << snpCoordsFile << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(file_exppaths.empty()){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: missing compulsory option --exp" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(! doesFileExist(file_exppaths)){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: can't find " << file_exppaths << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(file_genecoords.empty()){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: missing compulsory option --gcoord" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(! doesFileExist(file_genecoords)){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: can't find " << file_genecoords << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(anchor.empty()){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: SNPs in trans not yet implemented, see --anchor and --cis" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(anchor.compare("TSS") != 0 && anchor.compare("TSS+TES") != 0){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: --anchor should be TSS or TSS+TES" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+  } else{ // ! file_stats.empty()
+    if(! doesFileExist(file_sstats)){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: can't find " << file_sstats << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(type_analysis != "join"){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: --inss requires --type join" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
+    if(type_errors != "uvlr"){
+      cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	   << "ERROR: --inss requires --error uvlr" << endl << endl;
+      help(argv);
+      exit(EXIT_FAILURE);
+    }
   }
   if(out_prefix.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --out" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   // check writing files is possible
   stringstream ssOutFile;
@@ -493,14 +527,14 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --lik" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(likelihood.compare("normal") != 0 && likelihood.compare("poisson") != 0
      && likelihood.compare("quasipoisson") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --lik " << likelihood << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(likelihood.compare("normal") != 0 && type_analysis.compare("join") == 0
      && type_errors.compare("uvlr") != 0){
@@ -508,31 +542,31 @@ parseCmdLine(
 	 << "ERROR: --lik " << likelihood << " is not valid with --type join"
 	 << " and --error " << type_errors << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --type" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("sep") != 0 && type_analysis.compare("join") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --type " << type_analysis << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 && file_largegrid.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --gridL with --type join" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_largegrid.empty() && ! doesFileExist(file_largegrid)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find " << file_largegrid << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 &&
      (type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0) &&
@@ -540,21 +574,21 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --gridS is required with --type join and --bfs " << type_bfs << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_bfs.compare("gen") != 0 && type_bfs.compare("sin") != 0 &&
      type_bfs.compare("all") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --bfs " << type_bfs << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_errors.compare("uvlr") != 0 && type_errors.compare("mvlr") != 0 &&
      type_errors.compare("hybrid") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --error " << type_errors << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 && type_errors.compare("mvlr") == 0)
     cerr << "WARNING: summary statistics per subgroup won't be saved with --error mvlr" << endl;
@@ -562,41 +596,41 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --trick " << trick << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(trick != 0 && trick_cutoff > nb_permutations){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --tricut " << trick_cutoff << " is larger than --nperm "
 	 << nb_permutations << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_perm_sep != 0 && type_perm_sep != 1 && type_perm_sep != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --permsep " << type_perm_sep << " is not valid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("sep") == 0 && nb_permutations > 0 &&
      type_perm_sep != 1 && type_perm_sep != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if --type sep --nperm > 0, --permsep should be '1' or '2'" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_permbf.compare("none") != 0 && type_permbf.compare("gen") != 0 &&
      type_permbf.compare("gen-sin") != 0 && type_permbf.compare("all") != 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --pbf " << type_permbf << " is unvalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
      type_permbf.compare("none") == 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if --type join --nperm > 0, --pbf should be different than 'none'" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
      type_permbf.compare("none") != 0 && type_bfs.compare("gen") == 0 &&
@@ -604,7 +638,7 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if --type join --bfs gen --nperm > 0, --pbf should be 'gen'" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
      type_permbf.compare("none") != 0 && type_bfs.compare("sin") == 0 &&
@@ -612,19 +646,19 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if type join --bfs sin --nperm > 0, --pbf should be 'gen' or 'gen-sin'" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(nb_threads <= 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --thread " << nb_threads << " is invalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_snpstokeep.empty() && ! doesFileExist(file_snpstokeep)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find " << file_snpstokeep << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(seed == string::npos)
     seed = getSeed();
@@ -651,7 +685,7 @@ map<string,string> loadTwoColumnFile(const string & file, const int & verbose)
     if(tokens.size() != 2){
       cerr << "ERROR: file " << file << " should have only two columns"
 	   << " at line " << nb_lines << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(tokens[0][0] == '#')
       continue;
@@ -728,7 +762,7 @@ void loadListsGenoExplevelAndCovarFiles(
       if(it->second.compare(subgroup2genofile.begin()->second) != 0){
 	cerr << "ERROR: --error mvlr/hybrid requires the same genotypes in a single file for all subgroups"
 	     << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
   
   // identify the names of all remaining subgroups to be considered
@@ -770,11 +804,11 @@ void loadSamplesFromMatrixEqtl(
     openFile(it->second, fileStream, "rb");
     if(! getline(fileStream, line)){
       cerr << "ERROR: problem with the header of file " << it->second << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(line.empty()){
       cerr << "ERROR: file " << it->second << " is empty" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     closeFile(it->second, fileStream);
     if(it == subgroup2file.begin()){
@@ -827,11 +861,11 @@ void loadSamplesFromGenotypes(
     openFile(it->second, fileStream, "rb");
     if(! getline(fileStream, line)){
       cerr << "ERROR: problem with the header of file " << it->second << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(line.empty()){
       cerr << "ERROR: file " << it->second << " is empty" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     // if file in VCF format
@@ -859,7 +893,7 @@ void loadSamplesFromGenotypes(
 	if((tokens.size() - 5) % 3 != 0){
 	  cerr << "ERROR: the header of IMPUTE file " << it->second
 	       << " is badly formatted" << endl;
-	  exit(1);
+	  exit(EXIT_FAILURE);
 	}
 	tokens2.clear();
 	i = 5;
@@ -942,7 +976,7 @@ void loadSamples(const map<string,string> & subgroup2genofile,
        it != samples_covariates.end(); ++it)
     if(samples.IsAbsent(*it)){
       cerr << "ERROR: sample " << *it << " has covariates but neither expression levels nor genotypes" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   
   // do the mapping between the vector of all samples and each subgroup
@@ -969,12 +1003,12 @@ void loadGeneInfo(const string & file_genecoords, const int & verbose,
   if(verbose > 0)
     cout << "load gene coordinates ..." << endl << flush;
   
-  gzFile geneCoordsStream;
-  openFile(file_genecoords, geneCoordsStream, "rb");
-  string line;
+  vector<string> lines;
+  readFile(file_genecoords, lines);
+  
   vector<string> tokens;
-  while(getline(geneCoordsStream, line)){
-    split(line, " \t", tokens);
+  for(size_t i = 0; i < lines.size(); ++i){
+    split(lines[i], " \t", tokens);
     if(gene2object.find(tokens[3]) != gene2object.end())
       continue; // in case of redundancy
     Gene gene(tokens[3], tokens[0], tokens[1], tokens[2]);
@@ -987,13 +1021,6 @@ void loadGeneInfo(const string & file_genecoords, const int & verbose,
     mChr2VecPtGenes[gene.GetChromosome()].push_back(
       &(gene2object[gene.GetName()]));
   }
-  if(! gzeof(geneCoordsStream)){
-    cerr << "ERROR: can't read successfully file "
-	 << file_genecoords
-	 << " up to the end" << endl;
-    exit(1);
-  }
-  closeFile(file_genecoords, geneCoordsStream);
   
   // sort the genes per chr
   for(map<string,vector<Gene*> >::iterator it = mChr2VecPtGenes.begin();
@@ -1030,7 +1057,7 @@ void loadExplevels(const map<string,string> & subgroup2explevelfile,
     if(! getline(explevelstream, line)){
       cerr << "ERROR: problem with the header of file " << explevelfile
 	   << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     ++nb_lines;
     split(line, " \t", tokens);
@@ -1047,7 +1074,7 @@ void loadExplevels(const map<string,string> & subgroup2explevelfile,
 	cerr << "ERROR: not enough columns on line " << nb_lines << " of file "
 	     << explevelfile << " (" << tokens.size() << " != "
 	     << nb_samples + 1 << ")" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       if(gene2object.find(tokens[0]) == gene2object.end())
 	continue; // skip if no coordinate
@@ -1058,7 +1085,7 @@ void loadExplevels(const map<string,string> & subgroup2explevelfile,
     if(! gzeof(explevelstream)){
       cerr << "ERROR: can't read successfully file " << explevelfile
 	   << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(explevelfile, explevelstream);
@@ -1105,7 +1132,7 @@ void loadSnpsToKeep(const string & file_snpstokeep, const int & verbose,
 	cerr << "ERROR: file " << file_snpstokeep
 	     << " should have only one column"
 	     << " at line " << nb_lines << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       if(tokens[0][0] == '#')
 	continue;
@@ -1116,7 +1143,7 @@ void loadSnpsToKeep(const string & file_snpstokeep, const int & verbose,
     if(! gzeof(stream)){
       cerr << "ERROR: can't read successfully file "
 	   << file_snpstokeep << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     closeFile(file_snpstokeep, stream);
     
@@ -1142,7 +1169,7 @@ void loadGenosAndSnpInfoFromImpute(
   if((tokens.size() - 5) % 3 != 0){
     cerr << "ERROR: wrong number of columns on line " << nb_lines
 	 << " of file " << genofile << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   size_t nb_samples = static_cast<size_t>((tokens.size() - 5) / 3);
   
@@ -1153,7 +1180,7 @@ void loadGenosAndSnpInfoFromImpute(
       cerr << "ERROR: not enough columns on line " << nb_lines << " of file "
 	   << genofile << " (" << tokens.size() << " != "
 	   << (3 * nb_samples + 5) << ")" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(mChr2VecPtGenes.find(tokens[0]) == mChr2VecPtGenes.end())
       continue; // no gene on this chromosome
@@ -1201,12 +1228,12 @@ loadGenosAndSnpInfoFromVcf (
       cerr << "ERROR: not enough columns on line " << nb_lines
 	   << " of file " << genofile << " (" << tokens.size() << " != "
 	   << nb_samples + 9 << ")" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(tokens[8].find("GT") == string::npos){
       cerr << "ERROR: missing GT in 9-th field on line " << nb_lines
 	   << " of file " << genofile << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(mChr2VecPtGenes.find(tokens[0]) == mChr2VecPtGenes.end())
       continue; // no gene on this chromosome
@@ -1280,7 +1307,7 @@ void loadGenosAndSnpInfo(
     openFile(it->second, genoStream, "rb");
     if(! getline(genoStream, line)){
       cerr << "ERROR: problem with the header of file " << it->second << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     ++nb_lines;
     
@@ -1302,18 +1329,18 @@ void loadGenosAndSnpInfo(
       cerr << "ERROR: file " << it->second
 	   << " seems to be in the custom format but --scoord is missing"
 	   << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     else{
       cerr << "ERROR: can't recognize the format of file " << it->second
 	   << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     if(! gzeof(genoStream)){
       cerr << "ERROR: can't read successfully file " << it->second
 	   << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(it->second , genoStream);
@@ -1371,17 +1398,17 @@ void loadSnpInfo(const string & file_snpcoords,
   if(stat_bed.st_mtime > stat_tbi.st_mtime){
     cerr << "ERROR: index file (" << file_snpcoords_idx
 	 << ") is older than data file (" << file_snpcoords << ")" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   tabix_t * t;
   if((t = ti_open(file_snpcoords.c_str(), 0)) == 0){
     cerr << "ERROR: fail to open the data file (tabix)" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(ti_lazy_index_load(t) < 0){
     cerr << "ERROR: failed to load the index file (tabix)" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   const char *s;
@@ -1443,7 +1470,7 @@ void loadSnpInfo(const string & snpCoordsFile,
  {
     cerr << "ERROR: can't read successfully file " << snpCoordsFile
 	 << " up to the end" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   closeFile(snpCoordsFile, snpCoordsStream);
 }
@@ -1518,7 +1545,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
     openFile(it->second, genoStream, "rb");
     if(! getline(genoStream, line)){
       cerr << "ERROR: problem with the header of file " << it->second << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     ++nb_lines;
     split(line, " \t", tokens);
@@ -1535,7 +1562,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
 	cerr << "ERROR: not enough columns on line " << nb_lines << " of file "
 	     << it->second << " (" << tokens.size() << " != "
 	     << nb_samples + 1 << ")" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       if(snp2object.find(tokens[0]) == snp2object.end())
 	continue; // skip if no coordinate
@@ -1546,7 +1573,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
     if(! gzeof(genoStream)){
       cerr << "ERROR: can't read successfully file " << it->second
 	   << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(it->second, genoStream);
@@ -1631,20 +1658,19 @@ loadListCovarFiles (
   if(verbose > 0)
     cout <<"load file " << file_covarpaths << " ..." << endl;
   
-  while(getline (stream, line)){
-    nb_lines++;
+  while(getline(stream, line)){
+    nb_lines;
     split(line, " \t,", tokens);
     if(tokens.size() != 2){
       cerr << "ERROR: file " << file_covarpaths
-	   << " should have only two columns" << " at line " << nb_lines
-	   << endl;
-      exit(1);
+	   << " should have only two columns at line " << nb_lines << endl;
+      exit(EXIT_FAILURE);
     }
     if(tokens[0][0] == '#')
       continue;
     if(! sbgrpToKeep.empty() && sbgrpToKeep.compare(tokens[0]) != 0)
       continue;
-    if(find (subgroups.begin(), subgroups.end(), tokens[0])
+    if(find(subgroups.begin(), subgroups.end(), tokens[0])
        == subgroups.end()){
       cerr << "WARNING: skip covariates of subgroup " << tokens[0]
 	   << " as there is no corresponding genotype / phenotype files"
@@ -1652,15 +1678,15 @@ loadListCovarFiles (
       continue;
     }
     if(mCovarPaths.find(tokens[0]) == mCovarPaths.end())
-      mCovarPaths.insert (make_pair (tokens[0], vector<string> ()));
-    mCovarPaths[tokens[0]].push_back (tokens[1]);
+      mCovarPaths.insert(make_pair(tokens[0], vector<string> ()));
+    mCovarPaths[tokens[0]].push_back(tokens[1]);
     ++nbLoadedCovarFiles;
   }
   
   if(! gzeof(stream)){
     cerr << "ERROR: can't read successfully file "
 	 << file_covarpaths << " up to the end" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   closeFile(file_covarpaths, stream);
   
@@ -1692,7 +1718,7 @@ void loadCovariates(const map<string,string> subgroup2covarfile,
     openFile(covarfile, covarstream, "rb");
     if(! getline(covarstream, line)){
       cerr << "ERROR: problem with the header of file " << covarfile << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     ++nb_lines;
     split(line, " \t", tokens);
@@ -1709,7 +1735,7 @@ void loadCovariates(const map<string,string> subgroup2covarfile,
 	cerr << "ERROR: not enough columns on line " << nb_lines << " of file "
 	     << covarfile << " (" << tokens.size() << " != "
 	     << nb_samples + 1 << ")" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       covariate2values.insert(
 	make_pair(tokens[0], vector<string>(tokens.begin()+1, tokens.end())));
@@ -1717,7 +1743,7 @@ void loadCovariates(const map<string,string> subgroup2covarfile,
     if(! gzeof(covarstream)){
       cerr << "ERROR: can't read successfully file " << covarfile
 	   << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(covarfile, covarstream);
@@ -1732,7 +1758,192 @@ void loadCovariates(const map<string,string> subgroup2covarfile,
 	   << " covariates" << endl;
 }
 
+void loadRawInputData(
+  const string & file_genopaths,
+  const string & file_snpcoords,
+  const string & file_exppaths,
+  const string & file_genecoords,
+  const string & anchor,
+  const size_t & radius,
+  const float & min_maf,
+  const string & file_covarpaths,
+  const string & type_errors,
+  const vector<string> & subgroups_tokeep,
+  const set<string> & sSnpsToKeep,
+  const int & verbose,
+  vector<string> & subgroups,
+  Samples & samples,
+  map<string,Snp> & snp2object,
+  map<string,vector<Snp*> > & mChr2VecPtSnps,
+  Covariates & covariates,
+  map<string,Gene> & gene2object)
+{
+  map<string,string> subgroup2genofile, subgroup2explevelfile,
+    subgroup2covarfile;
+  loadListsGenoExplevelAndCovarFiles(file_genopaths, file_exppaths,
+				     file_covarpaths, subgroups_tokeep,
+				     type_errors, verbose, subgroup2genofile,
+				     subgroup2explevelfile,
+				     subgroup2covarfile, subgroups);
+  
+  loadSamples(subgroup2genofile, subgroup2explevelfile, subgroup2covarfile,
+	      type_errors, verbose, samples);
+  
+  loadCovariates(subgroup2covarfile, verbose, covariates);
+  
+  map<string,vector<Gene*> > mChr2VecPtGenes;
+  loadGeneInfo(file_genecoords, verbose, gene2object, mChr2VecPtGenes);
+  loadExplevels(subgroup2explevelfile, verbose, gene2object);
+  if(gene2object.empty())
+    return;
+  
+  if(file_snpcoords.empty())
+    loadGenosAndSnpInfo(subgroup2genofile, min_maf, sSnpsToKeep,
+  			mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
+  else{
+    loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
+  		verbose, snp2object, mChr2VecPtSnps);
+    loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
+  }
+  if(snp2object.empty())
+    return;
+}
+
+void loadListSstatsFile(
+  const string & file_sstats,
+  const int & verbose,
+  map<string,string> & subgroup2sstatsfile)
+{
+  string line;
+  gzFile stream;
+  vector<string> tokens;
+  size_t nb_lines = 0;
+  
+  openFile(file_sstats, stream, "rb");
+  if(verbose > 0)
+    cout <<"load file " << file_sstats << " ..." << endl;
+  
+  while(getline(stream, line)){
+    ++nb_lines;
+    split(line, " \t,", tokens);
+    if(tokens.size() != 2){
+      cerr << "ERROR: file " << file_sstats 
+	   << " should have only two columns at line " << nb_lines << endl;
+      exit(EXIT_FAILURE);
+    }
+    if(tokens[0][0] == '#')
+      continue;
+    if(subgroup2sstatsfile.find(tokens[0]) == subgroup2sstatsfile.end())
+      subgroup2sstatsfile.insert(make_pair(tokens[0], tokens[1]));
+  }
+  
+  if(! gzeof(stream)){
+    cerr << "ERROR: can't read successfully file "
+	 << file_sstats << " up to the end" << endl;
+    exit(EXIT_FAILURE);
+  }
+  closeFile(file_sstats, stream);
+  
+  if(verbose > 0)
+    cout << "items loaded: " << subgroup2sstatsfile.size() << " files" << endl;
+}
+
+void fillGeneSnpPairsWithSstats(
+  const map<string,string> & subgroup2sstatsfile,
+  const int & verbose,
+  map<string,Gene> & gene2object,
+  map<string,Snp> & snp2object)
+{
+  vector<string> lines, tokens;
+  map<string,size_t> col2idx;
+  col2idx["gene"] = string::npos;
+  col2idx["snp"] = string::npos;
+  col2idx["n"] = string::npos;
+  col2idx["sigmahat"] = string::npos;
+  col2idx["betahat.geno"] = string::npos;
+  col2idx["sebetahat.geno"] = string::npos;
+  Gene * pt_gene = NULL;
+  Snp * pt_snp = NULL;
+  vector<GeneSnpPair>::iterator it_gsp;
+  size_t idx_snp = string::npos;
+  
+  // loop over subgroups
+  for(map<string,string>::const_iterator it_sf = subgroup2sstatsfile.begin();
+      it_sf != subgroup2sstatsfile.end(); ++it_sf){
+    if(verbose > 0)
+      cout << "load summary statistics for subgroup "
+	   << it_sf->first << " ..." << endl;
+    readFile(it_sf->second, lines);
+    
+    // parse file header
+    for(map<string,size_t>::iterator it_c = col2idx.begin();
+	it_c != col2idx.end(); ++it_c)
+      it_c->second = string::npos;
+    split(lines[0], "\t", tokens);
+    for(size_t col_id = 0; col_id < tokens.size(); ++col_id)
+      if(col2idx.find(tokens[col_id]) != col2idx.end())
+	col2idx[tokens[col_id]] = col_id;
+    for(map<string,size_t>::const_iterator it_c = col2idx.begin();
+	it_c != col2idx.end(); ++it_c)
+      if(it_c->second == string::npos){
+	cerr << "ERROR: missing " << it_c->second << " in header of "
+	     << it_sf->second << endl;
+	exit(EXIT_FAILURE);
+      }
+    
+    // parse file content
+    for(size_t line_id = 1; line_id < lines.size(); ++line_id){
+      split(lines[line_id], "\t", tokens);
+      
+      // get gene (create it if necessary)
+      if(gene2object.find(tokens[col2idx["gene"]]) == gene2object.end())
+	gene2object.insert(make_pair(tokens[col2idx["gene"]],
+				     Gene(tokens[col2idx["gene"]])));
+      pt_gene = &(gene2object[tokens[col2idx["gene"]]]);
+      
+      // get snp (create it if necessary)
+      if(snp2object.find(tokens[col2idx["snp"]]) == snp2object.end())
+	snp2object.insert(make_pair(tokens[col2idx["snp"]],
+				    Snp(tokens[col2idx["snp"]])));
+      pt_snp = &(snp2object[tokens[col2idx["snp"]]]);
+      
+      // get gene-snp pair (create it if necessary)
+      idx_snp = pt_gene->FindIdxSnp(pt_snp);
+      if(idx_snp == string::npos){
+	pt_gene->AddCisSnp(pt_snp);
+	it_gsp = pt_gene->AddGeneSnpPair(pt_snp->GetName(), "uvlr");
+      } else
+	it_gsp = pt_gene->FindGeneSnpPair(idx_snp);
+      
+      it_gsp->SetSstats(it_sf->first,
+			atol(tokens[col2idx["n"]].c_str()),
+			atof(tokens[col2idx["sigmahat"]].c_str()),
+			atof(tokens[col2idx["betahat.geno"]].c_str()),
+			atof(tokens[col2idx["sebetahat.geno"]].c_str()));
+      
+    } // end of loop over lines
+    
+  } // end of loop over subgroups
+}
+
+void loadSummaryStats(
+  const string & file_sstats,
+  const int & verbose,
+  vector<string> & subgroups,
+  map<string,Gene> & gene2object,
+  map<string,Snp> & snp2object)
+{
+  map<string,string> subgroup2sstatsfile;
+  loadListSstatsFile(file_sstats, verbose, subgroup2sstatsfile);
+  
+  keys2vec(subgroup2sstatsfile, subgroups);
+  
+  fillGeneSnpPairsWithSstats(subgroup2sstatsfile, verbose, gene2object,
+  			     snp2object);
+}
+
 void testForAssociations(
+  const bool & hasDataNotSstats,
   const map<string,vector<Snp*> > & mChr2VecPtSnps,
   const string & anchor,
   const size_t & radius,
@@ -1752,10 +1963,12 @@ void testForAssociations(
 {
   if(verbose > 0){
     cout << "look for association between each pair gene-SNP ..." << endl
-	 << "anchor=" << anchor << " radius=" << radius
-	 << " likelihood=" << likelihood;
+	 << "likelihood=" << likelihood
+	 << " errors=" << type_errors;
     if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
-      cout << " errors=" << type_errors << " prop_cov_errors=" << prop_cov_errors;
+      cout << " prop_cov_errors=" << prop_cov_errors;
+    if(hasDataNotSstats)
+      cout << " anchor=" << anchor << " radius=" << radius;
     // cout << " threads=1";
     cout << endl << flush;
   }
@@ -1772,26 +1985,28 @@ void testForAssociations(
     if(verbose > 1)
       cerr << "gene " << itG->first << endl;
     
-    itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
-    if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
-      if(verbose > 1)
-	cerr << "WARNING: skip gene " << itG->second.GetName()
-	     << " because it has no SNP in cis" << endl;
-      continue;
+    if(hasDataNotSstats){
+      itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
+      if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
+	if(verbose > 1)
+	  cerr << "WARNING: skip gene " << itG->second.GetName()
+	       << " because it has no SNP in cis" << endl;
+	continue;
+      }
     }
     
-    if(type_analysis.compare("join") == 0 && type_errors.compare("uvlr") != 0 &&
-       ! itG->second.HasExplevelsInAllSubgroups(subgroups)){
+    if(type_analysis.compare("join") == 0 && type_errors.compare("uvlr") != 0
+       && ! itG->second.HasExplevelsInAllSubgroups(subgroups)){
       if(verbose > 1)
 	cerr << "WARNING: skip gene " << itG->second.GetName()
-	     << " because option --error mvlr/hybrid"
+	     << " because option --error " << type_errors
 	     << " requires expression levels in all subgroups" << endl;
       continue;
     }
-    itG->second.TestForAssociations(subgroups, samples, likelihood,
-				    type_analysis, need_qnorm, covariates,
-				    iGridL, iGridS, type_bfs, type_errors,
-				    prop_cov_errors, verbose-1);
+    itG->second.TestForAssociations(hasDataNotSstats, subgroups, samples,
+				    likelihood, type_analysis, need_qnorm,
+				    covariates, iGridL, iGridS, type_bfs,
+				    type_errors, prop_cov_errors, verbose-1);
     ++nbAnalyzedGenes;
     nbAnalyzedPairs += itG->second.GetNbGeneSnpPairs();
   }
@@ -1975,13 +2190,13 @@ makePermutations(
   rngPerm = gsl_rng_alloc (gsl_rng_default);
   if(rngPerm == NULL){
     cerr << "ERROR: can't allocate memory for the RNG" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(trick != 0){
     rngTrick = gsl_rng_alloc (gsl_rng_default);
     if(rngTrick == NULL){
       cerr << "ERROR: can't allocate memory for the RNG" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   }
   
@@ -2261,7 +2476,7 @@ void writeResAbfsRaw(
       	  if(comb == NULL){
       	    cerr << "ERROR: can't allocate memory for the combination"
       		 << endl;
-      	    exit(1);
+      	    exit(EXIT_FAILURE);
       	  }
       	  while(true){
       	    ssTxt.str("");
@@ -2332,7 +2547,7 @@ void writeResAbfsAvgGrids(
       comb = gsl_combination_calloc(nb_subgroups, k);
       if(comb == NULL){
 	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       while(true){
 	ssTxt << sep << "l10abf." << gsl_combination_get(comb, 0) + 1;
@@ -2376,7 +2591,7 @@ void writeResAbfsAvgGrids(
 	  if(comb == NULL){
 	    cerr << "ERROR: can't allocate memory for the combination"
 		 << endl;
-	    exit(1);
+	    exit(EXIT_FAILURE);
 	  }
 	  while(true){
 	    ssConfig.str("");
@@ -2507,6 +2722,7 @@ void run(const string & file_genopaths,
 	 const string & file_genecoords,
 	 const string & anchor,
 	 const size_t & radius,
+	 const string & file_sstats,
 	 const string & out_prefix,
 	 const bool & save_sstats,
 	 const bool & save_weighted_abfs,
@@ -2532,55 +2748,38 @@ void run(const string & file_genopaths,
 	 const vector<string> & subgroups_tokeep,
 	 const int & verbose)
 {
-  map<string,string> subgroup2genofile, subgroup2explevelfile,
-    subgroup2covarfile;
-  vector<string> subgroups;
-  loadListsGenoExplevelAndCovarFiles(file_genopaths, file_exppaths,
-				     file_covarpaths, subgroups_tokeep,
-				     type_errors, verbose, subgroup2genofile,
-				     subgroup2explevelfile,
-				     subgroup2covarfile, subgroups);
-  
-  Samples samples;
-  loadSamples(subgroup2genofile, subgroup2explevelfile, subgroup2covarfile,
-	      type_errors, verbose, samples);
-  
-  Covariates covariates;
-  loadCovariates(subgroup2covarfile, verbose, covariates);
-  
-  map<string,Gene> gene2object;
-  map<string,vector<Gene*> > mChr2VecPtGenes;
-  loadGeneInfo(file_genecoords, verbose, gene2object, mChr2VecPtGenes);
-  loadExplevels(subgroup2explevelfile, verbose, gene2object);
-  if(gene2object.empty())
-    return;
-  
   set<string> sSnpsToKeep;
   if(! file_snpstokeep.empty()){
     loadSnpsToKeep(file_snpstokeep, verbose, sSnpsToKeep);
     if(sSnpsToKeep.empty())
       return;
   }
-  map<string, Snp> snp2object;
-  map<string, vector<Snp*> > mChr2VecPtSnps;
-  if(file_snpcoords.empty())
-    loadGenosAndSnpInfo(subgroup2genofile, min_maf, sSnpsToKeep,
-  			mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
-  else{
-    loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
-  		verbose, snp2object, mChr2VecPtSnps);
-    loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
-  }
-  if(snp2object.empty())
+  
+  vector<string> subgroups;
+  Samples samples;
+  map<string,Snp> snp2object;
+  map<string,vector<Snp*> > mChr2VecPtSnps;
+  Covariates covariates;
+  map<string,Gene> gene2object;
+  
+  if(file_sstats.empty())
+    loadRawInputData(file_genopaths, file_snpcoords, file_exppaths,
+		     file_genecoords, anchor, radius, min_maf, file_covarpaths,
+		     type_errors, subgroups_tokeep, sSnpsToKeep, verbose,
+		     subgroups, samples, snp2object, mChr2VecPtSnps,
+		     covariates, gene2object);
+  else
+    loadSummaryStats(file_sstats, verbose, subgroups, gene2object, snp2object);
+  if(gene2object.empty() || snp2object.empty())
     return;
   
   Grid iGridL(file_largegrid, true, verbose);
   Grid iGridS(file_smallgrid, false, verbose);
   
-  testForAssociations(mChr2VecPtSnps, anchor, radius, subgroups, samples,
-		      likelihood, type_analysis, need_qnorm, covariates,
-		      iGridL, iGridS, type_bfs, type_errors, prop_cov_errors,
-		      verbose, gene2object);
+  testForAssociations(file_sstats.empty(), mChr2VecPtSnps, anchor, radius,
+		      subgroups, samples, likelihood, type_analysis,
+		      need_qnorm, covariates, iGridL, iGridS, type_bfs,
+		      type_errors, prop_cov_errors, verbose, gene2object);
   if(nb_permutations > 0 &&
      (type_perm_sep != 0 || type_permbf.compare("none") != 0)){
     omp_set_num_threads(nb_threads);
@@ -2598,19 +2797,21 @@ void run(const string & file_genopaths,
 int main(int argc, char ** argv)
 {
   int verbose = 1, trick = 0, type_perm_sep = 0, nb_threads = 1;
-  size_t radius = 100000, nb_permutations = 0, seed = string::npos, trick_cutoff = 10;
+  size_t radius = 100000, nb_permutations = 0, seed = string::npos,
+    trick_cutoff = 10;
   float min_maf = 0.0, prop_cov_errors = 0.5;
   bool save_sstats = false, save_weighted_abfs = false, need_qnorm = false,
     use_max_bf = false;
   string file_genopaths, file_snpcoords, file_exppaths, file_genecoords,
-    anchor = "TSS", out_prefix, likelihood = "normal", type_analysis,
-    file_covarpaths, file_largegrid, file_smallgrid, type_bfs = "gen",
-    type_errors = "uvlr", type_permbf = "none", file_snpstokeep;
+    anchor = "TSS", file_sstats, out_prefix, likelihood = "normal",
+    type_analysis, file_covarpaths, file_largegrid, file_smallgrid,
+    type_bfs = "gen", type_errors = "uvlr", type_permbf = "none",
+    file_snpstokeep;
   vector<string> subgroups_tokeep;
   
   parseCmdLine(argc, argv, file_genopaths, file_snpcoords, file_exppaths,
-	       file_genecoords, anchor, radius, out_prefix, save_sstats,
-	       save_weighted_abfs, likelihood, type_analysis,
+	       file_genecoords, anchor, radius, file_sstats, out_prefix,
+	       save_sstats, save_weighted_abfs, likelihood, type_analysis,
 	       need_qnorm, min_maf, file_covarpaths, file_largegrid,
 	       file_smallgrid, type_bfs, type_errors, prop_cov_errors,
 	       nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
@@ -2629,7 +2830,7 @@ int main(int argc, char ** argv)
   }
   
   run(file_genopaths, file_snpcoords, file_exppaths, file_genecoords, anchor,
-      radius, out_prefix, save_sstats, save_weighted_abfs,
+      radius, file_sstats, out_prefix, save_sstats, save_weighted_abfs,
       likelihood, type_analysis, need_qnorm, min_maf, file_covarpaths,
       file_largegrid, file_smallgrid, type_bfs, type_errors, prop_cov_errors,
       nb_permutations, seed, trick, trick_cutoff, type_perm_sep, type_permbf,

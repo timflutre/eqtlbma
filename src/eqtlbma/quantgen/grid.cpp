@@ -57,7 +57,7 @@ namespace quantgen {
       if (! gzeof(gridStream)) {
 	cerr << "ERROR: can't read successfully file " << gridFile
 	     << " up to the end" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       closeFile(gridFile, gridStream);
     

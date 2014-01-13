@@ -281,86 +281,86 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --bf-out" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(file_grid_weights.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --gwts" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! doesFileExist(file_grid_weights)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_grid_weights << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! model.empty() && model != "configs" && model != "types"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --model " << model << " is unvalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! model.empty() && nb_subgroups == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --nsubgrp" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! model.empty() && dim == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --dim" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_config_weights.empty() && ! doesFileExist(file_config_weights)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_config_weights << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_type_subgroup_weights.empty() && ! doesFileExist(file_type_subgroup_weights)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_type_subgroup_weights << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(file_hm.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --hm-in" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(find(quantities_to_save.begin(), quantities_to_save.end(), "post")
      != quantities_to_save.end() && post_probas_to_save.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --post with --save post" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! isNan(pi0) && post_probas_to_save.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --post with --pi0" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isNan(pi0) && ! post_probas_to_save.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --pi0 with --post" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(nb_threads <= 0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --thread " << nb_threads << " is invalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(save_best_snps != 0 && save_best_snps != 1 && save_best_snps != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --bestsnp " << save_best_snps << " is invalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(save_best_snps == 2
      && find(quantities_to_save.begin(), quantities_to_save.end(), "post")
@@ -368,19 +368,19 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --bestsnp 2 can only be used with --save post" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_genes_to_keep.empty() && ! doesFileExist(file_genes_to_keep)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_genes_to_keep << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_snps_to_keep.empty() && ! doesFileExist(file_snps_to_keep)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_snps_to_keep << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_snps_to_keep.empty())
     cout << "WARNING: using --snp can change the gene-level BFs and posteriors" << endl;
@@ -389,7 +389,7 @@ parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find file " << file_gene_snp_pairs_to_keep << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_gene_snp_pairs_to_keep.empty())
     cout << "WARNING: using --gene-snp can change the gene-level BFs and posteriors" << endl;
@@ -837,7 +837,7 @@ void loadFileGridWeights(const string & file_grid_weights,
   if(! gzeof(stream)){
     cerr << "ERROR: can't read successfully file "
 	 << file_grid_weights << " up to the end" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   closeFile(file_grid_weights, stream);
@@ -858,7 +858,7 @@ void loadFileGridWeights(const string & file_grid_weights,
     if(*(max_element(grid_idx_to_keep.begin(), grid_idx_to_keep.end()))
        >= grid_weights.size()){
       cerr << "ERROR: --gtk doesn't correspond to --gwts" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(verbose > 0)
       cout << "use only " << grid_idx_to_keep.size() << " grid weights" << endl;
@@ -895,7 +895,7 @@ void loadFileConfigWeights(const string & file_config_weights,
     if(! gzeof(stream)){
       cerr << "ERROR: can't read successfully file "
 	   << file_config_weights << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(file_config_weights, stream);
@@ -903,7 +903,7 @@ void loadFileConfigWeights(const string & file_config_weights,
     if(config_weights.size() != dim){
       cerr << "ERROR: file " << file_config_weights << " should contain "
 	   << dim << " config weights" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     if(verbose > 0)
@@ -956,7 +956,7 @@ void loadFileTypeSubgroupWeights(const string & file_type_subgroup_weights,
     if(! gzeof(stream)){
       cerr << "ERROR: can't read successfully file "
 	   << file_type_subgroup_weights << " up to the end" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     
     closeFile(file_type_subgroup_weights, stream);
@@ -964,19 +964,19 @@ void loadFileTypeSubgroupWeights(const string & file_type_subgroup_weights,
     if(type_weights.size() != dim){
       cerr << "ERROR: file " << file_type_subgroup_weights << " should contain "
 	   << dim << " type weights" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(subgroup_weights.size() != dim){
       cerr << "ERROR: file " << file_type_subgroup_weights << " should contain "
 	   << dim << " types for subgroups-per-type weights" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     for(size_t k = 0; k < dim; ++k)
       if(subgroup_weights[k].size() != nb_subgroups){
 	cerr << "ERROR: file " << file_type_subgroup_weights << " should contain "
 	     << nb_subgroups << " subgroups for subgroups-per-type "
 	     << k+1 << " weights" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
     
     if(verbose > 0)
@@ -1008,7 +1008,7 @@ void loadFileGeneSnpPairsToKeep(
       if(tokens.size() < 2){
 	cerr << "ERROR: filw with gene-snp pairs to keep should have"
 	     << " two columns gene<tab>snp" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       if(gene_snp_pairs_to_keep.find(tokens[0]) == gene_snp_pairs_to_keep.end())
 	gene_snp_pairs_to_keep.insert(make_pair(tokens[0], vector<string>()));
@@ -1034,7 +1034,7 @@ void averageBFs(const string & file_bf_out,
   if(tokens[0].compare("gene") != 0 && tokens[1].compare("snp") != 0
      && tokens[2].compare("config") != 0){
     cerr << "ERROR: wrong header line in file " << file_bf_out << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   for(size_t i = 1; i < lines.size(); ++i){
@@ -1125,7 +1125,7 @@ void parseLines(const string & file_bf_out,
   if(tokens[0].compare("gene") != 0 && tokens[1].compare("snp") != 0
      && tokens[2].compare("config") != 0){
     cerr << "ERROR: wrong header line in file " << file_bf_out << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   string curr_gene, curr_snp;

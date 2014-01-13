@@ -229,7 +229,7 @@ void Controller::load_data_one_file(
      || tokens[1].compare("snp") != 0
      || tokens[2].compare("config") != 0){
     cerr << "ERROR: file " << file << " has wrong header line" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   // parse the lines
@@ -313,7 +313,7 @@ void Controller::load_data(
   vector<string> files = glob(file_pattern);
   if(files.size() == 0){
     cerr << "ERROR: no input file was found from pattern " << file_pattern << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   else if(verbose_ > 0)
     cout << "nb of input files: " << files.size() << endl << flush;
@@ -559,11 +559,11 @@ double Controller::compute_log10_obs_lik(
   
   if(isNan(l10_sum)){
     cerr << "ERROR: log10(obslik) is NaN" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isInfinite(l10_sum)){
     cerr << "ERROR: log10(obslik) is +-Inf" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   
   return l10_sum;
@@ -874,7 +874,7 @@ void Controller::run_EM()
     if(tmp_log10_obs_lik < log10_obs_lik_){
       fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
 	      tmp_log10_obs_lik, log10_obs_lik_);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
 #endif
     
@@ -890,7 +890,7 @@ void Controller::run_EM()
       if(tmp_log10_obs_lik < log10_obs_lik_){
 	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
 		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(1);
+	exit(EXIT_FAILURE);
       }
 #endif
     }
@@ -906,7 +906,7 @@ void Controller::run_EM()
       if(tmp_log10_obs_lik < log10_obs_lik_){
 	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
 		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(1);
+	exit(EXIT_FAILURE);
       }
 #endif
       em_update_subgroup();
@@ -920,7 +920,7 @@ void Controller::run_EM()
       if(tmp_log10_obs_lik < log10_obs_lik_){
 	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
 		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(1);
+	exit(EXIT_FAILURE);
       }
 #endif
     }
@@ -938,7 +938,7 @@ void Controller::run_EM()
     if(new_log10_obs_lik_ < log10_obs_lik_){
       fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%7.4e < %7.4e)\n" ,
 	      new_log10_obs_lik_, log10_obs_lik_);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_)
       break;
@@ -1559,50 +1559,50 @@ void parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --data" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(model.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --model" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(model != "configs" && model != "types"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --model " << model << " is unvalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(model == "configs" && dim >= (size_t) pow(2, (double)nb_subgroups)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --model configs --nsubgrp " << nb_subgroups << " --dim "
 	 << dim << " is unvalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(dim == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --dim" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(nb_grid_points == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --ngrid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(out_file.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --out" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_init.empty() && ! doesFileExist(file_init)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find " << file_init << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(rand_init && seed == string::npos)
     seed = getSeed();
@@ -1610,7 +1610,7 @@ void parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --thresh " << thresh << " is invalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(nb_threads <= 0)
     nb_threads = 1;
@@ -1618,25 +1618,25 @@ void parseCmdLine(
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find " << file_ci << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! isNan(fixed_pi0) && (fixed_pi0 <= 0.0 || fixed_pi0 >= 1.0)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --pi0 " << fixed_pi0 << " is invalid" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_ci.empty() && ! doesFileExist(file_ci)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: can't find " << file_ci << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(! file_ci.empty() && skip_ci){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --getci should be given with --ci" << endl << endl;
     help(argv);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(model == "types"){
     configs_tokeep.clear(); // ignore --configs if model is "type"

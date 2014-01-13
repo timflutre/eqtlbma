@@ -29,6 +29,11 @@ namespace quantgen {
   {
   }
 
+  Snp::Snp(const string & name)
+  {
+    name_ = name;
+  }
+
   Snp::Snp(const string & name, const string & chromosome,
 	   const string & pos)
   {
@@ -55,7 +60,7 @@ namespace quantgen {
     if (lhs.GetChromosome().compare(rhs.GetChromosome()) != 0) {
       cerr << "ERROR: " << lhs.GetName() << " and " << rhs.GetName()
 	   << " are on different chromosomes, thus they can't be sorted" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     return(lhs.GetPosition() < rhs.GetPosition());
   }
@@ -90,7 +95,7 @@ namespace quantgen {
     if((end - begin) % 3 != 0){
       cerr << "ERROR: SNP " << name_
 	   << " from IMPUTE file has not the right number of columns" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     size_t nb_samples = static_cast<size_t>((end - begin) / 3);
     genotypes.assign(nb_samples, NaN);
@@ -199,7 +204,7 @@ namespace quantgen {
 			      genotypes, minor_allele_freq);
     else{
       cerr << "ERROR: genotype format '" << format << "' is not recognized" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     Genotypes genos;
     genos.values = genotypes;

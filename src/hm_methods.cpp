@@ -44,11 +44,11 @@ snp_eQTL::snp_eQTL(const string & name,
     for(size_t l = 0; l < raw_log10_bfs_[k].size(); ++l){
       if(isNan(raw_log10_bfs_[k][l])){
 	cerr << "ERROR: raw log10(BF)[" << (k+1) << "," << (l+1) << "] of snp " << name_ << " is NaN" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
       if(isInfinite(raw_log10_bfs_[k][l])){
 	cerr << "ERROR: raw log10(BF)[" << (k+1) << "," << (l+1) << "] of snp " << name_ << " is +-Inf" << endl;
-	exit(1);
+	exit(EXIT_FAILURE);
       }
     }
   }
@@ -65,7 +65,7 @@ snp_eQTL::snp_eQTL(const string & name,
     if(raw_log10_bfs_.size() != nb_subgroups_){
       cerr << "ERROR: snp " << name_ << " has BFs for "
 	   << raw_log10_bfs_.size() << " subgroups" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     dim_ = nb_types;
   }
@@ -89,12 +89,12 @@ double snp_eQTL::compute_log10_BF(
     if(isNan(dim_tmp_[j])){
       cerr << "ERROR: log10(BF)[" << (j+1) << "] avg over grid of snp "
 	   << name_ << " is NaN" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     if(isInfinite(dim_tmp_[j])){
       cerr << "ERROR: log10(BF)[" << (j+1) << "] avg over grid of snp "
 	   << name_ << " is +-Inf" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
 #endif
   }
@@ -108,12 +108,12 @@ double snp_eQTL::compute_log10_BF(
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over grid and configs"
 	 << " of snp " << name_ << " is NaN" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isInfinite(log10_BF)){
     cerr << "ERROR: log10(BF) avg over grid and configs"
 	 << " of snp " << name_ << " is +-Inf" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #endif
   
@@ -151,13 +151,13 @@ double snp_eQTL::compute_log10_BF(
 	  cerr << "ERROR: log10(BF) for subgroup " << (s+1)
 	       << " in grid " << (l+1) << " and type " << (k+1)
 	       << " of snp " << name_ << " is NaN" << endl;
-	  exit(1);
+	  exit(EXIT_FAILURE);
 	}
 	if(isInfinite(tmp)){
 	  cerr << "ERROR: log10(BF) for subgroup " << (s+1)
 	       << " in grid " << (l+1) << " and type " << (k+1)
 	       << " of snp " << name_ << " is +-Inf" << endl;
-	  exit(1);
+	  exit(EXIT_FAILURE);
 	}
 #endif
 	
@@ -179,12 +179,12 @@ double snp_eQTL::compute_log10_BF(
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over grid and types"
 	 << " of snp " << name_ << " is NaN" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isInfinite(log10_BF)){
     cerr << "ERROR: log10(BF) avg over grid and types"
 	 << " of snp " << name_ << " is +-Inf" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #endif
   
@@ -414,11 +414,11 @@ double gene_eQTL::compute_log10_BF(const vector<double> & grid_wts,
 #ifdef DEBUG
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isInfinite(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is +-Inf" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #endif
   
@@ -456,11 +456,11 @@ double gene_eQTL::compute_log10_BF(
 #ifdef DEBUG
   if(isNan(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is NaN" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   if(isInfinite(log10_BF)){
     cerr << "ERROR: log10(BF) avg over SNPs of gene " << name_ << " is +-Inf" << endl;
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 #endif
   

@@ -31,6 +31,11 @@ namespace quantgen {
   {
   }
   
+  Gene::Gene(const string & name)
+  {
+    name_ = name;
+  }
+  
   Gene::Gene(const string & name, const string & chromosome,
 	     const string & start, const string & end)
   {
@@ -59,7 +64,7 @@ namespace quantgen {
     if(lhs.GetChromosome().compare(rhs.GetChromosome()) != 0){
       fprintf(stderr, "ERROR: %s and %s are on different chromosomes, thus they can't be sorted\n",
 	      lhs.GetName().c_str(), rhs.GetName().c_str());
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     return((lhs.GetStart() < rhs.GetStart()) ||
 	   (lhs.GetStart() == rhs.GetStart() && 
@@ -127,6 +132,11 @@ namespace quantgen {
       os << it->first << ": " << it->second.size() << " samples" << endl;
   }
 
+  void Gene::AddCisSnp(const Snp * pt_snp)
+  {
+    snps_.push_back(pt_snp);
+  }
+
   void Gene::SetCisSnps(
     const map<string, vector<Snp*> > & mChr2VecPtSnps,
     const string & anchor, const size_t & radius)
@@ -141,9 +151,23 @@ namespace quantgen {
 	  break;
 	else if(is_in_cis == -1) // snp.coord < gene.end + radius
 	  continue;
-	snps_.push_back((itVecPtSnps->second)[snp_id]);
+	AddCisSnp((itVecPtSnps->second)[snp_id]);
       }
     }
+  }
+
+  bool Gene::HasCisSnp(const Snp * pt_snp)
+  {
+    return find(snps_.begin(), snps_.end(), pt_snp) != snps_.end();
+  }
+
+  size_t Gene::FindIdxSnp(const Snp * pt_snp)
+  {
+    size_t idx_snp = string::npos;
+    vector<const Snp*>::iterator it = find(snps_.begin(), snps_.end(), pt_snp);
+    if(it != snps_.end())
+      idx_snp = it - snps_.begin();
+    return idx_snp;
   }
 
   bool Gene::HasExplevelsInAtLeastOneSubgroup(void) const
@@ -178,7 +202,7 @@ namespace quantgen {
   bool Gene::HasAtLeastOneCisSnpInAtLeastOneSubgroup(void) const
   {
     bool res = false;
-    Snp * pt_snp;
+    const Snp * pt_snp;
     for(size_t snp_id = 0; snp_id < snps_.size(); ++snp_id){
       pt_snp = snps_[snp_id];
       for(map<string,vector<double> >::const_iterator it =
@@ -196,7 +220,7 @@ namespace quantgen {
     bool res = false;
     if(HasExplevels(subgroup)
        && HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
-      Snp * pt_snp;
+      const Snp * pt_snp;
       for(size_t snp_id = 0; snp_id < snps_.size(); ++snp_id){
 	pt_snp = snps_[snp_id];
 	if(pt_snp->HasGenotypes(subgroup)){
@@ -213,7 +237,22 @@ namespace quantgen {
     return subgroup2explevels_.find(subgroup)->second[idx];
   }
 
+  vector<GeneSnpPair>::iterator Gene::AddGeneSnpPair(
+    const string & snp_name,
+    const string & analysis_type)
+  {
+    gene_snp_pairs_.push_back(GeneSnpPair(name_, snp_name, analysis_type));
+    return gene_snp_pairs_.end() - 1;
+  }
+
+  vector<GeneSnpPair>::iterator Gene::FindGeneSnpPair(
+    const size_t & idx_snp)
+  {
+    return gene_snp_pairs_.begin() + idx_snp;
+  }
+
   void Gene::TestForAssociations(
+    const bool & hasDataNotSstats,
     const vector<string> & subgroups,
     const Samples & samples,
     const string & likelihood,
@@ -227,32 +266,41 @@ namespace quantgen {
     const float & prop_cov_errors,
     const int & verbose)
   {
+    const Snp * pt_snp = NULL;
+    vector<GeneSnpPair>::iterator it_gsp;
+    gsl_permutation * perm = NULL;
+    
     // To use OpenMP here, need to have a temporary vector shared between all
     // threads, replacing gene_snp_pairs_ inside the loop.
     // As this requires more memory, I prefer not to use OpenMP here.
     for(size_t idx_snp = 0; idx_snp < snps_.size(); ++idx_snp){
     
-      Snp * pt_snp = snps_[idx_snp];
+      pt_snp = snps_[idx_snp];
       if(verbose > 0)
 	cout << name_ << " (" << GetNbSubgroups() << " subgroups) versus "
 	     << pt_snp->name_ << " (" << pt_snp->GetNbSubgroups()
 	     << " subgroups)" << endl;
     
-      GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
-      gsl_permutation * perm = NULL;
+      if(hasDataNotSstats)
+	it_gsp = AddGeneSnpPair(pt_snp->name_, type_analysis);
+      else
+	it_gsp = FindGeneSnpPair(idx_snp);
+      perm = NULL;
     
       if(type_analysis.compare("sep") == 0 ||
 	 (type_analysis.compare("join") == 0 && type_errors.compare("uvlr") == 0)){
-	for(vector<string>::const_iterator it = subgroups.begin();
-	    it != subgroups.end(); ++it){
-	  if(HasExplevels(*it) && pt_snp->HasGenotypes(*it))
-	    gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp,
-					     covariates, *it,
-					     likelihood, need_qnorm,
-					     perm);
+	if(hasDataNotSstats){
+	  for(vector<string>::const_iterator it = subgroups.begin();
+	      it != subgroups.end(); ++it){
+	    if(HasExplevels(*it) && pt_snp->HasGenotypes(*it))
+	      it_gsp->CalcSstatsOneSbgrp(samples, *this, *pt_snp,
+					 covariates, *it,
+					 likelihood, need_qnorm,
+					 perm);
+	  }
 	}
 	if(type_analysis.compare("join") == 0)
-	  gene_snp_pair.CalcAbfsUvlr(subgroups, whichBfs, iGridL, iGridS);
+	  it_gsp->CalcAbfsUvlr(subgroups, whichBfs, iGridL, iGridS);
       }
       else{ // if mvlr or hybrid
 	if(! pt_snp->HasGenotypesInAllSubgroups(subgroups)){
@@ -263,16 +311,14 @@ namespace quantgen {
 	  continue;
 	}
 	if(type_errors.compare("mvlr") == 0)
-	  gene_snp_pair.CalcAbfsMvlr(subgroups, samples, *this, *pt_snp,
-				     covariates, need_qnorm, whichBfs, iGridL,
-				     iGridS, prop_cov_errors, perm);
+	  it_gsp->CalcAbfsMvlr(subgroups, samples, *this, *pt_snp,
+			       covariates, need_qnorm, whichBfs, iGridL,
+			       iGridS, prop_cov_errors, perm);
 	else if(type_errors.compare("hybrid") == 0)
-	  gene_snp_pair.CalcAbfsHybrid(subgroups, samples, *this, *pt_snp,
-				       covariates, need_qnorm, whichBfs, iGridL,
-				       iGridS, prop_cov_errors, perm);
+	  it_gsp->CalcAbfsHybrid(subgroups, samples, *this, *pt_snp,
+				 covariates, need_qnorm, whichBfs, iGridL,
+				 iGridS, prop_cov_errors, perm);
       }
-    
-      gene_snp_pairs_.push_back(gene_snp_pair);
     }
   }
 
@@ -339,7 +385,7 @@ namespace quantgen {
     perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   
     subgroup2nbperms_.insert(make_pair(subgroup, 0));
@@ -362,7 +408,7 @@ namespace quantgen {
 
 #pragma omp parallel for shared(pvals_perm)
       for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
-	Snp * pt_snp = snps_[idx_snp];
+	const Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(HasExplevels(subgroup) && pt_snp->HasGenotypes(subgroup)){
 	  gene_snp_pair.CalcSstatsOneSbgrp(samples, *this, *pt_snp, covariates,
@@ -449,7 +495,7 @@ namespace quantgen {
     perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   
     nbpermutations_sep_allsbgrps_ = 0;
@@ -472,7 +518,7 @@ namespace quantgen {
     
 #pragma omp parallel for shared(pvals_perm)
       for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
-	Snp * pt_snp = snps_[idx_snp];
+	const Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	double pval_perm_sbgrp, pval_perm_min_sbgrp = 1;
 	for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
@@ -556,7 +602,7 @@ namespace quantgen {
     perm = gsl_permutation_calloc(samples.GetTotalNbSamples());
     if(perm == NULL){
       cerr << "ERROR: can't allocate memory for the permutation" << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   
     nbpermutations_join_ = 0;
@@ -587,7 +633,7 @@ namespace quantgen {
     
 #pragma omp parallel for shared(l10_abfs_perm_snps)
       for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
-	Snp * pt_snp = snps_[idx_snp];
+	const Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
 	if(type_errors.compare("uvlr") == 0){
 	  for(vector<string>::const_iterator it_sbgrp = subgroups.begin();

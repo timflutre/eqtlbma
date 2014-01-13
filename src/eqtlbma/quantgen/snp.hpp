@@ -45,6 +45,7 @@ namespace quantgen {
     
   public:
     Snp(void);
+    Snp(const std::string & name);
     Snp(const std::string & name, const std::string & chr, const std::string & coord);
     std::string GetName(void) const { return name_; };
     std::string GetChromosome(void) const { return chromosome_; };

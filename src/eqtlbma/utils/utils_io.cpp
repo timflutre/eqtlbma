@@ -721,7 +721,7 @@ namespace utils {
   }
   
 /** \brief Clear the filesystem memory cache
-/*  \note http://stackoverflow.com/a/6818721/597069
+ *  \note http://stackoverflow.com/a/6818721/597069
 */
   void clearFilesystemMemCache(void)
   {
