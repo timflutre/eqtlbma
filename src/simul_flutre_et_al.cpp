@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- *  g++ -Wall -Wextra -g utils.cpp simul_flutre_et_al.cpp -lgsl -lgslcblas -lz -o simul_flutre_et_al
+ *  g++ -Wall -Wextra -g simul_flutre_et_al.cpp eqtlbma/utils/utils_io.cpp -I./eqtlbma -lgsl -lgslcblas -lz -o simul_flutre_et_al
  */
 
 #include <cmath>
@@ -31,7 +31,8 @@
 #include <limits>
 using namespace std;
 
-#include "utils.h"
+#include "utils/utils_io.hpp"
+using namespace utils;
 
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>

@@ -1,2 +1,2 @@
-bin_SCRIPTS = launch_eqtlbma_parallel.bash launch_hm.bash
-EXTRA_DIST = launch_eqtlbma_parallel.bash launch_hm.bash
+bin_SCRIPTS = eqtlbma_bf_parallel.bash tutorial_eqtlbma.R
+EXTRA_DIST = eqtlbma_bf_parallel.bash utils_eqtlbma.R tutorial_eqtlbma.R

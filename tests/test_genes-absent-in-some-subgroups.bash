@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 
-set -o errexit -o pipefail
-
-# Aim: launch a functional test with genes absent in some subgroups
+# Aim: launch a functional test for eqtlbma_bf with genes absent 
+#      in some subgroups
 # Author: Timothee Flutre
 # Not copyrighted -- provided to the public domain
 
+progVersion="1.0"
+
 #------------------------------------------------------------------------------
 
+# Display the help on stdout.
+# The format complies with help2man (http://www.gnu.org/s/help2man)
 function help () {
-    msg="\`${0##*/}' launches a functional test with genes absent in some subgroups.\n"
+    msg="\`${0##*/}' launches a functional test for eqtlbma_bf with genes absent in some subgroups.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -17,14 +20,15 @@ function help () {
     msg+="  -h, --help\tdisplay the help and exit\n"
     msg+="  -V, --version\toutput version information and exit\n"
     msg+="  -v, --verbose\tverbosity level (0/default=1/2/3)\n"
-    msg+="      --p2e\tabsolute path to the 'eqtlbma' binary\n"
-    msg+="      --p2R\tabsolute path to the 'functional_tests.R' script\n"
-    msg+="      --noclean\tkeep temporary directory with all files\n"
+    msg+="  -e, --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
+    msg+="  -R, --p2R\tabsolute path to the 'functional_tests.R' script\n"
+    msg+="  -n, --noclean\tkeep temporary directory with all files\n"
     echo -e "$msg"
 }
 
+# Display version and license information on stdout.
 function version () {
-    msg="${0##*/} 1.0\n"
+    msg="${0##*/} ${progVersion}\n"
     msg+="\n"
     msg+="Written by Timothee Flutre.\n"
     msg+="\n"
@@ -49,29 +53,46 @@ function timer () {
     fi
 }
 
-function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2e:,p2R:,noclean \
+# Parse the command-line arguments.
+# http://stackoverflow.com/a/4300224/597069
+function parseCmdLine () {
+    getopt -T > /dev/null # portability check (say, Linux or Mac OS?)
+    if [ $? -eq 4 ]; then # GNU enhanced getopt is available
+	TEMP=`getopt -o hVv:e:R:n -l help,version,verbose:,p2e:,p2R:,noclean \
         -n "$0" -- "$@"`
-    if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
+    else # original getopt is available (no long options, whitespace, sorting)
+	TEMP=`getopt hVv:e:R:n "$@"`
+    fi
+    if [ $? -ne 0 ]; then
+	echo "ERROR: "$(which getopt)" failed"
+	getopt -T > /dev/null
+	if [ $? -ne 4 ]; then
+	    echo "did you use long options? they are not handled \
+on your system, use -h for help"
+	fi
+	exit 2
+    fi
     eval set -- "$TEMP"
-    while true; do
+    while [ $# -gt 0 ]; do
         case "$1" in
-            -h|--help) help; exit 0; shift;;
-            -V|--version) version; exit 0; shift;;
-            -v|--verbose) verbose=$2; shift 2;;
-            --p2e) pathToEqtlBma=$2; shift 2;;
-	    --p2R) pathToRscript=$2; shift 2;;
-	    --noclean) clean=false; shift;;
+            -h | --help) help; exit 0; shift;;
+            -V | --version) version; exit 0; shift;;
+            -v | --verbose) verbose=$2; shift 2;;
+            -e | --p2e) pathToBf=$2; shift 2;;
+	    -R | --p2R) pathToRscript=$2; shift 2;;
+	    -n | --noclean) clean=false; shift;;
             --) shift; break;;
-            *) echo "ERROR: options parsing failed"; exit 1;;
+            *) echo "ERROR: options parsing failed, use -h for help"; exit 1;;
         esac
     done
-    if [[ ! -f $pathToEqtlBma ]]; then
-	echo "ERROR: can't find path to 'eqtlbma' -> '${pathToEqtlBma}'"
+    if [ ! -f "${pathToBf}" ]; then
+	echo "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'\n"
+	help
 	exit 1
     fi
-    if [[ ! -f $pathToRscript ]]; then
-	echo "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'"
+    if [ ! -f "${pathToRscript}" ]; then
+	echo "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'\n"
+	help
 	exit 1
     fi
 }
@@ -82,20 +103,19 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    R --no-restore --no-save --slave --vanilla --file=${pathToRscript} \
-	--args --verbose 1 --dir $(pwd) --rgs >& stdout_simul_exp
+    ${pathToRscript} --verbose 1 --dir $(pwd) --rgs >& stdout_simul_exp
 }
 
 function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToEqtlBma -g list_genotypes.txt --scoord snp_coords.bed.gz \
-	-p list_phenotypes.txt --fcoord gene_coords.bed.gz --cis 5 \
-	-o obs_eqtlbma --outss --outraw --step 3 --bfs all \
+    $pathToBf --geno list_genotypes.txt --scoord snp_coords.bed.gz \
+	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
+	--out obs_bf --outss --outw --type join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	-v 1 >& stdout_eqtlbma
+	-v 1 >& stdout_bf
 }
 
 function comp_obs_vs_exp () {
@@ -104,21 +124,21 @@ function comp_obs_vs_exp () {
     fi
     
     for i in {1..3}; do
-    # nbDiffs=$(diff <(zcat obs_eqtlbma_sumstats_s${i}.txt.gz) <(zcat exp_eqtlbma_sumstats_s${i}.txt.gz) | wc -l)
+    # nbDiffs=$(diff <(zcat obs_bf_sumstats_s${i}.txt.gz) <(zcat exp_bf_sumstats_s${i}.txt.gz) | wc -l)
     # if [ ! $nbDiffs -eq 0 ]; then
-	if ! zcmp -s obs_eqtlbma_sumstats_s${i}.txt.gz exp_eqtlbma_sumstats_s${i}.txt.gz; then
-	    echo "file 'obs_eqtlbma_sumstats_s${i}.txt.gz' has differences with exp"
+	if ! zcmp -s obs_bf_sumstats_s${i}.txt.gz exp_bf_sumstats_s${i}.txt.gz; then
+	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
 		exit 1
 	fi
     done
     
-    if ! zcmp -s obs_eqtlbma_l10abfs_raw.txt.gz exp_eqtlbma_l10abfs_raw.txt.gz; then
-    	echo "file 'obs_eqtlbma_l10abfs_raw.txt.gz' has differences with exp"
+    if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
+    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
 		exit 1
     fi
     
-    if ! zcmp -s obs_eqtlbma_l10abfs_avg-grids.txt.gz exp_eqtlbma_l10abfs_avg-grids.txt.gz; then
-    	echo "file 'obs_eqtlbma_l10abfs_avg-grids.txt.gz' has differences with exp"
+    if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
 		exit 1
     fi
     
@@ -130,10 +150,10 @@ function comp_obs_vs_exp () {
 #------------------------------------------------------------------------------
 
 verbose=1
-pathToEqtlBma=$eqtlbma_abspath
+pathToBf=$bf_abspath
 pathToRscript=$Rscript_abspath
 clean=true
-parseArgs "$@"
+parseCmdLine "$@"
 
 if [ $verbose -gt "0" ]; then
     startTime=$(timer)
@@ -149,6 +169,7 @@ testDir=tmp_test_${uniqId}
 rm -rf ${testDir}
 mkdir ${testDir}
 cd ${testDir}
+if [ $verbose -gt "0" ]; then echo "temp dir: "$(pwd); fi
 
 simul_data_and_calc_exp_res
 
