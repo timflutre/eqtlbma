@@ -5,7 +5,7 @@ This directory contains eQtlBma, a package implementing Bayesian methods
 to detect expression quantitative trait loci (eQTL).
 
 eQtlBma is free software, you can redistribute it and/or modify it under
-the terms of the GNU General Public License.
+the terms of the GNU General Public License (GPLv3+).
 
 The GNU General Public License does not permit this software to be
 redistributed in proprietary programs.
@@ -14,7 +14,7 @@ This library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-See the wiki on GitHub: https://github.com/timflutre/eqtlbma/wiki
+The code is hosted online: https://github.com/timflutre/eqtlbma
 
 
 Installation
@@ -29,6 +29,8 @@ For the impatients:
     make check
     sudo make install
 
+See also https://github.com/timflutre/eqtlbma/wiki.
+
 
 More information about eQtlBma
 ==============================
@@ -38,4 +40,5 @@ To generate the manual in the doc/ directory, type:
 or
    make html
 
-See the NEWS file for recent changes to the package.
+See the NEWS file for recent changes to the package, and ask questions on
+the mailing list: https://groups.google.com/forum/#!forum/eqtlbma-users.

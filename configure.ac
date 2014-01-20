@@ -1,4 +1,4 @@
-AC_INIT([eqtlbma], [1.3], [timflutre@gmail.com], [eqtlbma], [https://github.com/timflutre/eqtlbma/wiki])
+AC_INIT([eqtlbma], [1.3], [eqtlbma-users@googlegroups.com], [eqtlbma], [https://github.com/timflutre/eqtlbma/wiki])
 AC_CONFIG_SRCDIR([src/eqtlbma_bf.cpp]) # safety check
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall -Werror 1.13])
