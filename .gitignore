@@ -13,7 +13,6 @@ config.status
 configure
 doc/manual_eqtlbma.info
 doc/manual_eqtlbma.t2p/
-doc/manual_eqtlbma.pdf
 doc/stamp-vti
 doc/version.texi
 doc/manual_eqtlbma.html/
