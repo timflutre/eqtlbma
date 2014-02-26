@@ -318,11 +318,10 @@ snp2 0 1 0 ...
 ...
 @end verbatim
 
-The VCF and IMPUTE-like formats contain information about SNP coordinates,
-but not the allele-dose format.
-Therefore, with the latter, we also need to use the option @option{--scoord}
+The VCF and IMPUTE-like formats contain information about SNP coordinates, thus they should not be used with @option{--scoord}.
+However, the allele-dose format do need the option @option{--scoord},
 followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.edu/FAQ/FAQformat.html,BED format}.
-This means that the coordinates are 0-based, there is no header line and the column separator is a tabulation.
+This means that the start coordinate is 0-based, there is no header line and the column separator is a tabulation.
 
 When parallelizing an analyzis over genes, we may want to only load the SNPs in @emph{cis} of the genes in the given job.
 In order to speed-up this, the code uses the @url{https://github.com/samtools/tabix,tabix} library (Li, 2011).

@@ -87,9 +87,10 @@ void help(char ** argv)
        << "\t\t followed by >sample1_a1a1<del>sample1_a1a2<del>sample1_a2a2<del>..." << endl
        << "\t\tcustom: genotypes as allele dose, same as for MatrixEQTL" << endl
        << "\t\t and missing data can be NA or -1 (as used by vcftools --012)" << endl
-       << "      --scoord\tfile with the SNP coordinates (compulsory if custom genotype format)" << endl
+       << "      --scoord\tfile with the SNP coordinates" << endl
+       << "\t\tcompulsory if custom genotype format; forbidden otherwise" << endl
        << "\t\tshould be in the BED format (delimiter: tab)" << endl
-       << "\t\tSNPs in the genotype files without coordinate are skipped" << endl
+       << "\t\tSNPs in the genotype files without coordinate are skipped (see also --snp)" << endl
        << "\t\tif a tabix-indexed file is also present, it will be used" << endl
        << "      --exp\tfile with absolute paths to expression level files" << endl
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
@@ -1011,6 +1012,11 @@ void loadGeneInfo(const string & file_genecoords, const int & verbose,
     split(lines[i], " \t", tokens);
     if(gene2object.find(tokens[3]) != gene2object.end())
       continue; // in case of redundancy
+    if(tokens[1] == tokens[2]){
+      cerr << "ERROR: start and end coordinates of " << tokens[3]
+	   << " should be different (at least 1 bp)" << endl;
+      exit(1);
+    }
     Gene gene(tokens[3], tokens[0], tokens[1], tokens[2]);
     if(tokens.size() >= 6)
       gene.SetStrand(tokens[5]);
@@ -1460,6 +1466,11 @@ void loadSnpInfo(const string & snpCoordsFile,
       continue;
     if(snp2object.find(tokens[3]) != snp2object.end())
       continue; // in case of redundancy
+    if(tokens[1] == tokens[2]){
+      cerr << "ERROR: start and end coordinates of " << tokens[3]
+	   << " should be different (at least 1 bp)" << endl;
+      exit(1);
+    }
     Snp snp(tokens[3], tokens[0], tokens[2]);
     snp2object.insert(make_pair(snp.GetName(), snp));
     if(mChr2VecPtSnps.find(snp.GetChromosome()) == mChr2VecPtSnps.end())
@@ -1523,7 +1534,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
     return;
   
   if(verbose > 0)
-    cout << "load genotypes ..." << endl << flush;
+    cout << "load genotypes (custom format) ..." << endl << flush;
   
   gzFile genoStream;
   string line;
@@ -1549,6 +1560,14 @@ void loadGenos(const map<string, string> & subgroup2genofile,
     }
     ++nb_lines;
     split(line, " \t", tokens);
+    if(tokens[0].compare("chr") == 0){
+      cerr << "ERROR: don't use --scoord if genotypes in IMPUTE format" << endl;
+      exit(1);
+    }
+    if(tokens[0].find("##fileformat=VCF") != string::npos){
+      cerr << "ERROR: don't use --scoord if genotypes in VCF format" << endl;
+      exit(1);
+    }
     if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
 	|| tokens[0].compare("ID") == 0)
       nb_samples = tokens.size() - 1;
