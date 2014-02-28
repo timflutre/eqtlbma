@@ -48,6 +48,7 @@ help <- function(){
   txt <- paste0(txt, "      --ris\tremove some individuals from some subgroups\n")
   txt <- paste0(txt, "      --rgsi\tremove some exp levels in some subgroups for some individuals\n")
   txt <- paste0(txt, "      --lik\tlikelihood (default=norm/pois/qpois)\n")
+  txt <- paste0(txt, "      --gfmt\tformat of the genotypes (default=custom/impute)\n")
   message(txt)
 }
 
@@ -58,12 +59,12 @@ help <- function(){
 version <- function(){
   txt <- paste0(prog.name, " ", prog.version, "\n")
   txt <- paste0(txt, "\n")
-  txt <- paste0(txt, "Written by Timothee Flutre.\n")
-  txt <- paste0(txt, "\n")
-  txt <- paste0(txt, "Copyright (C) 2011-2013 Timothee Flutre.\n")
+  txt <- paste0(txt, "Copyright (C) 2011-2014 Timothee Flutre.\n")
   txt <- paste0(txt, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
   txt <- paste0(txt, "This is free software; see the source for copying conditions.  There is NO\n")
   txt <- paste0(txt, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n")
+  txt <- paste0(txt, "\n")
+  txt <- paste0(txt, "Written by Timothee Flutre.\n")
   message(txt)
 }
 
@@ -120,6 +121,10 @@ parseCmdLine <- function(params){
       params$lik <- args[i+1]
       i <- i + 1
     }
+    else if(args[i] == "--gfmt"){
+      params$geno.format <- args[i+1]
+      i <- i + 1
+    }
   }
   
   if(params$verbose > 1){
@@ -139,7 +144,8 @@ parseCmdLine <- function(params){
 checkParams <- function(params){
   stopifnot(! is.null(params$dir.name),
             file.exists(params$dir.name),
-            params$lik %in% c("norm","pois","qpois"))
+            params$lik %in% c("norm","pois","qpois"),
+            params$geno.format %in% c("custom","impute"))
 }
 
 print.mat2 <- function(mat, a, b){
@@ -396,7 +402,6 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
   
   if(verbose > 0)
     message("write simulated data ...")
-  
   write.table(x=data$gene.coords, file=gzfile("gene_coords.bed.gz"),
               quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
   if(geno.format == "custom"){
@@ -415,6 +420,26 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
     message("ERROR: saving genotypes in VCF is not yet implemented")
   } else if(geno.format == "impute"){
     message("ERROR: saving genotypes in IMPUTE is not yet implemented")
+    tmp <- data.frame(chr=data$snp.coords$chr,
+                      name=data$snp.coords$id,
+                      coord=data$snp.coords$end,
+                      a1=rep("A", nrow(data$geno.counts)),
+                      a2=rep("C", nrow(data$geno.counts)))
+    for(i in 1:ncol(data$geno.counts)){
+      tmp[[paste0(colnames(data$geno.counts)[i], "_a1a1")]] <-
+        ifelse(data$geno.counts[,i] == 0, 1, 0)
+      tmp[[paste0(colnames(data$geno.counts)[i], "_a1a2")]] <- 
+        ifelse(data$geno.counts[,i] == 1, 1, 0)
+      tmp[[paste0(colnames(data$geno.counts)[i], "_a2a2")]] <- 
+        ifelse(data$geno.counts[,i] == 2, 1, 0)
+    }
+    write.table(x=tmp, file=gzfile("genotypes_imp.txt.gz"),
+                quote=FALSE, sep="\t", row.names=FALSE, col.names=TRUE)
+    tmp <- data.frame(subgroup=names(data$phenos),
+                      file=rep("genotypes_imp.txt.gz",
+                        length(data$phenos)))
+    write.table(x=tmp, file="list_genotypes.txt", quote=FALSE,
+                row.names=FALSE, col.names=FALSE)
   }
   
   for(s in 1:length(data$phenos)){
@@ -1415,7 +1440,8 @@ run <- function(params){
   data <- getSimulatedData(params$rmvGenesFromSbgrp, params$rmvIndsFromSbgrp,
                            params$rmvExpFromSbgrpsInds, params$lik,
                            params$verbose)
-  writeSimulatedData(data, geno.format="custom", verbose=params$verbose)
+  writeSimulatedData(data, geno.format=params$geno.format,
+                     verbose=params$verbose)
   grids <- getGrids()
   writeGrids(grids, params$verbose)
   res <- getResultsOnSimulatedData(data, grids, params$withCovars,
@@ -1433,7 +1459,8 @@ main <- function(){
                  mvlr=FALSE,
                  rmvIndsFromSbgrp=FALSE,
                  rmvExpFromSbgrpsInds=FALSE,
-                 lik="norm")
+                 lik="norm",
+                 geno.format="custom")
   params <- parseCmdLine(params)
   checkParams(params)
   if(params$verbose > 0)

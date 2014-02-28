@@ -298,6 +298,18 @@ parseCmdLine(
     case 0:
       if(long_options[option_index].flag != 0)
 	break;
+      if(strcmp(long_options[option_index].name, "help") == 0){
+	help(argv);
+	exit(0);
+      }
+      if(strcmp(long_options[option_index].name, "version") == 0){
+	version(argv);
+	exit(0);
+      }
+      if(strcmp(long_options[option_index].name, "verbose") == 0){
+	verbose = atoi(optarg);
+	break;
+      }
       if(strcmp(long_options[option_index].name, "geno") == 0){
 	file_genopaths = optarg;
 	break;
@@ -1166,7 +1178,8 @@ void loadGenosAndSnpInfoFromImpute(
   string & line,
   size_t & nb_lines,
   size_t & nb_snps_tokeep_per_subgroup,
-  map<string, Snp> & snp2object)
+  map<string, Snp> & snp2object,
+  map<string, vector<Snp*> > & mChr2VecPtSnps)
 {
   string subgroup = it_subgroup2genofile->first,
     genofile = it_subgroup2genofile->second;
@@ -1212,7 +1225,8 @@ loadGenosAndSnpInfoFromVcf (
   string & line,
   size_t & nb_lines,
   size_t & nb_snps_tokeep_per_subgroup,
-  map<string, Snp> & snp2object)
+  map<string, Snp> & snp2object,
+  map<string, vector<Snp*> > & mChr2VecPtSnps)
 {
   string subgroup = it_subgroup2genofile->first,
     genofile = it_subgroup2genofile->second;
@@ -1320,7 +1334,8 @@ void loadGenosAndSnpInfo(
     if(line.find("##fileformat=VCF") != string::npos) // VCF format
       loadGenosAndSnpInfoFromVcf(it, sSnpsToKeep, mChr2VecPtGenes,
 				 genoStream, line, nb_lines,
-				 nb_snps_tokeep_per_subgroup, snp2object);
+				 nb_snps_tokeep_per_subgroup, snp2object,
+				 mChr2VecPtSnps);
     else if(line.find("chr") != string::npos
 	    && (line.find("name") != string::npos || line.find("id") != string::npos)
 	    && line.find("coord") != string::npos
@@ -1329,7 +1344,7 @@ void loadGenosAndSnpInfo(
       loadGenosAndSnpInfoFromImpute(it, sSnpsToKeep, mChr2VecPtGenes,
 				    genoStream, line, nb_lines,
 				    nb_snps_tokeep_per_subgroup,
-				    snp2object);
+				    snp2object, mChr2VecPtSnps);
     else if(line.compare(0, 2, "id") == 0 || line.compare(0, 2, "Id") == 0
 	     || line.compare(0, 2, "ID") == 0){
       cerr << "ERROR: file " << it->second
@@ -1376,6 +1391,13 @@ void loadGenosAndSnpInfo(
   if(same_files)
     duplicateGenosPerSnpInAllSubgroups(subgroup2genofile, verbose,
 				       snp2object);
+  
+  for(map<string, Snp>::const_iterator it = snp2object.begin();
+      it != snp2object.end(); ++it){
+    if(mChr2VecPtSnps.find(it->second.GetChromosome()) == mChr2VecPtSnps.end())
+      mChr2VecPtSnps.insert(make_pair(it->second.GetChromosome(), vector<Snp*>()));
+    mChr2VecPtSnps[it->second.GetChromosome()].push_back(&(snp2object[it->second.GetName()]));
+  }
   
   // sort the SNPs per chr
   for(map<string, vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
@@ -1436,9 +1458,6 @@ void loadSnpInfo(const string & file_snpcoords,
 	  continue; // in case of redundancy
 	Snp snp(tokens[3], tokens[0], tokens[2]);
 	snp2object.insert(make_pair(snp.GetName(), snp));
-	if(mChr2VecPtSnps.find(snp.GetChromosome()) == mChr2VecPtSnps.end())
-	  mChr2VecPtSnps.insert(make_pair(snp.GetChromosome(), vector<Snp*>()));
-	mChr2VecPtSnps[snp.GetChromosome()].push_back(&(snp2object[snp.GetName()]));
 	
       }
       ti_iter_destroy(iter);
@@ -1473,9 +1492,6 @@ void loadSnpInfo(const string & snpCoordsFile,
     }
     Snp snp(tokens[3], tokens[0], tokens[2]);
     snp2object.insert(make_pair(snp.GetName(), snp));
-    if(mChr2VecPtSnps.find(snp.GetChromosome()) == mChr2VecPtSnps.end())
-      mChr2VecPtSnps.insert(make_pair(snp.GetChromosome(), vector<Snp*>()));
-    mChr2VecPtSnps[snp.GetChromosome()].push_back(&(snp2object[snp.GetName()]));
   }
   if(! gzeof(snpCoordsStream))
  {
@@ -1513,6 +1529,13 @@ void loadSnpInfo(const string & file_snpcoords,
     cout << " (unindexed BED file) ..." << endl << flush;
     loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose,
 		snp2object, mChr2VecPtSnps);
+  }
+  
+  for(map<string, Snp>::const_iterator it = snp2object.begin();
+      it != snp2object.end(); ++it){
+    if(mChr2VecPtSnps.find(it->second.GetChromosome()) == mChr2VecPtSnps.end())
+      mChr2VecPtSnps.insert(make_pair(it->second.GetChromosome(), vector<Snp*>()));
+    mChr2VecPtSnps[it->second.GetChromosome()].push_back(&(snp2object[it->second.GetName()]));
   }
   
   // sort the SNPs per chr
