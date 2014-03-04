@@ -347,6 +347,9 @@ covar2 -1.0 0.8 ...
 @end verbatim
 Note that this format is also read by the R package MatrixEQTL.
 Here also, no missing covariate is allowed.
+However, in eQtlBma, the covariates are assumed to be additive.
+This is fine for continuous covariates (say, principal components to account for some population structure) or binary (say, gender).
+However, if the covariates are categorical, we recommend to regress them out beforehand, for instance by using R where you can encode them as @url{https://stat.ethz.ch/R-manual/R-devel/library/base/html/factor.html,factors}.
 
 
 @subsection Expression levels
