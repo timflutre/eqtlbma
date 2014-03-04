@@ -336,7 +336,7 @@ The option @option{--maf} allows to skip SNPs if their minor allele frequency in
 The option @option{--covar} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.
 The first column is the identifier of the subgroup.
-The second column is the path to the file containing the genotypes for this subgroup.
+The second column is the path to the file containing the covariates for this subgroup.
 
 Each covariate file has to be in the following format:
 @verbatim
