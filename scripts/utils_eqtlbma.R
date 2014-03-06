@@ -99,6 +99,39 @@ makeGrid <- function(grid.type="general", no.het=FALSE){
   return(grid)
 }
 
+##' Plot the histogram of the minor allele frequency per SNP
+##'
+##' Missing values (encoded as NA) are discarded.
+##' @title Histogram of minor allele frequencies
+##' @param genos.dose matrix or data.frame of allele dose ([0;1]) with
+##' SNPs in rows and samples in columns
+##' @param maf vector of minor allele frequencies
+##' @param main string for the main title (default="")
+##' @param xlim default=c(0,0.5)
+##' @return vector of minor allele frequencies (to avoid recomputing it)
+plotHistMinAllelFreq <- function(genos.dose=NULL, maf=NULL, main="",
+                                 xlim=c(0,0.5), ...){
+    stopifnot(! is.null(genos.dose) || ! is.null(maf))
+    
+    if(! is.null(genos.dose) & is.null(maf)){
+        if(nrow(genos.dose) < ncol(genos.dose))
+            warning("input matrix doesn't seem to have SNPs in rows and samples in columns")
+        genos.dose <- as.matrix(genos.dose)
+        maf <- apply(genos.dose, 1, function(x){
+            x <- x[complete.cases(x)] # discard missing values (encoded as NA)
+            tmp <- sum(x) / (2 * length(x))
+            ifelse(tmp <= 0.5, tmp, 1 - tmp)
+        })
+    }
+    
+    print(summary(maf))
+    
+    hist(x=maf, xlab="Minor allele frequency", ylab="Number of SNPs",
+         main=main, xlim=xlim, ...)
+    
+    invisible(return(maf))
+}
+
 ##' Identify SNPs in cis of each gene
 ##'
 ##' Use findOverlaps() from GenomicRanges, TSS +- cis.radius
