@@ -265,6 +265,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
 ##' covariance matrix of the variables
 ##' @return Array with samples in the third dimension
 matvrnorm <- function(n=1, M, U, V){
+    require(MASS)
     stopifnot(nrow(M) == nrow(U),
               ncol(M) == nrow(V),
               nrow(U) == ncol(U),
