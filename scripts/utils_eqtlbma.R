@@ -124,10 +124,8 @@ plotHistMinAllelFreq <- function(genos.dose=NULL, maf=NULL, main="",
         })
     }
     
-    print(summary(maf))
-    
-    hist(x=maf, xlab="Minor allele frequency", ylab="Number of SNPs",
-         main=main, xlim=xlim, ...)
+    tmp <- hist(x=maf, xlab="Minor allele frequency", ylab="Number of SNPs",
+                main=main, xlim=xlim, ...)
     
     invisible(return(maf))
 }
