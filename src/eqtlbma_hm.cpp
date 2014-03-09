@@ -320,12 +320,15 @@ void Controller::load_data(
   
   vector<string> lines;
   for(size_t i = 0; i < files.size(); ++i){
-    if(verbose_ > 0)
+    if(verbose_ == 1)
       progressBar("", i+1, files.size());
+    else if(verbose_ > 1)
+      cout << "file " << (i+1) << " " << files[i] << endl;
     load_data_one_file(files[i], configs_tokeep, lines);
     lines.clear();
+    // vector<string>().swap(lines);
   }
-  if(verbose_ > 0)
+  if(verbose_ == 1)
     cout << endl << flush;
   
   // initialization of useful data structures for the EM

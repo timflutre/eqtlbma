@@ -296,57 +296,69 @@ namespace utils {
     gzFile stream;
     openFile(pathToFile, stream, "rb");
     
-    int errnum;
-    const char * error_msg = NULL;
-    
-    size_t nb_bytes_to_read = 256000; // 8192 is default for gzbuffer
-    if(gzbuffer(stream, nb_bytes_to_read) == -1){
-      error_msg = gzerror(stream, &errnum);
-      if(errnum != Z_OK){
-	cerr << "ERROR: gzbuffer failed with " << nb_bytes_to_read
-	     << " bytes" << endl;
-	cerr << error_msg << endl;
-	exit(EXIT_FAILURE);
-      }
+    string line;
+    size_t line_id = 0;
+    while(getline(stream, line)){
+      lines.push_back(line);
+      ++line_id;
     }
-    
-    size_t buf_len = nb_bytes_to_read;
-    char * buf = (char *) malloc(buf_len);
-    if(buf == NULL){
-      cerr << "ERROR: can't allocate " << nb_bytes_to_read
-	   << " bytes" << endl;
+    if(! gzeof(stream)){
+      cerr << "ERROR: can't read successfully file "
+	<< pathToFile << " up to the end" << endl;
       exit(EXIT_FAILURE);
     }
     
-    size_t nb_bytes_read = 0, tot_nb_bytes_read = 0;
-    while(! gzeof(stream)){
-      nb_bytes_read = gzread(stream, buf + tot_nb_bytes_read,
-			     nb_bytes_to_read);
-      tot_nb_bytes_read += nb_bytes_read;
-      if(nb_bytes_read < nb_bytes_to_read and ! gzeof(stream)){
-	error_msg = gzerror(stream, &errnum);
-	if(errnum != Z_OK){
-	  cerr << "ERROR: gzread failed on " << pathToFile << endl;
-	  cerr << error_msg << endl;
-	  exit(EXIT_FAILURE);
-	}
-      }
-      if(tot_nb_bytes_read == buf_len){
-	buf_len += nb_bytes_to_read;
-	buf = (char*) realloc(buf, buf_len);
-	if(buf == NULL){
-	  cerr << "ERROR: can't allocate " << nb_bytes_to_read
-	       << " bytes" << endl;
-	  exit(EXIT_FAILURE);
-	}
-      }
-    }
+    // int errnum;
+    // const char * error_msg = NULL;
+    
+    // size_t nb_bytes_to_read = 256000; // 8192 is default for gzbuffer
+    // if(gzbuffer(stream, nb_bytes_to_read) == -1){
+    //   error_msg = gzerror(stream, &errnum);
+    //   if(errnum != Z_OK){
+    // 	cerr << "ERROR: gzbuffer failed with " << nb_bytes_to_read
+    // 	     << " bytes" << endl;
+    // 	cerr << error_msg << endl;
+    // 	exit(EXIT_FAILURE);
+    //   }
+    // }
+    
+    // size_t buf_len = nb_bytes_to_read;
+    // char * buf = (char *) malloc(buf_len);
+    // if(buf == NULL){
+    //   cerr << "ERROR: can't allocate " << nb_bytes_to_read
+    // 	   << " bytes" << endl;
+    //   exit(EXIT_FAILURE);
+    // }
+    
+    // size_t nb_bytes_read = 0, tot_nb_bytes_read = 0;
+    // while(! gzeof(stream)){
+    //   nb_bytes_read = gzread(stream, buf + tot_nb_bytes_read,
+    // 			     nb_bytes_to_read);
+    //   tot_nb_bytes_read += nb_bytes_read;
+    //   if(nb_bytes_read < nb_bytes_to_read && ! gzeof(stream)){
+    // 	error_msg = gzerror(stream, &errnum);
+    // 	if(errnum != Z_OK){
+    // 	  cerr << "ERROR: gzread failed on " << pathToFile << endl;
+    // 	  cerr << error_msg << endl;
+    // 	  exit(EXIT_FAILURE);
+    // 	}
+    //   }
+    //   if(tot_nb_bytes_read == buf_len){
+    // 	buf_len += nb_bytes_to_read;
+    // 	buf = (char*) realloc(buf, buf_len);
+    // 	if(buf == NULL){
+    // 	  cerr << "ERROR: can't allocate " << nb_bytes_to_read
+    // 	       << " bytes" << endl;
+    // 	  exit(EXIT_FAILURE);
+    // 	}
+    //   }
+    // }
+    
+    // lines = split(buf, "\n", lines);
+    
+    // free(buf);
     
     closeFile(pathToFile, stream);
-    
-    lines = split(buf, "\n", lines);
-    
-    free(buf);
     
     return 0;
   }
