@@ -221,6 +221,8 @@ void Controller::load_data_one_file(
 {
   // load the whole file at once (supposedly quicker)
   readFile(file, lines);
+  if(verbose_ > 1)
+    cout << lines.size() << " lines" << endl;
   
   // check the header
   vector<string> tokens;
