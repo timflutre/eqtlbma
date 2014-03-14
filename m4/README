@@ -1,0 +1,4 @@
+This directory, m4/, is necessary for some versions of the GNU build system 
+(Autotools). It is supposed to contain custom macros, but the package eqtlbma
+doesn't have any (yet). Therefore the directory remains empty. As git doesn't
+like empty directories, this README was created.
