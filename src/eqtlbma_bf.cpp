@@ -899,10 +899,10 @@ void loadSamplesFromGenotypes(
       
       // if file in IMPUTE format
       if(tokens[0].compare("chr") == 0
-	  && tokens[1].compare("name") == 0
-	  && tokens[2].compare("coord") == 0
-	  && tokens[3].compare("a1") == 0
-	  && tokens[4].compare("a2") == 0){
+	 && (tokens[1].compare("name") == 0 || tokens[1].compare("id") == 0)
+	 && tokens[2].compare("coord") == 0
+	 && tokens[3].compare("a1") == 0
+	 && tokens[4].compare("a2") == 0){
 	if((tokens.size() - 5) % 3 != 0){
 	  cerr << "ERROR: the header of IMPUTE file " << it->second
 	       << " is badly formatted" << endl;
@@ -1337,7 +1337,8 @@ void loadGenosAndSnpInfo(
 				 nb_snps_tokeep_per_subgroup, snp2object,
 				 mChr2VecPtSnps);
     else if(line.find("chr") != string::npos
-	    && (line.find("name") != string::npos || line.find("id") != string::npos)
+	    && (line.find("name") != string::npos
+		|| line.find("id") != string::npos)
 	    && line.find("coord") != string::npos
 	    && line.find("a1") != string::npos
 	    && line.find("a2") != string::npos) // IMPUTE format
