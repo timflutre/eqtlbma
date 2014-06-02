@@ -919,9 +919,10 @@ rm -rf lists_snps; mkdir lists_snps; \
 seq -w 1 $(ls lists_genes/* | wc -l) | \
 parallel 'i={}; bedtools window -w 100000 -a lists_genes/list_genes_${i}.bed.gz \
 -b snp_coords.bed.gz | \
-cut -f8 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
+cut -f10 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
+Each SNP file contains the identifiers (e.g. rs number) of the SNPs in cis of the genes in the corresponding batch.
 Change the "100000" into "1000000" if you want a 1Mb radius instead of a 100Kb radius for the @emph{cis} window.
 Note also that, to have the @emph{cis} region centered on the TSS only (i.e. neglecting the TES), 
 you will first have to modify the file "gene_coords.bed.gz":
@@ -935,7 +936,7 @@ zcat gene_coords.bed.gz \
 @sp 1
 
 @item
-@strong{How do I make the file of seeds when usin eqtlbma_bf_parallel.bash?}
+@strong{How do I make the file of seeds when using eqtlbma_bf_parallel.bash?}
 
 Before launching @command{eqtlbma_bf_parallel.bash} to do permutations, 
 use the following command-line (requires R):
