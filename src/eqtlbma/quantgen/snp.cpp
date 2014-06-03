@@ -99,22 +99,21 @@ namespace quantgen {
     }
     size_t nb_samples = static_cast<size_t>((end - begin) / 3);
     genotypes.assign(nb_samples, NaN);
+    minor_allele_freq = 0.0;
     double AA, BB, AB;
-    bool any_missing_value = false;
     for(size_t i = 0; i < nb_samples; ++i){
       AA = atof((begin+3*i)->c_str());
       AB = atof((begin+3*i+1)->c_str());
       BB = atof((begin+3*i+2)->c_str());
-      if (AA == 0 && AB == 0 && BB == 0) {
-	cerr << "WARNING: skip snp " << name_ << " in subgroup " << subgroup
-	     << " because of missing value" << endl;
-	any_missing_value = true;
-	break;
+      if(AA == 0 && AB == 0 && BB == 0){
+	minor_allele_freq = NaN;
       }
-      genotypes[i] = 0 * AA + 1 * AB + 2 * BB;
-      minor_allele_freq += genotypes[i];
+      else{
+	genotypes[i] = 0 * AA + 1 * AB + 2 * BB;
+	minor_allele_freq += genotypes[i];
+      }
     }
-    if(! any_missing_value){
+    if(! isNan(minor_allele_freq)){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
@@ -131,25 +130,24 @@ namespace quantgen {
   {
     size_t nb_samples = static_cast<size_t>(end - begin + 1);
     genotypes.assign(nb_samples, NaN);
+    minor_allele_freq = 0.0;
     vector<string> tokens2, tokens3;
-    bool any_missing_value = false;
     for(size_t i = 0; i < nb_samples; ++i){
       split(*(begin+i), ":", tokens2);
       if(tokens2[0].find(".") != string::npos) {
-	cerr << "WARNING: skip snp " << name_ << " in subgroup " << subgroup
-	     << " because of missing value" << endl;
-	any_missing_value = true;
-	break;
+	minor_allele_freq = NaN;
       }
-      split(tokens2[0], "|/", tokens3);
-      genotypes[i] = 0;
-      if(tokens3[0].compare("1") == 0)
-	genotypes[i] += 1;
-      if(tokens3[1].compare("1") == 0)
-	genotypes[i] += 1;
-      minor_allele_freq += genotypes[i];
+      else{
+	split(tokens2[0], "|/", tokens3);
+	genotypes[i] = 0;
+	if(tokens3[0].compare("1") == 0)
+	  genotypes[i] += 1;
+	if(tokens3[1].compare("1") == 0)
+	  genotypes[i] += 1;
+	minor_allele_freq += genotypes[i];
+      }
     }
-    if(! any_missing_value){
+    if(! isNan(minor_allele_freq)){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
@@ -166,19 +164,18 @@ namespace quantgen {
   {
     size_t nb_samples = static_cast<size_t>(end - begin);
     genotypes.assign(nb_samples, NaN);
-    bool any_missing_value = false;
+    minor_allele_freq = 0.0;
     for(size_t i = 0; i < nb_samples; ++i){
       if((begin+i)->compare("NA") == 0 || (begin+i)->compare("na") == 0
 	  || (begin+i)->compare("NaN") == 0 || (begin+i)->compare("nan") == 0){
-	cerr << "WARNING: skip snp " << name_ << " in subgroup " << subgroup
-	     << " because of missing value" << endl;
-	any_missing_value = true;
-	break;
+	minor_allele_freq = NaN;
       }
-      genotypes[i] = atof((begin+i)->c_str());
-      minor_allele_freq += genotypes[i];
+      else{
+	genotypes[i] = atof((begin+i)->c_str());
+	minor_allele_freq += genotypes[i];
+      }
     }
-    if(! any_missing_value){
+    if(! isNan(minor_allele_freq)){
       minor_allele_freq /= (2 * nb_samples);
       minor_allele_freq = (minor_allele_freq <= 0.5 ?
 			   minor_allele_freq
@@ -192,7 +189,8 @@ namespace quantgen {
 			const string & format)
   {
     vector<double> genotypes;
-    double minor_allele_freq = 0;
+    double minor_allele_freq;
+    
     if(format.compare("impute") == 0)
       AddSubgroupFromImputeLine(subgroup, begin, end,
 				genotypes, minor_allele_freq);
@@ -206,6 +204,7 @@ namespace quantgen {
       cerr << "ERROR: genotype format '" << format << "' is not recognized" << endl;
       exit(EXIT_FAILURE);
     }
+    
     Genotypes genos;
     genos.values = genotypes;
     genos.maf = minor_allele_freq;
@@ -230,6 +229,17 @@ namespace quantgen {
 	   subgroup2genotypes_.begin(); it != subgroup2genotypes_.end(); ++it)
       os << it->first << ": " << GetNbSamples(it->first) << " samples "
 	 << " (maf=" << GetMinorAlleleFreq(it->first) << ")" << endl;
+  }
+
+  void Snp::EraseIfMissingValuesPerSubgroup()
+  {
+    map<string,Genotypes>::iterator it = subgroup2genotypes_.begin();
+    while(it != subgroup2genotypes_.end()){
+      if(isNan(GetMinorAlleleFreq(it->first)))
+	subgroup2genotypes_.erase(it++);
+      else
+	++it;
+    }
   }
 
   void Snp::EraseIfLowMafPerSubgroup(const double & min_maf)

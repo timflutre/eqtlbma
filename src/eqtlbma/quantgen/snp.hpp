@@ -24,6 +24,7 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <algorithm>
 
 #include "utils/utils_io.hpp"
 #include "utils/utils_math.hpp"
@@ -76,6 +77,7 @@ namespace quantgen {
 		     const std::vector<std::string>::const_iterator & begin,
 		     const std::vector<std::string>::const_iterator & end,
 		     const std::string & format);
+    void EraseIfMissingValuesPerSubgroup();
     void EraseIfLowMafPerSubgroup(const double & min_maf);
     void DuplicateGenotypesFromFirstSubgroup(const std::string & subgroup_old,
 					     const std::string & subgroup_new);

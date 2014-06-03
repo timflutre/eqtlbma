@@ -1373,6 +1373,20 @@ void loadGenosAndSnpInfo(
 	   << endl << flush;
   }
   
+  if(verbose > 0)
+    cout << "discard SNPs with missing values ..." << endl << flush;
+  map<string,Snp>::iterator it = snp2object.begin();
+  while(it != snp2object.end()){
+    it->second.EraseIfMissingValuesPerSubgroup();
+    if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
+      if(verbose > 0)
+	cerr << "WARNING: skip SNP " << it->second.GetName()
+	     << " because it has missing values in each subgroup" << endl;
+      snp2object.erase(it++);
+    } else
+      ++it;
+  }
+  
   if(min_maf > 0){
     if(verbose > 0)
       cout << "filter SNPs with MAF < " << min_maf << " ..." << endl << flush;
@@ -1380,7 +1394,7 @@ void loadGenosAndSnpInfo(
     while(it != snp2object.end()){
       it->second.EraseIfLowMafPerSubgroup(min_maf);
       if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
-	if(verbose > 1)
+	if(verbose > 0)
 	  cerr << "WARNING: skip SNP " << it->second.GetName()
 	       << " because it has a low MAF in each subgroup" << endl;
 	snp2object.erase(it++);
