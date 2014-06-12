@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 ## `tutorial_eqtlbma.R' simulates data for the tutorial of the eQtlBma package
-## Copyright (C) 2013 Timothee Flutre
+## Copyright (C) 2013-2014 Timothée Flutre
 ## License: GPLv3+
 
 ## This program is free software: you can redistribute it and/or modify
@@ -23,9 +23,10 @@ prog.version <- "1.0"
 
 R.v.maj <- as.numeric(R.version$major)
 R.v.min.1 <- as.numeric(strsplit(R.version$minor, "\\.")[[1]][1])
-if(R.v.maj < 2 || (R.v.maj == 2 && R.v.min.1 < 15))
-    stop("require R >= 2.15 (for paste0)", call.=FALSE)
+if(R.v.maj < 3 || (R.v.maj == 3 && R.v.min.1 < 0))
+    stop("require R >= 3.0 (for built-in mclapply)", call.=FALSE)
 
+suppressPackageStartupMessages(require("parallel")) # for built-in mclapply
 suppressPackageStartupMessages(require("GenomicRanges")) # from Bioconductor
 suppressPackageStartupMessages(require("MASS")) # for mvrnorm
 
@@ -69,9 +70,6 @@ help <- function(){
     txt <- paste0(txt, "\n")
     txt <- paste0(txt, "Examples:\n")
     txt <- paste0(txt, " Rscript ./", prog.name, " --pkg ~/src/eqtlbma\n")
-    ## txt <- paste0(txt, "\n")
-    ## txt <- paste0(txt, "Remarks:\n")
-    ## txt <- paste0(txt, " This is my typical template file for R.")
     message(txt)
 }
 
@@ -82,12 +80,12 @@ help <- function(){
 version <- function(){
     txt <- paste0(prog.name, " ", prog.version, "\n")
     txt <- paste0(txt, "\n")
-    txt <- paste0(txt, "Written by Timothee Flutre.\n")
-    txt <- paste0(txt, "\n")
-    txt <- paste0(txt, "Copyright (C) 2013 Timothee Flutre.\n")
+    txt <- paste0(txt, "Copyright (C) 2013-2014 Timothée Flutre.\n")
     txt <- paste0(txt, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
     txt <- paste0(txt, "This is free software; see the source for copying conditions. There is NO\n")
     txt <- paste0(txt, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n")
+    txt <- paste0(txt, "\n")
+    txt <- paste0(txt, "Written by Timothée Flutre.\n")
     message(txt)
 }
 

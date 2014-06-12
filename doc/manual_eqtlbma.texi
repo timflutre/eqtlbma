@@ -136,7 +136,7 @@ mkdir tutorial_eqtlbma
 cd tutorial_eqtlbma
 @end verbatim
 
-Instead of using ``real'' data, we will simulate ``realistic'' data using the widely-used free software @url{http://www.r-project.org/,R} (version >= 2.15).
+Instead of using ``real'' data, we will simulate ``realistic'' data using the widely-used free software @url{http://www.r-project.org/,R} (version >= 3.0).
 Let's imagine that N=200 individuals are sampled.
 For each, mRNA levels are measured for G=1000 genes in S=3 tissues.
 Moreover, each gene has on average 50 SNPs in cis, for which we know the genotypes.
