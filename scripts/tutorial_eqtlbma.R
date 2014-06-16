@@ -64,6 +64,10 @@ help <- function(){
     ## txt <- paste0(txt, "\t\tusing the \"popgen\" package from J. Marchini\n")
     ## txt <- paste0(txt, "\t\tsome SNPs can be fixed\n")
     txt <- paste0(txt, "     --pi0\tprior proba for a gene to have no eQTL in any subgroup (default=0.3)\n")
+    txt <- paste0(txt, "     --coverr\terror covariance between subgroups (default=1)\n")
+    txt <- paste0("\t\t0: the SxS covariance matrix is the identity\n")
+    txt <- paste0("\t\t1: the SxS covariance matrix is unconstrained, same for all genes\n")
+    ## txt <- paste0("\t\t2: the SxS covariance matrix is unconstrained, different for each gene\n"
     txt <- paste0(txt, "     --seed\tseed for the RNG (default=1859)\n")
     txt <- paste0(txt, "     --dir\tdirectory in which files are written (current by default)\n")
     txt <- paste0(txt, "     --ncores\tnb of cores to run in parallel (default=1)\n")
@@ -174,6 +178,10 @@ parseCmdLine <- function(params){
             params$pi0 <- as.numeric(args[i+1])
             i <- i + 1
         }
+        else if(args[i] == "--coverr"){
+            params$coverr <- as.numeric(args[i+1])
+            i <- i + 1
+        }
         else if(args[i] == "--seed"){
             params$seed <- as.numeric(args[i+1])
             i <- i + 1
@@ -211,6 +219,13 @@ checkParams <- function(params){
         quit("no", status=1)
     }
     source(paste0(params$pkg, "/scripts/utils_eqtlbma.R"))
+    
+    if(! params$coverr %in% c(0,1,2)){
+        write(paste0(prog.name, ": --coverr should be 0, 1 or 2\n"),
+              stderr())
+        quit("no", status=1)
+    }
+    
     if(params$prop.rare < 0 || params$prop.rare > 1){
         write(paste0(prog.name, ": --rare ", params$prop.rare,
                      " should be between 0 and 1\n"),
@@ -220,7 +235,7 @@ checkParams <- function(params){
     
     if(params$related){
         require(popgen)
-        library(MASS)
+        require(MASS)
     }
     
     return(params)
@@ -497,8 +512,8 @@ simulGenotypes <- function(snp.coords.bed, inds, maf, prop.rare, related,
 ##' @param nb.cores nb of cores for parallel execution (via mclapply)
 ##' @param verbose verbosity level (0/default=1/2)
 ##' @return List with expression levels and truth
-simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related, pi0,
-                               nb.cores=1, verbose=1){
+simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
+                               pi0, coverr, nb.cores=1, verbose=1){
     if(verbose > 0)
         message("simulate gene expression levels ...")
     
@@ -521,15 +536,19 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related, pi0,
         diag(rep(phi2, nb.subgroups), nb.subgroups, nb.subgroups)
     
     ## errors: covariance between subgroups
-    ## use inverse-Wishart prior
-    r <- ceiling(0.1 * nb.inds) # "r small relative to sample size"
-    q.i <- 2 # intercept + other covariates
-    m.i <- ceiling(0.3 * nb.inds) # maybe there is a better choice?
-    nu.i <- m.i - q.i - r - 1
-    stopifnot(nu.i > 0)
-    H.i <- diag(nb.subgroups) # maybe there is a better choice?
-    cov.err.S <- solve(rWishart(n=1, df=m.i,
-                                Sigma=(1/nu.i)*solve(H.i))[,,1])
+    ## identity or use inverse-Wishart prior
+    if(coverr == 0){
+        cov.err.S <- diag(nb.subgroups)
+    } else if(coverr == 1){
+        r <- ceiling(0.1 * nb.inds) # "r small relative to sample size"
+        q.i <- 2 # intercept + other covariates
+        m.i <- ceiling(0.3 * nb.inds) # maybe there is a better choice?
+        nu.i <- m.i - q.i - r - 1
+        stopifnot(nu.i > 0)
+        H.i <- diag(nb.subgroups) # maybe there is a better choice?
+        cov.err.S <- solve(rWishart(n=1, df=m.i,
+                                    Sigma=(1/nu.i)*solve(H.i))[,,1])
+    }
     if(verbose > 0){
         message("covariance matrix of the errors (same for all genes):")
         print(cov.err.S)
@@ -751,6 +770,7 @@ run <- function(params){
                                           gn2sn,
                                           params$related,
                                           params$pi0,
+                                          params$coverr,
                                           params$nb.cores,
                                           params$verbose)
     
@@ -777,6 +797,7 @@ main <- function(){
                    prop.rare=0.1,
                    related=FALSE,
                    pi0=0.3,
+                   coverr=1,
                    seed=1859,
                    dir=getwd(),
                    nb.cores=1)
