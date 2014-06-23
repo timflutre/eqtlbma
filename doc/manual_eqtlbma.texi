@@ -7,6 +7,10 @@
 @syncodeindex pg cp
 @c %**end of header
 
+@c to have proper quotes in code blocks http://www.gnu.org/software/texinfo/manual/texinfo/texinfo.html#g_t_0040url
+@codequoteundirected on
+@codequotebacktick on
+
 @copying
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
@@ -97,7 +101,7 @@ and then compute various posterior probabilities of interest.
 @end itemize
 
 The details of the model are freely available online in the @url{http://dx.doi.org/10.1371/journal.pgen.1003486,article} by Flutre @emph{et al} (PLoS Genetics, 2013).
-See also Wen's @url{http://stephenslab.uchicago.edu/MSpapers/WenThesis.pdf,PhD thesis} (2011), Wen & Stephens (Annals of Applied Statistics, 2013) and Wen (Biometrics, accepted).
+See also Wen's @url{http://stephenslab.uchicago.edu/MSpapers/WenThesis.pdf,PhD thesis} (2011), the @url{http://dx.doi.org/10.1214/13-AOAS695,article} by Wen & Stephens (Annals of Applied Statistics, 2014) and the @url{http://dx.doi.org/10.1111/biom.12112,article} by Wen (Biometrics, 2014).
 
 @c=============================================================================
 
