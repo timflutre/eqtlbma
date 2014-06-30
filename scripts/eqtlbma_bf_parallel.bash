@@ -1,8 +1,21 @@
 #!/usr/bin/env bash
 
-# Aim: used to launch eqtlbma_bf in parallel
-# Author: Timothee Flutre
-# Not copyrighted -- provided to the public domain
+# `eqtlbma_bf_parallel.bash' is used to launch eqtlbma_bf in parallel
+# Copyright (C) 2013 Timothée Flutre
+# License: GPL-3+
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 function help () {
     msg="\`${0##*/}' is used to launch eqtlbma_bf in parallel.\n"
@@ -76,9 +89,12 @@ function help () {
 function version () {
     msg="${0##*/} 1.2\n"
     msg+="\n"
-    msg+="Written by Timothee Flutre.\n"
+    msg+="Copyright (C) 2013 Timothée Flutre.\n"
+    msg+="License GPL-3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n"
+    msg+="This is free software; see the source for copying conditions. There is NO\n"
+    msg+="warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
     msg+="\n"
-    msg+="Not copyrighted -- provided to the public domain\n"
+    msg+="Written by Timothée Flutre.\n"
     echo -e "$msg"
 }
 

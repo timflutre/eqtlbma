@@ -2,7 +2,7 @@
 
 ## `tutorial_eqtlbma.R' simulates data for the tutorial of the eQtlBma package
 ## Copyright (C) 2013-2014 Timothée Flutre
-## License: GPLv3+
+## License: GPL-3+
 
 ## This program is free software: you can redistribute it and/or modify
 ## it under the terms of the GNU General Public License as published by
@@ -85,7 +85,7 @@ version <- function(){
     txt <- paste0(prog.name, " ", prog.version, "\n")
     txt <- paste0(txt, "\n")
     txt <- paste0(txt, "Copyright (C) 2013-2014 Timothée Flutre.\n")
-    txt <- paste0(txt, "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
+    txt <- paste0(txt, "License GPL-3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
     txt <- paste0(txt, "This is free software; see the source for copying conditions. There is NO\n")
     txt <- paste0(txt, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n")
     txt <- paste0(txt, "\n")

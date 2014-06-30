@@ -1,18 +1,19 @@
-##  `utils_eqtlbma.R' contains utility functions for the eQtlBma package
-##  Copyright (C) 2013 Timothee Flutre
+## `utils_eqtlbma.R' contains utility functions for the eQtlBma package
+## Copyright (C) 2013 Timothée Flutre
+## License: GPL-3+
 ##
-##  This program is free software: you can redistribute it and/or modify
-##  it under the terms of the GNU General Public License as published by
-##  the Free Software Foundation, either version 3 of the License, or
-##  (at your option) any later version.
+## This program is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
 ##
-##  This program is distributed in the hope that it will be useful,
-##  but WITHOUT ANY WARRANTY; without even the implied warranty of
-##  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-##  GNU General Public License for more details.
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
 ##
-##  You should have received a copy of the GNU General Public License
-##  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+## You should have received a copy of the GNU General Public License
+## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ##' Transform gene expression levels into a N(0,1) via quantile normalization
 ##' 
@@ -225,7 +226,7 @@ estimKinshipBaldingNichols <- function(genos.dose){
     })
     tmp <- sweep(genos.dose, 1, 2 * allele.freqs, FUN="-")
     tmp <- sweep(tmp, 1, 2 * sqrt(allele.freqs * (1 - allele.freqs)), FUN="/")
-    K <- (1/P) * crossprod(tmp, tmp)
+    K <- (1/nrow(genos.dose)) * crossprod(tmp, tmp)
     return(K)
 }
 

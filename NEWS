@@ -26,7 +26,6 @@ as well as to parallelize over SNPs in 'eqtlbma_bf' for permutations
 
 Bug fixes
 * in 'eqtlbma_bf', add +1 to the start of gene coordinates from BED files
-* in 'eqtlbma_bf', properly skip SNPs with missing genotypes
 * in 'eqtlbma_hm', don't use underscore to split identifiers
 
 

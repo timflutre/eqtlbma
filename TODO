@@ -1,4 +1,5 @@
 * allow 2 radii, one for TSS and one for TES, and handle gene strand (include BEDtools? or htslib?)
+* speed-up tutorial (with Rcpp?) to simulate more subgroups quicker
 * add penalty to pi0 in EM
 * add option to eqtlbma_bf to choose if "meta-analysis" BFs should be saved
 * allow eqtlbma_bf to read summary stats with cov of beta-hats
