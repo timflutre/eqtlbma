@@ -1459,7 +1459,7 @@ void parseCmdLine(
       {"ngrid", required_argument, 0, 0},
       {"out", required_argument, 0, 0},
       {"init", required_argument, 0, 0},
-      {"rand", required_argument, 0, 0},
+      {"rand", no_argument, 0, 0},
       {"seed", required_argument, 0, 0},
       {"thresh", required_argument, 0, 0},
       {"thread", required_argument, 0, 0},
@@ -1574,20 +1574,26 @@ void parseCmdLine(
   }
   if(model != "configs" && model != "types"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --model " << model << " is unvalid" << endl << endl;
+	 << "ERROR: --model " << model << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(model == "configs" && dim >= (size_t) pow(2, (double)nb_subgroups)){
+  if(nb_subgroups == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --model configs --nsubgrp " << nb_subgroups << " --dim "
-	 << dim << " is unvalid" << endl << endl;
+	 << "ERROR: missing compulsory option --nsubgrp" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(dim == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: missing compulsory option --dim" << endl << endl;
+    help(argv);
+    exit(EXIT_FAILURE);
+  }
+  if(model == "configs" && dim >= (size_t) pow(2, (double)nb_subgroups)){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: --model configs --nsubgrp " << nb_subgroups << " --dim "
+	 << dim << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
