@@ -311,7 +311,7 @@ namespace utils {
     int errnum;
     const char * error_msg = NULL;
     
-    size_t nb_bytes_to_read = 256000; // 8192 is default for gzbuffer
+    size_t nb_bytes_to_read = pow(2, 18); // 8192=2^13 is default for gzbuffer
     if(gzbuffer(stream, nb_bytes_to_read) == -1){
       error_msg = gzerror(stream, &errnum);
       if(errnum != Z_OK){

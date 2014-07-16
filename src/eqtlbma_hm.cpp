@@ -463,7 +463,8 @@ void Controller::randomize_parameter_sp(const size_t & seed)
   // double x2 = gsl_ran_exponential(r,1.0);
   // pi0_ = .90 + .1*x1/(x1 + x2);
   // pi0_ = x1/(x1 + x2);
-  pi0_ = gsl_rng_uniform(r);
+  if(! param2fixed_["pi0"])
+    pi0_ = gsl_rng_uniform(r);
   
   double sum = 0.0;
   for(size_t l = 0; l < grid_size_; ++l){
