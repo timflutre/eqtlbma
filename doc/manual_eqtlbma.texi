@@ -103,6 +103,9 @@ and then compute various posterior probabilities of interest.
 The details of the model are freely available online in the @url{http://dx.doi.org/10.1371/journal.pgen.1003486,article} by Flutre @emph{et al} (PLoS Genetics, 2013).
 See also Wen's @url{http://stephenslab.uchicago.edu/MSpapers/WenThesis.pdf,PhD thesis} (2011), the @url{http://dx.doi.org/10.1214/13-AOAS695,article} by Wen & Stephens (Annals of Applied Statistics, 2014) and the @url{http://dx.doi.org/10.1111/biom.12112,article} by Wen (Biometrics, 2014).
 
+To install the package, it is recommended to read this @url{https://github.com/timflutre/eqtlbma/wiki,web page}.
+In case of trouble during installation or usage of the package, questions can be posted to this @url{https://groups.google.com/forum/#!forum/eqtlbma-users,mailing list}.
+
 @c=============================================================================
 
 @node Tutorial
@@ -921,7 +924,8 @@ As it can take some time, we can use @url{http://www.gnu.org/software/parallel/,
 @verbatim
 rm -rf lists_snps; mkdir lists_snps; \
 seq -w 1 $(ls lists_genes/* | wc -l) | \
-parallel 'i={}; bedtools window -w 100000 -a lists_genes/list_genes_${i}.bed.gz \
+parallel 'i={}; bedtools window -w 100000 \
+-a lists_genes/list_genes_${i}.bed.gz \
 -b snp_coords.bed.gz | \
 cut -f10 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
@@ -933,7 +937,9 @@ you will first have to modify the file "gene_coords.bed.gz":
 
 @verbatim
 zcat gene_coords.bed.gz \
-| awk 'BEGIN{OFS="\t"} {print $1,$2,$2+1,$4}' \
+| awk 'BEGIN{OFS="\t"} \
+{printf "%s\t%s\t%s", $1,$2,$2+1; \
+for(i=4;i<=NF;++i)printf "\t%s", $i; printf "\n"}' \
 | gzip > gene_coords_TSS.bed.gz
 @end verbatim
 

@@ -1,5 +1,5 @@
 ## `utils_eqtlbma.R' contains utility functions for the eQtlBma package
-## Copyright (C) 2013 Timothée Flutre
+## Copyright (C) 2013-2014 Timothée Flutre
 ## License: GPL-3+
 ##
 ## This program is free software: you can redistribute it and/or modify
@@ -210,24 +210,6 @@ plotHistCisSnpsPerGene <- function(gn2sn){
     text(x=x, y=1.2*y, labels=paste0("minimum: ", min(nb.cis.snps.per.gene), " SNPs"))
     text(x=x, y=y, labels=paste0("median: ", median(nb.cis.snps.per.gene), " SNPs"))
     text(x=x, y=0.8*y, labels=paste0("maximum: ", max(nb.cis.snps.per.gene), " SNPs"))
-}
-
-##' Estimate kinship matrix K via the Balding-Nichols model
-##'
-##' eqn 2.2 of Astle & Nichols (Statistical Science, 2009)
-##' @title Balding-Nichols matrix
-##' @param genos.dose matrix with SNPs in rows and individuals in columns,
-##' and genotypes coded as allele dose (i.e. in [0,2]),
-##' but no missing data is allowed
-##' @return Kinship matrix
-estimKinshipBaldingNichols <- function(genos.dose){
-    allele.freqs <- apply(genos.dose, 1, function(x){
-        sum(x) / (2 * length(x))
-    })
-    tmp <- sweep(genos.dose, 1, 2 * allele.freqs, FUN="-")
-    tmp <- sweep(tmp, 1, 2 * sqrt(allele.freqs * (1 - allele.freqs)), FUN="/")
-    K <- (1/nrow(genos.dose)) * crossprod(tmp, tmp)
-    return(K)
 }
 
 ##' Get all binary configurations

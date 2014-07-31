@@ -65,9 +65,9 @@ help <- function(){
     ## txt <- paste0(txt, "\t\tsome SNPs can be fixed\n")
     txt <- paste0(txt, "     --pi0\tprior proba for a gene to have no eQTL in any subgroup (default=0.3)\n")
     txt <- paste0(txt, "     --coverr\terror covariance between subgroups (default=1)\n")
-    txt <- paste0("\t\t0: the SxS covariance matrix is the identity\n")
-    txt <- paste0("\t\t1: the SxS covariance matrix is unconstrained, same for all genes\n")
-    ## txt <- paste0("\t\t2: the SxS covariance matrix is unconstrained, different for each gene\n"
+    txt <- paste0(txt, "\t\t0: the SxS covariance matrix is the identity\n")
+    txt <- paste0(txt, "\t\t1: the SxS covariance matrix is unconstrained, same for all genes\n")
+    ## txt <- paste0(txt, "\t\t2: the SxS covariance matrix is unconstrained, different for each gene\n"
     txt <- paste0(txt, "     --seed\tseed for the RNG (default=1859)\n")
     txt <- paste0(txt, "     --dir\tdirectory in which files are written (current by default)\n")
     txt <- paste0(txt, "     --ncores\tnb of cores to run in parallel (default=1)\n")
