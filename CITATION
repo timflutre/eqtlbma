@@ -1,0 +1,15 @@
+To cite eQtlBma in publications, please use:
+
+Flutre, T., Wen, X., Pritchard, J. & Stephens, M. A statistical framework for joint eQTL analysis in multiple tissues. PLoS Genetics 9, e1003486+ (2013).
+
+A BibTeX entry for LaTeX users is:
+
+@article{flutre2013eqtlbma,
+    author = {Flutre, Timoth\'{e}e and Wen, Xiaoquan and Pritchard, Jonathan and Stephens, Matthew},
+    title = {A Statistical Framework for Joint {eQTL} Analysis in Multiple Tissues},
+    journal = {PLoS Genetics},
+    volume = {9},
+    year = {2013},
+    publisher = {Public Library of Science},
+    doi = {10.1371/journal.pgen.1003486}
+}
