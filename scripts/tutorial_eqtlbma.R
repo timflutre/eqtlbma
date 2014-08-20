@@ -65,7 +65,7 @@ help <- function(){
     ## txt <- paste0(txt, "\t\tsome SNPs can be fixed\n")
     txt <- paste0(txt, "     --pi0\tprior proba for a gene to have no eQTL in any subgroup (default=0.3)\n")
     txt <- paste0(txt, "     --coverr\terror covariance between subgroups (default=1)\n")
-    txt <- paste0(txt, "\t\t0: the SxS covariance matrix is the identity\n")
+    txt <- paste0(txt, "\t\t0: the SxS covariance matrix is diagonal, same for all genes\n")
     txt <- paste0(txt, "\t\t1: the SxS covariance matrix is unconstrained, same for all genes\n")
     ## txt <- paste0(txt, "\t\t2: the SxS covariance matrix is unconstrained, different for each gene\n"
     txt <- paste0(txt, "     --seed\tseed for the RNG (default=1859)\n")
@@ -536,10 +536,7 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
         diag(rep(phi2, nb.subgroups), nb.subgroups, nb.subgroups)
     
     ## errors: covariance between subgroups
-    ## identity or use inverse-Wishart prior
-    if(coverr == 0){
-        cov.err.S <- diag(nb.subgroups)
-    } else if(coverr == 1){
+    if(coverr == 0 | coverr == 1){
         r <- ceiling(0.1 * nb.inds) # "r small relative to sample size"
         q.i <- 2 # intercept + other covariates
         m.i <- ceiling(0.3 * nb.inds) # maybe there is a better choice?
@@ -548,6 +545,9 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
         H.i <- diag(nb.subgroups) # maybe there is a better choice?
         cov.err.S <- solve(rWishart(n=1, df=m.i,
                                     Sigma=(1/nu.i)*solve(H.i))[,,1])
+        if(coverr == 0)
+            cov.err.S <- cov.err.S * (matrix(0,nb.subgroups,nb.subgroups) +
+                                      diag(nb.subgroups))
     }
     if(verbose > 0){
         message("covariance matrix of the errors (same for all genes):")
