@@ -569,9 +569,14 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
                         snp=do.call(c, lapply(names(gn2sn), function(n){gn2sn[[n]]})),
                         config=rep(0, sum(sapply(gn2sn, length))),
                         stringsAsFactors=FALSE)
+    truth <- cbind(truth, matrix(NA, ncol=nb.subgroups))
+    colnames(truth)[seq(4, 4+nb.subgroups-1)] <- paste0("sigma.",
+                                                        1:nb.subgroups)
+    col.idx.sigmas <- grep("sigma", colnames(truth))
     truth <- cbind(truth, matrix(0.0, ncol=nb.subgroups))
-    colnames(truth)[seq(4,4+nb.subgroups-1)] <- paste0("beta.g.",
-                                                       1:nb.subgroups)
+    colnames(truth)[seq(4+nb.subgroups, 4+2*nb.subgroups-1)] <-
+        paste0("beta.g.", 1:nb.subgroups)
+    col.idx.betas <- grep("beta", colnames(truth))
     
     configs <- getBinaryConfigs(nb.subgroups) # first row is null config
     prior.configs <- c(0.0, # conditional on being an eQTL in at least one
@@ -600,6 +605,8 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
             print(cov.err.S)
             stop(paste0("NAs in error matrix for ", gene))
         }
+        truth[which(truth$gene == gene), col.idx.sigmas] <<-
+            rep(sqrt(diag(cov.err.S)), each=sum(truth$gene == gene))
         if(runif(1) < pi0){
             X <- X.c
             B <- B.c
@@ -615,7 +622,7 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
             truth[which(truth$gene == gene & truth$snp == eqtn),
                   "config"] <<- paste0(which(config != 0), collapse="-")
             truth[which(truth$gene == gene & truth$snp == eqtn),
-                  seq(4,4+nb.subgroups-1)] <<- B.g
+                  col.idx.betas] <<- B.g
             X <- cbind(X.c, X.g)
             B <- rbind(B.c, B.g)
         }
@@ -629,6 +636,10 @@ simulGeneExpLevels <- function(subgroups, inds, genos.dose, gn2sn, related,
         close(pb)
     
     if(verbose > 0){
+        null.genes <- tapply(truth$config, list(truth$gene), function(configs){
+            all(configs == "0")
+        })
+        message(paste0("true pi0: ", sum(null.genes) / length(null.genes)))
         message("true configuration proportions:")
         print(table(truth$config[truth$config != "0"]) /
               sum(truth$config != "0"))
