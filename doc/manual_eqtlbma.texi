@@ -146,34 +146,17 @@ cd tutorial_eqtlbma
 Instead of using ``real'' data, we will simulate ``realistic'' data using the widely-used free software @url{http://www.r-project.org/,R} (version >= 3.0).
 Let's imagine that N=200 individuals are sampled.
 For each, mRNA levels are measured for G=1000 genes in S=3 tissues.
-Moreover, each gene has on average 50 SNPs in cis, for which we know the genotypes.
+Moreover, each gene has on average 50 SNPs in @emph{cis}, for which we know the genotypes.
 
 @verbatim
 tutorial_eqtlbma.R \
 --pkg ~/src/eqtlbma \
->& stdout_tutorial_eqtlbma.txt
+>& stdout_tutorial_eqtlbma.txt &
 @end verbatim
 where ``~/src/eqtlbma'' is supposed to be the path corresponding to where the package is present (you may have to adapt it to your particular situation).
 
 You can track the progress of the program by looking into the file ``stdout_tutorial_eqtlbma.txt''.
 Simulating data with R can be slow, but you can use option @option{--cores} to speed this up (adapt to the number of cores available on your machine).
-
-@c We generate SNP and gene coordinates in such a way that genes have an average length of 100 bp, they are separated from each other by an interval of 500 bp, and they have, on average, 10 SNPs in @emph{cis}.
-@c The @emph{cis} region is anchored at the transcription start site (TSS, assumed to be the start column in the BED file) with a radius of 10 bp.
-
-@c The genotypes are simulated with a minor allele frequency (MAF) of 0.3 and at Hardy-Weinberg equilibrium.
-@c With real data, the package will allow you to filter out SNPs based on their MAF (of course, you can do it by yourself beforehand).
-@c The package can also incorporate ``genotype PCs'' as covariates to control for genetic relatedness among individuals, with the disclaimer that, with strong relatedness, that is, not only population structure but also family relationships, ``genotype PCs'' are usually not enough.
-
-@c The phenotypes are simulated according to the generative model implemented in the package.
-@c Indeed the aim of the tutorial is not of assessing inference accuracy, rather of merely presenting the package!
-@c For each gene g, independently, we perform a series of steps.
-@c We first decide if a gene has an eQTL in at least one tissue, according to the probability for a gene to have no eQTL in any tissue: pi_0 = 0.3.
-@c We then decide which SNP is ``the'' eQTL among the P_g SNPs in @emph{cis} of gene g, assuming that all SNPs have the same probability to be chosen: nu_p = 1 / P_g.
-@c Note that it would be more informative to call such a SNP the eQTN, with ``N'' standing for ``nucleotide'', as it is the causal site.
-@c After that, we draw the effect sizes, S-dimensional vector beta, of the eQTL in all tissues, such that an approximation of the average proportion of variance explained in a given tissue is 0.3.
-@c Finally, we simulate the mRNA levels in all tissues by adding Normally-distributed errors.
-@c The errors are correlated with an average covariance between tissues of 0.2.
 
 As you can now see in the directory, several files were generated in such formats that it should be easy for you to prepare your own data similarly.
 
@@ -194,7 +177,7 @@ eqtlbma_bf \
 --gridS grid_phi2_oma2_with-configs.txt \
 --bfs all \
 --error mvlr \
->& stdout_eqtlbma_bf.txt
+>& stdout_eqtlbma_bf.txt &
 @end verbatim
 
 You can track the progress of the program by looking into the file ``stdout_eqtlbma_bf.txt''.
@@ -212,7 +195,7 @@ eqtlbma_hm \
 --dim 7 \
 --ngrid 10 \
 --out out_eqtlbma_hm.txt.gz \
->& stdout_eqtlbma_hm.txt
+>& stdout_eqtlbma_hm.txt &
 @end verbatim
 
 You can track the progress of the program by looking into the file ``stdout_eqtlbma_bf.txt''.
@@ -228,8 +211,8 @@ zcat out_eqtlbma_hm.txt.gz | grep "#config" \
 
 Finally we can launch the third program, @command{eqtlbma_avg_bfs}.
 To obtain the posterior probabilities, we need an estimate of the probability for a gene to have no eQTL in any tissue, @math{\pi_0}.
-As this quantity is hard to estimate accurately with the EM algorithm, we usually perform permutations using @command{eqtlbma_bf}.
-As this can take some time, for the tutorial, we will use its true value, 0.3:
+As this quantity is hard to estimate accurately with the EM algorithm, we usually perform permutations using @command{eqtlbma_bf} (see below).
+But for now, as this can take some time, we will use its true value, 0.3:
 
 @verbatim
 eqtlbma_avg_bfs \
@@ -244,7 +227,7 @@ eqtlbma_avg_bfs \
 --bestdim \
 --alldim \
 --out out_eqtlbma_avg_bfs.txt.gz \
->& stdout_eqtlbma_avg_bfs.txt
+>& stdout_eqtlbma_avg_bfs.txt &
 @end verbatim
 
 Upon completion, the output file ``out_eqtlbma_avg_bfs.txt.gz'' contains the posterior probability for the gene to have an eQTL in at least one tissue (column 3), the posterior for a SNP to be ``the'' eQTL (column 4), the posterior for the eQTL to be active in a given tissue (columns 6-8) and the posterior for the eQTL to be active in a given configuration (columns 9-15).
@@ -252,6 +235,146 @@ Upon completion, the output file ``out_eqtlbma_avg_bfs.txt.gz'' contains the pos
 You should now be able to perform a similar analysis with your own data.
 Of course, you will surely need more details.
 See the next sections about input and output formats, program options, parallelization, etc.
+
+@sp 2
+
+The remaining of this section briefly describes how to estimate @math{\pi_0}, via gene-level p-values obtained by permutations followed by the @url{http://www.bioconductor.org/packages/release/bioc/html/qvalue.html,qvalue} package, or via the EBF/QBF procedures proposed in @url{http://arxiv.org/abs/1311.3981,this preprint} by Wen (2013).
+
+As permutations take time, we will run them in parallel, which hence requires to prepare the data in batches (@pxref{Frequently asked questions} for more explanations).
+
+First we keep only the TSS of each gene:
+@verbatim
+zcat gene_coords.bed.gz \
+| awk 'BEGIN{OFS="\t"} \
+{printf "%s\t%s\t%s", $1,$2,$2+1; \
+for(i=4;i<=NF;++i)printf "\t%s", $i; printf "\n"}' \
+| gzip > gene_coords_TSS.bed.gz
+@end verbatim
+
+Then we split the genes in batches:
+@verbatim
+nbBatches="100"; rm -rf lists_genes; mkdir lists_genes; cd lists_genes; \
+zcat ../gene_coords_TSS.bed.gz | split \
+-l $(echo "scale=0; $(zcat ../gene_coords_TSS.bed.gz | wc -l)/${nbBatches}" | bc -l) \
+--suffix-length=3 --numeric-suffixes=1 --additional-suffix=.bed \
+--filter='gzip > $FILE.gz' - list_genes_; cd ..
+@end verbatim
+
+Then we make a file containing all @emph{cis} SNPs per batch of genes:
+@verbatim
+rm -rf lists_snps; mkdir lists_snps; \
+seq -w 1 $(ls lists_genes/* | wc -l) | \
+parallel 'i={}; bedtools window -w 1000 \
+-a lists_genes/list_genes_${i}.bed.gz \
+-b snp_coords.bed.gz | \
+cut -f10 | sort -V | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
+@end verbatim
+
+Finally we draw one seed per batch:
+@verbatim
+nbSeeds=$(ls lists_genes/* | wc -l); \
+echo "set.seed(1859); x <- sample.int(n=1000000, size=${nbSeeds}); \
+write(x, gzfile(\"list_seeds.txt.gz\"), 1)" \
+| R --vanilla --quiet
+@end verbatim
+
+@sp 1
+
+For the gene-level p-values, we can now perform permutations in parallel (note also in the command-line below that each batch is run on 4 threads):
+@verbatim
+echo "eqtlbma_bf_parallel.bash --p2b ~/bin/eqtlbma_bf --geneD lists_genes \
+--snpD lists_snps --seedF list_seeds.txt.gz --geno list_genotypes.txt \
+--scoord snp_coords.bed.gz --exp list_explevels.txt --anchor TSS --cis 1000 \
+--out out_eqtlbma --type join --covar list_covariates.txt \
+--gridL grid_phi2_oma2_general.txt --gridS grid_phi2_oma2_with-configs.txt \
+--bfs all --error mvlr --nperm 10000 --trick 2 --tricut 10 --pbf all --thread 4" \
+| qsub -cwd -j y -V -l h_vmem=8g -N stdout_eqtlbma_bf-perm -t 1-100 -pe simple_pe 4
+@end verbatim
+
+Once all jobs are finished, let us check that they all ran successfully:
+@verbatim
+ls stdout_eqtlbma_bf-perm.o*.* | while read f; do \
+if [ $(grep -c "END" $f) != 2 ]; then echo $f; fi; done
+@end verbatim
+
+We can then open R and estimate @math{\pi_0} with the @command{qvalue} package:
+@smallformat
+@verbatim
+setwd("~/tutorial_eqtlbma")
+f <- Sys.glob("out_eqtlbma_[0-9][0-9][0-9]_joinPermPvals.txt.gz")
+d <- do.call(rbind, lapply(f, function(fi){
+  read.table(fi, header=TRUE, stringsAsFactor=FALSE)
+}))
+hist(d$join.perm.pval, xlim=c(0,1), breaks=100)
+library(qvalue)
+qobj <- qvalue(p=d$join.perm.pval, fdr.level=0.05, robust=TRUE, pi0.method="smoother")
+qobj$pi0
+called.nulls.pval <- ! qobj$significant
+@end verbatim
+@end smallformat
+
+We can now use this estimate of @math{\pi_0} to compute the various posterior probabilities of interest with @command{eqtlbma_avg_bfs} as shown above.
+
+@sp 1
+
+For the EBF procedure, we only need the gene-level Bayes factors averaged over the grid and configuration weights (estimated via the EM algorithm):
+@verbatim
+eqtlbma_avg_bfs \
+--in "out_eqtlbma_l10abfs_raw.txt.gz" \
+--gwts grid_weights.txt \
+--nsubgrp 3 --dim 7 \
+--cwts config_weights.txt \
+--save bf \
+--out out_eqtlbma_avg_bfs_genes.txt.gz \
+>& stdout_eqtlbma_avg_bfs_genes.txt &
+@end verbatim
+
+Once we have these Bayes factors, we can estimate @math{\pi_0} with the EBF procedure implemented in an R file in the @command{eqtlbma} package:
+@smallformat
+@verbatim
+gene.bfs <- read.table("out_eqtlbma_avg_bfs_genes.txt.gz", header=TRUE)
+source("~/src/eqtlbma/scripts/utils_eqtlbma.R")
+pi0.ebf <- estimatePi0WithEbf(log10.bfs=gene.bfs$gene.log10.bf[!duplicated(gene.bfs$gene)],
+                              verbose=1)
+called.nulls.ebf <- ! controlBayesFdr(log10.bfs=gene.bfs$gene.log10.bf[!duplicated(gene.bfs$gene)],
+                                      pi0=pi0.ebf, fdr.level=0.05, verbose=1)
+@end verbatim
+@end smallformat
+
+We can now use this estimate of @math{\pi_0} to compute the various posterior probabilities of interest with @command{eqtlbma_avg_bfs} as shown above.
+
+@sp 1
+
+For the QBF procedure, the @command{eqtlbma} package performs permutations to get the median Bayes factors under the null, but much less than to get p-values:
+@verbatim
+echo "eqtlbma_bf_parallel.bash --p2b ~/bin/eqtlbma_bf --geneD lists_genes \
+--snpD lists_snps --seedF list_seeds.txt.gz --geno list_genotypes.txt \
+--scoord snp_coords.bed.gz --exp list_explevels.txt --anchor TSS --cis 1000 \
+--out out_eqtlbma --type join --covar list_covariates.txt \
+--gridL grid_phi2_oma2_general.txt --gridS grid_phi2_oma2_with-configs.txt \
+--bfs all --error mvlr --nperm 250 --pbf all --thread 4" \
+| qsub -cwd -j y -V -l h_vmem=8g -N stdout_eqtlbma_bf-permed -t 1-100 -pe simple_pe 4
+@end verbatim
+
+We check that all jobs ran successfully:
+@verbatim
+ls stdout_eqtlbma_bf-permed.o*.* | while read f; do \
+if [ $(grep -c "END" $f) != 2 ]; then echo $f; fi; done
+@end verbatim
+
+Once we have these median Bayes factors, we can estimate @math{\pi_0} with the QBF procedure implemented in an R file in the @command{eqtlbma} package:
+@smallformat
+@verbatim
+perms.qbf <- read.table("out_eqtlbma_avg_bfs-permed.txt.gz", header=TRUE)
+source("~/src/eqtlbma/scripts/utils_eqtlbma.R")
+pi0.qbf <- estimatePi0WithQbf(log10.bfs=perms.qbf$med.perm.log10.bf[!duplicated(perms.qbf$gene)],
+                              gamma=0.5, verbose=1)
+called.nulls.qbf <- ! controlBayesFdr(log10.bfs=gene.bfs$gene.log10.bf[!duplicated(gene.bfs$gene)],
+                                      pi0=pi0.qbf, fdr.level=0.05, verbose=1)
+@end verbatim
+@end smallformat
+
+We can now use this estimate of @math{\pi_0} to compute the various posterior probabilities of interest with @command{eqtlbma_avg_bfs} as shown above.
 
 @c=============================================================================
 
@@ -589,7 +712,7 @@ Then, we can use the script @command{eqtlbma_bf_parallel.bash}.
 After installation of the package, it should be in your PATH.
 Otherwise it is in the directory @command{scripts/} of the package.
 
-A typical command-line looks like this (works with Sun Grid Engine):
+A typical command-line looks like this (works with @url{https://en.wikipedia.org/wiki/Oracle_Grid_Engine,Sun Grid Engine}):
 @verbatim
 qsub -cwd -j y -V -l h_vmem=2g -N job_eqtlbma -t 1-100 \
 eqtlbma_bf_parallel.bash \
@@ -609,7 +732,7 @@ eqtlbma_bf_parallel.bash \
 --error mvlr \
 --nperm 10000 \
 --trick 2 \
---pbf gen-sin
+--pbf all
 @end verbatim
 
 Note that you can also use the option @option{--snp} if you want to analyse
@@ -622,6 +745,32 @@ to make each batch reproducible when doing permutations.
 
 Once all jobs are finished, see the FAQ entry describing how to concatenate all output files of a given kind,
 for instance to have all ``_sumstats_<subgroup>.txt.gz'' batch files into a single file.
+
+If the cluster doesn't work with SGE but with @url{https://en.wikipedia.org/wiki/Simple_Linux_Utility_for_Resource_Management,SLURM}, here is the equivalent command-line:
+@verbatim
+for i in $(seq -w 1 100); do echo $i; \
+echo -e '#!/usr/bin/env bash\n'''eqtlbma_bf_parallel.bash \
+--p2b ~/bin/eqtlbma_bf \
+--geneD lists_genes \
+--snpD lists_snps \
+--seedF list_seeds.txt.gz \
+--task ${i} \
+--geno list_genotypes.txt \
+--scoord snp_coords.bed.gz \
+--exp list_expressions.txt \
+--out out_eqtlbma \
+--type join \
+--covar list_covariates.txt \
+--gridL grid_phi2_oma2_general.txt \
+--gridS grid_phi2_oma2_with-configs.txt \
+--bfs all \
+--error mvlr \
+--nperm 10000 \
+--trick 2 \
+--pbf all'' \
+| sbatch -J job_eqtlbma_bf -o stdout_eqtlbma_bf-perm-${i}.o%j \
+--mem-per-cpu=10000; sleep 1; done
+@end verbatim
 
 
 @section Reading the outputs
@@ -904,7 +1053,7 @@ It is available at least in version 8.17 of @url{https://www.gnu.org/software/co
 Using GNU tools and assuming the coordinates are in a file named ``gene_coords.bed.gz'':
 
 @verbatim
-nbBatches="100"; mkdir lists_genes; cd lists_genes; \
+nbBatches="100"; rm -rf lists_genes; mkdir lists_genes; cd lists_genes; \
 zcat ../gene_coords.bed.gz | split \
 -l $(echo "scale=0; $(zcat ../gene_coords.bed.gz | wc -l)/${nbBatches}" | bc -l) \
 --suffix-length=3 --numeric-suffixes=1 --additional-suffix=.bed \
@@ -927,7 +1076,7 @@ seq -w 1 $(ls lists_genes/* | wc -l) | \
 parallel 'i={}; bedtools window -w 100000 \
 -a lists_genes/list_genes_${i}.bed.gz \
 -b snp_coords.bed.gz | \
-cut -f10 | sort | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
+cut -f10 | sort -V | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
 Each SNP file contains the identifiers (e.g. rs number) of the SNPs in cis of the genes in the corresponding batch.

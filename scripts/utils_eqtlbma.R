@@ -73,31 +73,31 @@ removeConfoundersFromGeneExp <- function(X, confounders){
 ##' @param no.het if TRUE, the grid is built without heterogeneity
 ##' @return Matrix with the grid
 makeGrid <- function(grid.type="general", no.het=FALSE){
-  stopifnot(is.character(grid.type), is.logical(no.het))
-  
-  oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
-  oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
-  
-  if(grid.type != "general"){
-    if(no.het){
-      oma2.over.oma2.plus.phi2 <- c(1)
-    } else
-      oma2.over.oma2.plus.phi2 <- c(3/4, 1)
-  }
-  
-  grid <- matrix(NA, nrow=length(oma2.plus.phi2) *
-                 length(oma2.over.oma2.plus.phi2), ncol=2)
-  colnames(grid) <- c("phi2", "oma2")
-  i <- 1
-  for(aes in oma2.plus.phi2){
-    for(hom in oma2.over.oma2.plus.phi2){
-      grid[i,"phi2"] <- aes * (1 - hom)
-      grid[i,"oma2"] <- aes * hom
-      i <- i + 1
+    stopifnot(is.character(grid.type), is.logical(no.het))
+    
+    oma2.plus.phi2 <- c(0.1^2, 0.2^2, 0.4^2, 0.8^2, 1.6^2) # avg eff size
+    oma2.over.oma2.plus.phi2 <- c(0, 1/4, 1/2, 3/4, 1) # homogeneity
+    
+    if(grid.type != "general"){
+        if(no.het){
+            oma2.over.oma2.plus.phi2 <- c(1)
+        } else
+            oma2.over.oma2.plus.phi2 <- c(3/4, 1)
     }
-  }
-  
-  return(grid)
+    
+    grid <- matrix(NA, nrow=length(oma2.plus.phi2) *
+                   length(oma2.over.oma2.plus.phi2), ncol=2)
+    colnames(grid) <- c("phi2", "oma2")
+    i <- 1
+    for(aes in oma2.plus.phi2){
+        for(hom in oma2.over.oma2.plus.phi2){
+            grid[i,"phi2"] <- aes * (1 - hom)
+            grid[i,"oma2"] <- aes * hom
+            i <- i + 1
+        }
+    }
+    
+    return(grid)
 }
 
 ##' Plot the histogram of the minor allele frequency per SNP
@@ -145,7 +145,7 @@ plotHistMinAllelFreq <- function(genos.dose=NULL, maf=NULL, main="",
 ##' vector of SNP names (reported genes have at least one cis SNP)
 findCisSnpsPerGene <- function(gene.coords.bed, snp.coords.bed, anchor,
                                cis.radius.5p, cis.radius.3p, verbose=1){
-    require("GenomicRanges") # from Bioconductor
+    library("GenomicRanges") # from Bioconductor
     stopifnot(anchor %in% c("TSS", "TSS+TES"))
     
     ## convert SNP coordinates from data.frame to GRanges structure
@@ -197,14 +197,18 @@ findCisSnpsPerGene <- function(gene.coords.bed, snp.coords.bed, anchor,
 ##' Plot the histogram of the number of cis SNPs per gene
 ##'
 ##' @title Histogram of cis SNPs
-##' @param nb.cis.snps.per.gene vector
+##' @param gn2sn list with one component per gene corresponding to a vector
+##' of SNP names in cis of that gene; see findCisSnpsPerGene()
 plotHistCisSnpsPerGene <- function(gn2sn){
+    stopifnot(is.list(gn2sn))
+    
     nb.cis.snps.per.gene <- sapply(gn2sn, length)
     tmp <- hist(x=nb.cis.snps.per.gene,
                 main=paste0(length(gn2sn), " genes and ",
                     length(unique(do.call(c, gn2sn))), " SNPs"),
                 xlab="number of cis SNPs per gene",
                 col="grey", border="white")
+    
     x <- tmp$breaks[ceiling((3/4)*length(tmp$breaks))]
     y <- max(tmp$counts) / 2
     text(x=x, y=1.2*y, labels=paste0("minimum: ", min(nb.cis.snps.per.gene), " SNPs"))
@@ -220,20 +224,21 @@ plotHistCisSnpsPerGene <- function(gn2sn){
 ##' @param verbose 
 ##' @return Matrix with configurations in rows and subgroups in columns
 getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
-  if(verbose > 0)
-    cat("list all configurations for the effect of a SNP in each subgroup\n")
-  if(nb.subgroups >= 20)
-    warning("nb of subgroups may be too high, better to keep it below 20!",
-            call.=FALSE, immediate.=TRUE)
-  states <- c(0,1)  # must be sorted!
-  if(nb.subgroups == 1)
-    matrix(data=states, nrow=2, ncol=1)
-  else{
-    inner <- Recall(nb.subgroups-1)
-    cbind(rep(states, rep(nrow(inner), 2)),
-          matrix(t(inner), ncol=ncol(inner), nrow=nrow(inner)*2,
-                 byrow=TRUE))
-  }
+    stopifnot(is.numeric(nb.subgroups), length(nb.subgroups) == 1)
+    if(nb.subgroups >= 20)
+        warning("nb of subgroups may be too high, better to keep it below 20!",
+                call.=FALSE, immediate.=TRUE)
+    if(verbose > 0)
+        cat("list all configurations for the effect of a SNP in each subgroup\n")
+    states <- c(0,1)  # must be sorted!
+    if(nb.subgroups == 1)
+        matrix(data=states, nrow=2, ncol=1)
+    else{
+        inner <- Recall(nb.subgroups-1)
+        cbind(rep(states, rep(nrow(inner), 2)),
+              matrix(t(inner), ncol=ncol(inner), nrow=nrow(inner)*2,
+                     byrow=TRUE))
+    }
 }
 
 ##' Simulate from a matrix-variate Normal distribution
@@ -246,7 +251,7 @@ getBinaryConfigs <- function(nb.subgroups=1, verbose=0){
 ##' covariance matrix of the variables
 ##' @return Array with samples in the third dimension
 matvrnorm <- function(n=1, M, U, V){
-    require(MASS)
+    library(MASS)
     stopifnot(nrow(M) == nrow(U),
               ncol(M) == nrow(V),
               nrow(U) == ncol(U),
@@ -270,59 +275,59 @@ matvrnorm <- function(n=1, M, U, V){
 ##' @param main main title for the plot
 ##' @return List with probas per subgroup
 calcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
-                                         main=NULL){
-  stopifnot(is.data.frame(configs),
-            "id" %in% colnames(configs),
-            "proba" %in% colnames(configs),
-            is.logical(plot.it))
-  
-  if(plot.it && is.null(main))
-    main <- "Estimates of configuration probabilities"
-  
-  ## nb of subgroups
-  if("0" %in% configs$id){
-    S <- log2(nrow(configs))
-  } else
-    S <- log2(nrow(configs) + 1)
-  
-  probas1 <- rep(0, 9)
-  probas2 <- list()
-  for(s in 1:S){
-    probas2[[s]] <- c(NA)
-    for(i in 1:nrow(configs)){
-      if(configs$id[i] == "0")
-        next
-      if(length(strsplit(configs$id[i], "-")[[1]]) == s){
-        probas1[s] <- probas1[s] + configs$proba[i]
-        probas2[[s]] <- c(probas2[[s]], configs$proba[i])
-      }
-    }
-    probas2[[s]] <- probas2[[s]][! is.na(probas2[[s]])]
-  }
-  
-  if(plot.it){
+                                          main=NULL){
+    stopifnot(is.data.frame(configs),
+              "id" %in% colnames(configs),
+              "proba" %in% colnames(configs),
+              is.logical(plot.it))
+    
+    if(plot.it && is.null(main))
+        main <- "Estimates of configuration probabilities"
+    
+    ## nb of subgroups
     if("0" %in% configs$id){
-      plot(x=0:S, y=log10(c(configs$proba[configs$id == "0"], probas1)),
-           xlim=c(0,S), ylim=c(-15.1,1),
-           pch=19, yaxt="n", col="blue",
-           xlab="nb of subgroups in which an eQTL is active",
-           ylab="log10(sum over configuration probabilities)",
-           main=main)
-    } else{
-      plot(x=1:S, y=log10(probas1),
-           xlim=c(1,S), ylim=c(-15.1,1),
-           pch=19, yaxt="n", col="blue",
-           xlab="nb of subgroups in which an eQTL is active",
-           ylab="log10(sum over configuration probabilities)",
-           main=main)
+        S <- log2(nrow(configs))
+    } else
+        S <- log2(nrow(configs) + 1)
+    
+    probas1 <- rep(0, 9)
+    probas2 <- list()
+    for(s in 1:S){
+        probas2[[s]] <- c(NA)
+        for(i in 1:nrow(configs)){
+            if(configs$id[i] == "0")
+                next
+            if(length(strsplit(configs$id[i], "-")[[1]]) == s){
+                probas1[s] <- probas1[s] + configs$proba[i]
+                probas2[[s]] <- c(probas2[[s]], configs$proba[i])
+            }
+        }
+        probas2[[s]] <- probas2[[s]][! is.na(probas2[[s]])]
     }
-    axis(side=2, at=log10(c(1e-15, 1e-10, 1e-5, 1e-2, 1)),
-         labels=c("1e-15", "1e-10", "1e-5", "1e-2", "1"))
-    for(s in 1:(S-1))
-      points(x=jitter(rep(s, length(probas2[[s]]))), y=log10(probas2[[s]]), pch=1)
-  }
-  
-  return(list(subgroups=probas1, configs=probas2))
+    
+    if(plot.it){
+        if("0" %in% configs$id){
+            plot(x=0:S, y=log10(c(configs$proba[configs$id == "0"], probas1)),
+                 xlim=c(0,S), ylim=c(-15.1,1),
+                 pch=19, yaxt="n", col="blue",
+                 xlab="nb of subgroups in which an eQTL is active",
+                 ylab="log10(sum over configuration probabilities)",
+                 main=main)
+        } else{
+            plot(x=1:S, y=log10(probas1),
+                 xlim=c(1,S), ylim=c(-15.1,1),
+                 pch=19, yaxt="n", col="blue",
+                 xlab="nb of subgroups in which an eQTL is active",
+                 ylab="log10(sum over configuration probabilities)",
+                 main=main)
+        }
+        axis(side=2, at=log10(c(1e-15, 1e-10, 1e-5, 1e-2, 1)),
+             labels=c("1e-15", "1e-10", "1e-5", "1e-2", "1"))
+        for(s in 1:(S-1))
+            points(x=jitter(rep(s, length(probas2[[s]]))), y=log10(probas2[[s]]), pch=1)
+    }
+    
+    return(list(subgroups=probas1, configs=probas2))
 }
 
 ##' Calculate the pairwise eQTL sharing by marginalizing other subgroups
@@ -337,40 +342,40 @@ calcActivityProbasPerSubgroup <- function(configs, plot.it=FALSE,
 ##' Pr(eQTL in subgroup j | eQTL in subgroup i)
 calcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
                                             subgroups=NULL){
-  stopifnot(is.data.frame(configs),
-            is.logical(reformat))
-  
-  S <- log2(nrow(configs) + 1)
-  if(is.null(subgroups))
-    subgroups <- paste0("subgroup.", 1:S)
-  
-  ## reformat the data
-  if(reformat){
-    stopifnot("id" %in% colnames(configs),
-              "proba" %in% colnames(configs))
-    tmp <- list()
-    for(s in subgroups)
-      tmp[[s]] <- rep(0, nrow(configs))
-    tmp[["proba"]] <- configs$proba
-    tmp <- do.call(cbind, tmp)
-    for(i in 1:nrow(configs))
-      tmp[i, as.numeric(strsplit(configs$id[i], "-")[[1]])] <- 1
-  } else
-    tmp <- configs
-  
-  ## compute the marginals
-  pi1.marginal <- matrix(nrow=S, ncol=S,
-                         dimnames=list(subgroups, subgroups))
-  diag(pi1.marginal) <- 1
-  for(j in 1:S){ # for each column
-    for(i in 1:S){ # for each row
-      num <- which(tmp[,i] == 1 & tmp[,j] == 1)
-      denom <- which(tmp[,i] == 1)
-      pi1.marginal[i,j] <- sum(tmp[num,"proba"]) / sum(tmp[denom,"proba"])
+    stopifnot(is.data.frame(configs),
+              is.logical(reformat))
+    
+    S <- log2(nrow(configs) + 1)
+    if(is.null(subgroups))
+        subgroups <- paste0("subgroup.", 1:S)
+    
+    ## reformat the data
+    if(reformat){
+        stopifnot("id" %in% colnames(configs),
+                  "proba" %in% colnames(configs))
+        tmp <- list()
+        for(s in subgroups)
+            tmp[[s]] <- rep(0, nrow(configs))
+        tmp[["proba"]] <- configs$proba
+        tmp <- do.call(cbind, tmp)
+        for(i in 1:nrow(configs))
+            tmp[i, as.numeric(strsplit(configs$id[i], "-")[[1]])] <- 1
+    } else
+        tmp <- configs
+    
+    ## compute the marginals
+    pi1.marginal <- matrix(nrow=S, ncol=S,
+                           dimnames=list(subgroups, subgroups))
+    diag(pi1.marginal) <- 1
+    for(j in 1:S){ # for each column
+        for(i in 1:S){ # for each row
+            num <- which(tmp[,i] == 1 & tmp[,j] == 1)
+            denom <- which(tmp[,i] == 1)
+            pi1.marginal[i,j] <- sum(tmp[num,"proba"]) / sum(tmp[denom,"proba"])
+        }
     }
-  }
-  
-  return(pi1.marginal)
+    
+    return(pi1.marginal)
 }
 
 ##' After the EM has been fitted on each pair of subgroups, this function
@@ -380,28 +385,28 @@ calcMarginalPairwiseEqtlSharing <- function(configs, reformat=TRUE,
 ##' and S(S-1)/2 rows where S is the nb of subgroups
 ##' @return Matrix so that mat[i,j] corresponds to Pr(active in subgroup j | active in subgroup i)
 reformatPairwiseEqtlSharing <- function(dat){
-  stopifnot(ncol(dat) == 4)
-  
-  S <- (1 + sqrt(1 + 4 * 2 * nrow(dat))) / 2
-  message(paste0("nb of subgroups: ", S))
-  
-  subgroups <- sort(unique(do.call(c, lapply(dat[,1], function(x){
-    strsplit(x, "\\|")[[1]]
-  }))))
-  message(paste(subgroups, collapse="-"))
-  
-  mat <- matrix(nrow=S, ncol=S,
-                dimnames=list(subgroups, subgroups))
-  
-  diag(mat) <- 1
-  for(k in 1:nrow(dat)){
-    j <- strsplit(dat[k,1], "\\|")[[1]][1]
-    i <- strsplit(dat[k,1], "\\|")[[1]][2]
-    mat[i,j] <- as.numeric(dat[k,2])
-    mat[j,i] <- as.numeric(dat[k,4])
-  }
-  
-  return(mat)
+    stopifnot(ncol(dat) == 4)
+    
+    S <- (1 + sqrt(1 + 4 * 2 * nrow(dat))) / 2
+    message(paste0("nb of subgroups: ", S))
+    
+    subgroups <- sort(unique(do.call(c, lapply(dat[,1], function(x){
+        strsplit(x, "\\|")[[1]]
+    }))))
+    message(paste(subgroups, collapse="-"))
+    
+    mat <- matrix(nrow=S, ncol=S,
+                  dimnames=list(subgroups, subgroups))
+    
+    diag(mat) <- 1
+    for(k in 1:nrow(dat)){
+        j <- strsplit(dat[k,1], "\\|")[[1]][1]
+        i <- strsplit(dat[k,1], "\\|")[[1]][2]
+        mat[i,j] <- as.numeric(dat[k,2])
+        mat[j,i] <- as.numeric(dat[k,4])
+    }
+    
+    return(mat)
 }
 
 ##' Estimate pi0 (proba for a null hypothesis to be true)
@@ -413,21 +418,22 @@ reformatPairwiseEqtlSharing <- function(dat){
 ##' @param verbose verbosity level (0/default=1)
 ##' @return Numeric
 estimatePi0WithEbf <- function(log10.bfs, verbose=1){
-  if(verbose > 0)
-    message(paste0("nb of tests: ", length(log10.bfs)))
-  
-  tmp <- log10.bfs[order(log10.bfs)] # sort in increasing order
-  
-  d0 <- which(cumsum(10^tmp) / seq_along(10^tmp) >= 1)[1]
-  if(verbose > 0)
-    message(paste0("cutoff at the ", d0, "-th BF"))
-  
-  pi0.ebf <- d0 / length(tmp)
-  if(verbose > 0)
-    message(paste0("estimate pi0-hat = ",
-                   format(x=pi0.ebf, scientific=TRUE, digits=6)))
-  
-  return(pi0.ebf)
+    stopifnot(is.numeric(log10.bfs), is.vector(log10.bfs))
+    if(verbose > 0)
+        message(paste0("nb of tests: ", length(log10.bfs)))
+    
+    tmp <- log10.bfs[order(log10.bfs)] # sort in increasing order
+    
+    d0 <- which(cumsum(10^tmp) / seq_along(10^tmp) >= 1)[1]
+    if(verbose > 0)
+        message(paste0("cutoff at the ", d0, "-th BF"))
+    
+    pi0.ebf <- d0 / length(tmp)
+    if(verbose > 0)
+        message(paste0("estimate pi0-hat = ",
+                       format(x=pi0.ebf, scientific=TRUE, digits=6)))
+    
+    return(pi0.ebf)
 }
 
 ##' Estimate pi0 (proba for a null hypothesis to be true)
@@ -441,15 +447,17 @@ estimatePi0WithEbf <- function(log10.bfs, verbose=1){
 ##' @param verbose verbosity level (0/default=1)
 ##' @return Numeric
 estimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
-  if(verbose > 0)
-    message(paste0("nb of tests: ", nrow(log10.bfs)))
-  
-  pi0.qbf <- sum(log10.bfs[,1] <= log10.bfs[,2]) / (nrow(log10.bfs) * gamma)
-  if(verbose > 0)
-    message(paste0("estimate pi0-hat = ",
-                   format(x=pi0.qbf, scientific=TRUE, digits=6)))
-  
-  return(pi0.qbf)
+    stopifnot(is.numeric(log10.bfs), is.matrix(log10.bfs),
+              ncol(log10.bfs) == 2)
+    if(verbose > 0)
+        message(paste0("nb of tests: ", nrow(log10.bfs)))
+    
+    pi0.qbf <- sum(log10.bfs[,1] <= log10.bfs[,2]) / (nrow(log10.bfs) * gamma)
+    if(verbose > 0)
+        message(paste0("estimate pi0-hat = ",
+                       format(x=pi0.qbf, scientific=TRUE, digits=6)))
+    
+    return(pi0.qbf)
 }
 
 ##' Call significant tests by controlling the Bayesian FDR
@@ -463,26 +471,27 @@ estimatePi0WithQbf <- function(log10.bfs, gamma, verbose=1){
 ##' @param verbose verbosity level (0/default=1)
 ##' @return Vector of booleans, TRUE if null is rejected (thus called significant)
 controlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
-  if(verbose > 0)
-    message(paste0(length(log10.bfs), " tests and pi0-hat = ",
-                   format(x=pi0, scientific=TRUE, digits=6)))
-  
-  ## compute the posterior probability of each test being null
-  post.null <- pi0 / (pi0 + (1-pi0) * 10^log10.bfs)
-  
-  ## find the cutoff for which their cumulative mean is >= fdr.level
-  idx <- order(post.null)
-  post.null <- post.null[idx]
-  for(L in 1:length(post.null))
-    if(mean(post.null[1:L]) >= fdr.level)
-      break
-  log10.bf.L <- log10.bfs[idx[L]]
-  if(verbose > 0)
-    message(paste0(L, " significant tests, at cutoff log10(BF)=", log10.bf.L))
-  
-  significant <- log10.bfs >= log10.bf.L
-  
-  return(significant)
+    stopifnot(is.numeric(log10.bfs), is.vector(log10.bfs))
+    if(verbose > 0)
+        message(paste0(length(log10.bfs), " tests and pi0-hat = ",
+                       format(x=pi0, scientific=TRUE, digits=6)))
+    
+    ## compute the posterior probability of each test being null
+    post.null <- pi0 / (pi0 + (1-pi0) * 10^log10.bfs)
+    
+    ## find the cutoff for which their cumulative mean is >= fdr.level
+    idx <- order(post.null)
+    post.null <- post.null[idx]
+    for(L in 1:length(post.null))
+        if(mean(post.null[1:L]) >= fdr.level)
+            break
+    log10.bf.L <- log10.bfs[idx[L]]
+    if(verbose > 0)
+        message(paste0(L, " significant tests, at cutoff log10(BF)=", log10.bf.L))
+    
+    significant <- log10.bfs >= log10.bf.L
+    
+    return(significant)
 }
 
 ##' Compute log_{10}(\sum_i w_i 10^x_i) stably
@@ -491,13 +500,15 @@ controlBayesFdr <- function(log10.bfs, pi0, fdr.level=0.05, verbose=1){
 ##' @param weights optional vector of weights (equal weights if not specified)
 ##' @return Numeric
 log10WeightedSum <- function(x, weights=NULL){
-  stopifnot(is.vector(x))
-  if(! is.null(weights)){
-    stopifnot(is.vector(weights))
-  } else
-    weights <- rep(1/length(x), length(x))
-  max <- max(x)
-  max + log10(sum(weights * 10^(x - max)))
+    stopifnot(is.numeric(x), is.vector(x))
+    
+    if(! is.null(weights)){
+        stopifnot(is.vector(weights))
+    } else
+        weights <- rep(1/length(x), length(x))
+    
+    max <- max(x)
+    max + log10(sum(weights * 10^(x - max)))
 }
 
 ##' Calculate the asymptotic Bayes Factor proposed by Wakefield
@@ -511,13 +522,15 @@ log10WeightedSum <- function(x, weights=NULL){
 ##' @param log10 to return the log10 of the ABF (default=TRUE)
 ##' @return Numeric
 calcAsymptoticBayesFactorWakefield <- function(theta.hat, V, W, log10=TRUE){
-  z2 <- theta.hat^2 / V # Wald statistic
-  log10.ABF <- 0.5 * log10(V) - 0.5 * log10(V + W) +
-    (0.5 * z2 * W / (V + W)) / log(10)
-  if(log10)
-    return(log10.ABF)
-  else
-    return(10^log10.ABF)
+    z2 <- theta.hat^2 / V # Wald statistic
+    
+    log10.ABF <- 0.5 * log10(V) - 0.5 * log10(V + W) +
+        (0.5 * z2 * W / (V + W)) / log(10)
+    
+    if(log10)
+        return(log10.ABF)
+    else
+        return(10^log10.ABF)
 }
 
 ##' Calculate the exact Bayes Factor proposed by Servin and Stephens
@@ -532,25 +545,28 @@ calcAsymptoticBayesFactorWakefield <- function(theta.hat, V, W, log10=TRUE){
 ##' @param log10 to return the log10 of the ABF (default=TRUE)
 ##' @return Numeric
 calcExactBayesFactorServinStephens <- function(G, Y, sigma.a, sigma.d, log10=TRUE){
-  stopifnot(is.vector(G), is.vector(Y))
-  subset <- complete.cases(Y) & complete.cases(G)
-  Y <- Y[subset]
-  G <- G[subset]
-  stopifnot(length(Y) == length(G))
-  N <- length(G)
-  X <- cbind(rep(1,N), G, G == 1)
-  inv.Sigma.B <- diag(c(0, 1/sigma.a^2, 1/sigma.d^2))
-  inv.Omega <- inv.Sigma.B + t(X) %*% X
-  inv.Omega0 <- N
-  tY.Y <- t(Y) %*% Y
-  log10.BF <- as.numeric(0.5 * log10(inv.Omega0) -
-                         0.5 * log10(det(inv.Omega)) -
-                         log10(sigma.a) - log10(sigma.d) -
-                         (N/2) * (log10(tY.Y - t(Y) %*% X %*% solve(inv.Omega)
-                                        %*% t(X) %*% cbind(Y)) -
-                                  log10(tY.Y - N*mean(Y)^2)))
-  if(log10)
-    return(log10.BF)
-  else
-    return(10^log10.BF)
+    stopifnot(is.vector(G), is.vector(Y))
+    
+    subset <- complete.cases(Y) & complete.cases(G)
+    Y <- Y[subset]
+    G <- G[subset]
+    stopifnot(length(Y) == length(G))
+    
+    N <- length(G)
+    X <- cbind(rep(1,N), G, G == 1)
+    inv.Sigma.B <- diag(c(0, 1/sigma.a^2, 1/sigma.d^2))
+    inv.Omega <- inv.Sigma.B + t(X) %*% X
+    inv.Omega0 <- N
+    tY.Y <- t(Y) %*% Y
+    log10.BF <- as.numeric(0.5 * log10(inv.Omega0) -
+                           0.5 * log10(det(inv.Omega)) -
+                           log10(sigma.a) - log10(sigma.d) -
+                           (N/2) * (log10(tY.Y - t(Y) %*% X %*% solve(inv.Omega)
+                                          %*% t(X) %*% cbind(Y)) -
+                                    log10(tY.Y - N*mean(Y)^2)))
+    
+    if(log10)
+        return(log10.BF)
+    else
+        return(10^log10.BF)
 }
