@@ -40,11 +40,11 @@ namespace quantgen {
   }
 
   GeneSnpPair::GeneSnpPair(const string & gene_name, const string & snp_name,
-			   const string & analysis_type)
+			   const string & error_model)
   {
     gene_name_ = gene_name;
     snp_name_ = snp_name;
-    analysis_type_ = analysis_type;
+    error_model_ = error_model;
   }
 
   bool operator==(const GeneSnpPair& lhs, const GeneSnpPair& rhs)

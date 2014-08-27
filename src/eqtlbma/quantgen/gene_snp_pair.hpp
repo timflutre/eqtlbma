@@ -51,7 +51,7 @@ namespace quantgen {
   private:
     std::string gene_name_;
     std::string snp_name_;
-    std::string analysis_type_; // uvlr or mvlr or hybrid (optional)
+    std::string error_model_; // uvlr or mvlr or hybrid (optional)
     
     std::map<std::string,size_t> subgroup2samplesize_;
     std::map<std::string,size_t> subgroup2nbcovariates_;
@@ -134,13 +134,13 @@ namespace quantgen {
     GeneSnpPair(void);
     GeneSnpPair(const std::string & gene_name, const std::string & snp_name);
     GeneSnpPair(const std::string & gene_name, const std::string & snp_name,
-		const std::string & analysis_type);
+		const std::string & error_model);
     void SetGeneName(const std::string & gene_name) { gene_name_ = gene_name; };
     void SetSnpName(const std::string & snp_name) { snp_name_ = snp_name; };
-    void SetAnalysisType(const std::string & analysis_type) { analysis_type_ = analysis_type; };
+    void SetErrorModel(const std::string & error_model) { error_model_ = error_model; };
     std::string GetGeneName(void) const { return gene_name_; };
     std::string GetSnpName(void) const { return snp_name_; };
-    std::string GetAnalysisType(void) { return analysis_type_; };
+    std::string GetErrorModel(void) { return error_model_; };
     bool HasResults(const std::string & subgroup) const;
     void CalcSstatsOneSbgrp(
       const Samples & samples,

@@ -9,6 +9,7 @@ libeqtlbma_la_SOURCES = \
 	irls/LogLink.h \
 	irls/LinkFunc.h \
 	quantgen/covariates.hpp \
+	quantgen/data_loader.hpp \
 	quantgen/gene.hpp \
 	quantgen/gene_snp_pair.hpp \
 	quantgen/grid.hpp \

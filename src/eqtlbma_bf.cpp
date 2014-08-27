@@ -1,7 +1,7 @@
 /** \file eqtlbma_bf.cpp
  *
  *  `eqtlbma_bf' performs eQTL mapping in multiple subgroups via a Bayesian model.
- *  Copyright (C) 2012-2013 Timothee Flutre
+ *  Copyright (C) 2012-2013 Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -57,6 +57,7 @@ using namespace std;
 #include "utils/utils_math.hpp"
 using namespace utils;
 
+#include "quantgen/data_loader.hpp"
 #include "quantgen/gene.hpp"
 #include "quantgen/snp.hpp"
 #include "quantgen/gene_snp_pair.hpp"
@@ -118,7 +119,7 @@ void help(char ** argv)
        << "      --lik\tlikelihood to use" << endl
        << "\t\t'normal' (default)" << endl
        << "\t\t'poisson' or 'quasipoisson'" << endl
-       << "      --type\ttype of analysis to perform" << endl
+       << "      --analys\tanalysis to perform" << endl
        << "\t\t'sep': separate analysis of each subgroup" << endl
        << "\t\t'join': joint analysis of all subgroups" << endl
        << "      --outss\twrite the output file with all summary statistics" << endl
@@ -138,14 +139,14 @@ void help(char ** argv)
        << "      --gridL\tfile with a 'large' grid for prior variances in standardized effect sizes" << endl
        << "\t\tfirst column is phi^2 and second column is omega^2, no header" << endl
        << "\t\tthis grid is used with model 1 ('general alternative') trying to capture" << endl
-       << "\t\t all sorts of types of heterogeneity" << endl
-       << "\t\trequired with --type join" << endl
+       << "\t\t all sorts of heterogeneity" << endl
+       << "\t\trequired with --analys join" << endl
        << "      --gridS\tfile with a 'small' grid of values for phi^2 and omega^2" << endl
        << "\t\tsame format as --gridL" << endl
-       << "\t\trequired with --type join if --bfs is 'sin' or 'all'" << endl
+       << "\t\trequired with --analyis join if --bfs is 'sin' or 'all'" << endl
        << "      --bfs\twhich Bayes Factors to compute for the joint analysis" << endl
-       << "\t\teach BF for a given configuration is the average of the BFs over one of the grids, with equal weights" << endl
        << "\t\tonly the Laplace-approximated BF from Wen and Stephens (AoAS 2013) is implemented" << endl
+       << "\t\tif --outw, each BF for a given configuration is the average of the BFs over one of the grids, with equal weights" << endl
        << "\t\t'gen' (default): general way to capture any level of heterogeneity" << endl
        << "\t\t correspond to the consistent configuration with the large grid" << endl
        << "\t\t fixed-effect and maximum-heterogeneity BFs are also calculated" << endl
@@ -153,11 +154,11 @@ void help(char ** argv)
        << "\t\t they use the small grid (BF_BMAlite is also reported)" << endl
        << "\t\t'all': compute also the BFs for all configurations (costly if many subgroups)" << endl
        << "\t\t all BFs use the small grid (BF_BMA is also reported)" << endl
-       << "      --error\tmodel for the errors" << endl
+       << "      --error\tmodel for the errors (if --analys join)" << endl
        << "\t\t'uvlr': default, errors are not correlated between subgroups (different individuals)" << endl
        << "\t\t'mvlr': errors can be correlated between subgroups (same individuals)" << endl
        << "\t\t'hybrid': errors can be correlated between pairs of subgroups (common individuals)" << endl
-       << "      --fiterr\tparam used when estimating the variance of the errors (only with 'mvlr' or 'hybrid')" << endl
+       << "      --fiterr\tparam used when estimating the variance of the errors (if --analys join, only with 'mvlr' or 'hybrid')" << endl
        << "\t\tdefault=0.5 but can be between 0 (null model) and 1 (full model)" << endl
        << "      --nperm\tnumber of permutations" << endl
        << "\t\tdefault=0, otherwise 10000 is recommended" << endl
@@ -203,12 +204,12 @@ void version(char ** argv)
 {
   cout << argv[0] << " " << VERSION << endl
        << endl
-       << "Copyright (C) 2012-2013 Timothee Flutre and Xiaoquan Wen." << endl
+       << "Copyright (C) 2012-2014 Timothée Flutre and Xiaoquan Wen." << endl
        << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>" << endl
        << "This is free software; see the source for copying conditions.  There is NO" << endl
        << "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." << endl
        << endl
-       << "Written by Timothee Flutre and Xiaoquan Wen." << endl;
+       << "Written by Timothée Flutre and Xiaoquan Wen." << endl;
 }
 
 /** \brief Parse the command-line arguments and check the values of the 
@@ -229,21 +230,22 @@ parseCmdLine(
   bool & save_sstats,
   bool & save_weighted_abfs,
   string & likelihood,
-  string & type_analysis,
+  string & analysis,
   bool & need_qnorm,
   float & min_maf,
   string & covarFile,
   string & file_largegrid,
   string & file_smallgrid,
-  string & type_bfs,
-  string & type_errors,
+  string & bfs,
+  string & error_model,
   float & prop_cov_errors,
+  size_t & nb_types,
   size_t & nb_permutations,
   size_t & seed,
   int & trick,
   size_t & trick_cutoff,
-  int & type_perm_sep,
-  string & type_permbf,
+  int & perm_sep,
+  string & permbf,
   bool & use_max_bf,
   int & nb_threads,
   string & file_snpstokeep,
@@ -268,7 +270,7 @@ parseCmdLine(
       {"outm", no_argument, 0, 0},
       {"outw", no_argument, 0, 0},
       {"lik", required_argument, 0, 0},
-      {"type", required_argument, 0, 0},
+      {"analys", required_argument, 0, 0},
       {"qnorm", no_argument, 0, 0},
       {"maf", required_argument, 0, 0},
       {"covar", required_argument, 0, 0},
@@ -354,8 +356,8 @@ parseCmdLine(
 	likelihood = optarg;
 	break;
       }
-      if(strcmp(long_options[option_index].name, "type") == 0){
-	type_analysis = optarg;
+      if(strcmp(long_options[option_index].name, "analys") == 0){
+	analysis = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "qnorm") == 0){
@@ -379,11 +381,11 @@ parseCmdLine(
 	break;
       }
       if(strcmp(long_options[option_index].name, "bfs") == 0){
-	type_bfs = optarg;
+	bfs = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "error") == 0){
-	type_errors = optarg;
+	error_model = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "fiterr") == 0){
@@ -407,11 +409,11 @@ parseCmdLine(
 	break;
       }
       if(strcmp(long_options[option_index].name, "permsep") == 0){
-	type_perm_sep = atoi(optarg);
+	perm_sep = atoi(optarg);
 	break;
       }
       if(strcmp(long_options[option_index].name, "pbf") == 0){
-	type_permbf = optarg;
+	permbf = optarg;
 	break;
       }
       if(strcmp(long_options[option_index].name, "maxbf") == 0){
@@ -497,7 +499,7 @@ parseCmdLine(
       help(argv);
       exit(EXIT_FAILURE);
     }
-    if(anchor.compare("TSS") != 0 && anchor.compare("TSS+TES") != 0){
+    if(anchor != "TSS" && anchor != "TSS+TES"){
       cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	   << "ERROR: --anchor should be TSS or TSS+TES" << endl << endl;
       help(argv);
@@ -510,13 +512,13 @@ parseCmdLine(
       help(argv);
       exit(EXIT_FAILURE);
     }
-    if(type_analysis != "join"){
+    if(analysis != "join"){
       cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	   << "ERROR: --inss requires --type join" << endl << endl;
+	   << "ERROR: --inss requires --analys join" << endl << endl;
       help(argv);
       exit(EXIT_FAILURE);
     }
-    if(type_errors != "uvlr"){
+    if(error_model != "uvlr"){
       cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	   << "ERROR: --inss requires --error uvlr" << endl << endl;
       help(argv);
@@ -542,36 +544,36 @@ parseCmdLine(
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(likelihood.compare("normal") != 0 && likelihood.compare("poisson") != 0
-     && likelihood.compare("quasipoisson") != 0){
+  if(likelihood != "normal" && likelihood != "poisson"
+     && likelihood != "quasipoisson"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: --lik " << likelihood << " is not valid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(likelihood.compare("normal") != 0 && type_analysis.compare("join") == 0
-     && type_errors.compare("uvlr") != 0){
+  if(likelihood != "normal" && analysis != "join"
+     && error_model != "uvlr"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --lik " << likelihood << " is not valid with --type join"
-	 << " and --error " << type_errors << endl << endl;
+	 << "ERROR: --lik " << likelihood << " is not valid with --analys join"
+	 << " and --error " << error_model << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.empty()){
+  if(analysis.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --type" << endl << endl;
+	 << "ERROR: missing compulsory option --analys" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("sep") != 0 && type_analysis.compare("join") != 0){
+  if(analysis != "sep" && analysis != "join"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --type " << type_analysis << " is not valid" << endl << endl;
+	 << "ERROR: --analys " << analysis << " is not valid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 && file_largegrid.empty()){
+  if(analysis != "join" && file_largegrid.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --gridL with --type join" << endl << endl;
+	 << "ERROR: missing compulsory option --gridL with --analys join" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
@@ -581,29 +583,28 @@ parseCmdLine(
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 &&
-     (type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0) &&
+  if(analysis == "join" &&
+     (bfs == "sin" || bfs == "all") &&
      file_smallgrid.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --gridS is required with --type join and --bfs " << type_bfs << endl << endl;
+	 << "ERROR: --gridS is required with --analys join and --bfs " << bfs << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_bfs.compare("gen") != 0 && type_bfs.compare("sin") != 0 &&
-     type_bfs.compare("all") != 0){
+  if(bfs!= "gen" && bfs != "sin" && bfs != "all"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --bfs " << type_bfs << " is not valid" << endl << endl;
+	 << "ERROR: --bfs " << bfs << " is not valid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_errors.compare("uvlr") != 0 && type_errors.compare("mvlr") != 0 &&
-     type_errors.compare("hybrid") != 0){
+  if(error_model != "uvlr" && error_model != "mvlr" &&
+     error_model != "hybrid"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --error " << type_errors << " is not valid" << endl << endl;
+	 << "ERROR: --error " << error_model << " is not valid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 && type_errors.compare("mvlr") == 0)
+  if(analysis == "join" && error_model == "mvlr")
     cerr << "WARNING: summary statistics per subgroup won't be saved with --error mvlr" << endl;
   if(trick != 0 && trick != 1 && trick != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
@@ -618,46 +619,43 @@ parseCmdLine(
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_perm_sep != 0 && type_perm_sep != 1 && type_perm_sep != 2){
+  if(perm_sep != 0 && perm_sep != 1 && perm_sep != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --permsep " << type_perm_sep << " is not valid" << endl << endl;
+	 << "ERROR: --permsep " << perm_sep << " is not valid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("sep") == 0 && nb_permutations > 0 &&
-     type_perm_sep != 1 && type_perm_sep != 2){
+  if(analysis == "sep" && nb_permutations > 0 &&
+     perm_sep != 1 && perm_sep != 2){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
 	 << "ERROR: if --type sep --nperm > 0, --permsep should be '1' or '2'" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_permbf.compare("none") != 0 && type_permbf.compare("gen") != 0 &&
-     type_permbf.compare("gen-sin") != 0 && type_permbf.compare("all") != 0){
+  if(permbf != "none" && permbf != "gen" &&
+     permbf != "gen-sin" && permbf != "all"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --pbf " << type_permbf << " is unvalid" << endl << endl;
+	 << "ERROR: --pbf " << permbf << " is unvalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
-     type_permbf.compare("none") == 0){
+  if(analysis == "join" && nb_permutations > 0 && permbf == "none"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: if --type join --nperm > 0, --pbf should be different than 'none'" << endl << endl;
+	 << "ERROR: if --analys join --nperm > 0, --pbf should be different than 'none'" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
-     type_permbf.compare("none") != 0 && type_bfs.compare("gen") == 0 &&
-     type_permbf.compare("gen") != 0){
+  if(analysis == "join" && nb_permutations > 0 && permbf != "none" &&
+     bfs == "gen" && permbf != "gen"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: if --type join --bfs gen --nperm > 0, --pbf should be 'gen'" << endl << endl;
+	 << "ERROR: if --analys join --bfs gen --nperm > 0, --pbf should be 'gen'" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
-  if(type_analysis.compare("join") == 0 && nb_permutations > 0 &&
-     type_permbf.compare("none") != 0 && type_bfs.compare("sin") == 0 &&
-     type_permbf.compare("all") == 0){
+  if(analysis == "join" && nb_permutations > 0 && permbf != "none" &&
+     bfs == "sin" && permbf == "all"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: if type join --bfs sin --nperm > 0, --pbf should be 'gen' or 'gen-sin'" << endl << endl;
+	 << "ERROR: if --analys join --bfs sin --nperm > 0, --pbf should be 'gen' or 'gen-sin'" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
@@ -677,54 +675,12 @@ parseCmdLine(
     seed = getSeed();
 }
 
-map<string,string> loadTwoColumnFile(const string & file, const int & verbose)
-{
-  map<string,string> mItems;
-  if(file.empty())
-    return mItems;
-  
-  string line;
-  gzFile stream;
-  vector<string> tokens;
-  size_t nb_lines = 0;
-  
-  openFile(file, stream, "rb");
-  if(verbose > 0)
-    cout <<"load file " << file << " ..." << endl;
-  
-  while(getline(stream, line)){
-    nb_lines++;
-    split(line, " \t,", tokens);
-    if(tokens.size() != 2){
-      cerr << "ERROR: file " << file << " should have only two columns"
-	   << " at line " << nb_lines << endl;
-      exit(EXIT_FAILURE);
-    }
-    if(tokens[0][0] == '#')
-      continue;
-    if(mItems.find(tokens[0]) == mItems.end())
-      mItems.insert(make_pair(tokens[0], tokens[1]));
-  }
-  
-  if(! gzeof(stream)){
-    cerr << "ERROR: can't read successfully file "
-	 << file << " up to the end" << endl;
-    exit (1);
-  }
-  closeFile(file, stream);
-  
-  if(verbose > 0)
-    cout << "items loaded: " << mItems.size() << endl;
-  
-  return mItems;
-}
-
 void loadListsGenoExplevelAndCovarFiles(
   const string & file_genopaths,
   const string & file_exppaths,
   const string & file_covarpaths,
   const vector<string> & subgroups_tokeep,
-  const string & type_errors,
+  const string & error_model,
   const int & verbose,
   map<string,string> & subgroup2genofile,
   map<string,string> & subgroup2explevelfile,
@@ -770,7 +726,7 @@ void loadListsGenoExplevelAndCovarFiles(
   
   // for correlated errors, check that, at least, all subgroups 
   // have genotypes in the same file
-  if(type_errors.compare("uvlr") != 0)
+  if(error_model != "uvlr")
     for(it = subgroup2genofile.begin(); it != subgroup2genofile.end(); ++it)
       if(it->second.compare(subgroup2genofile.begin()->second) != 0){
 	cerr << "ERROR: --error mvlr/hybrid requires the same genotypes in a single file for all subgroups"
@@ -826,16 +782,14 @@ void loadSamplesFromMatrixEqtl(
     closeFile(it->second, fileStream);
     if(it == subgroup2file.begin()){
       split(line, " \t", samples);
-      if(samples[0].compare("Id") == 0 || samples[0].compare("id") == 0
-	  || samples[0].compare("ID") == 0)
+      if(samples[0] == "Id" || samples[0] == "id" || samples[0] == "ID")
 	samples.erase(samples.begin());
       subgroup2samples.insert(make_pair(it->first, samples));
     }
     else{
       vector<string> tokens;
       split(line, " \t", tokens);
-      if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
-	  || tokens[0].compare("ID") == 0)
+      if(tokens[0] == "Id" || tokens[0] == "id" || tokens[0] == "ID")
 	tokens.erase(tokens.begin());
       subgroup2samples.insert(make_pair(it->first, tokens));
       for(vector<string>::const_iterator itT = tokens.begin();
@@ -898,11 +852,11 @@ void loadSamplesFromGenotypes(
       closeFile(it->second, fileStream);
       
       // if file in IMPUTE format
-      if(tokens[0].compare("chr") == 0
-	 && (tokens[1].compare("name") == 0 || tokens[1].compare("id") == 0)
-	 && tokens[2].compare("coord") == 0
-	 && tokens[3].compare("a1") == 0
-	 && tokens[4].compare("a2") == 0){
+      if(tokens[0] == "chr"
+	 && (tokens[1] == "name" || tokens[1] == "id")
+	 && tokens[2] == "coord"
+	 && tokens[3] == "a1"
+	 && tokens[4] == "a2"){
 	if((tokens.size() - 5) % 3 != 0){
 	  cerr << "ERROR: the header of IMPUTE file " << it->second
 	       << " is badly formatted" << endl;
@@ -922,8 +876,7 @@ void loadSamplesFromGenotypes(
 	    samples.push_back(*itT);
       }
       else{ // if file in MatrixEQTL format (allele dosage)
-	if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
-	    || tokens[0].compare("ID") == 0)
+	if(tokens[0] == "Id" || tokens[0] == "id" || tokens[0] == "ID")
 	  tokens.erase(tokens.begin());
 	subgroup2samples_genotypes.insert(make_pair(it->first, tokens));
       }
@@ -955,7 +908,7 @@ void loadSamplesFromGenotypes(
 void loadSamples(const map<string,string> & subgroup2genofile,
 		 const map<string,string> & subgroup2explevelfile,
 		 const map<string,string> & subgroup2covarfile,
-		 const string & type_errors,
+		 const string & error_model,
 		 const int & verbose,
 		 Samples & samples)
 {
@@ -997,7 +950,7 @@ void loadSamples(const map<string,string> & subgroup2genofile,
   samples.AddSamplesFromData(subgroup2samples_explevels, "explevel");
   samples.AddSamplesFromData(subgroup2samples_covariates, "covariate");
   
-  if(type_errors.compare("hybrid") == 0){
+  if(error_model == "hybrid"){
     if(verbose > 0){
       cout << "nb of samples with genotype and exp level (pairs of subgroups):" << endl;
       samples.ShowPairs(cout);
@@ -1079,8 +1032,7 @@ void loadExplevels(const map<string,string> & subgroup2explevelfile,
     }
     ++nb_lines;
     split(line, " \t", tokens);
-    if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
-	|| tokens[0].compare("ID") == 0)
+    if(tokens[0] == "Id" || tokens[0] == "id" || tokens[0] == "ID")
       nb_samples = tokens.size() - 1;
     else
       nb_samples = tokens.size();
@@ -1598,7 +1550,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
     }
     ++nb_lines;
     split(line, " \t", tokens);
-    if(tokens[0].compare("chr") == 0){
+    if(tokens[0] == "chr"){
       cerr << "ERROR: don't use --scoord if genotypes in IMPUTE format" << endl;
       exit(1);
     }
@@ -1606,8 +1558,7 @@ void loadGenos(const map<string, string> & subgroup2genofile,
       cerr << "ERROR: don't use --scoord if genotypes in VCF format" << endl;
       exit(1);
     }
-    if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
-	|| tokens[0].compare("ID") == 0)
+    if(tokens[0] == "Id" || tokens[0] == "id" || tokens[0] == "ID")
       nb_samples = tokens.size() - 1;
     else
       nb_samples = tokens.size();
@@ -1779,8 +1730,7 @@ void loadCovariates(const map<string,string> subgroup2covarfile,
     }
     ++nb_lines;
     split(line, " \t", tokens);
-    if(tokens[0].compare("Id") == 0 || tokens[0].compare("id") == 0
-	|| tokens[0].compare("ID") == 0)
+    if(tokens[0] == "Id" || tokens[0] == "id" || tokens[0] == "ID")
       nb_samples = tokens.size() - 1;
     else
       nb_samples = tokens.size();
@@ -1824,7 +1774,7 @@ void loadRawInputData(
   const size_t & radius,
   const float & min_maf,
   const string & file_covarpaths,
-  const string & type_errors,
+  const string & error_model,
   const vector<string> & subgroups_tokeep,
   const set<string> & sSnpsToKeep,
   const int & verbose,
@@ -1839,12 +1789,12 @@ void loadRawInputData(
     subgroup2covarfile;
   loadListsGenoExplevelAndCovarFiles(file_genopaths, file_exppaths,
 				     file_covarpaths, subgroups_tokeep,
-				     type_errors, verbose, subgroup2genofile,
+				     error_model, verbose, subgroup2genofile,
 				     subgroup2explevelfile,
 				     subgroup2covarfile, subgroups);
   
   loadSamples(subgroup2genofile, subgroup2explevelfile, subgroup2covarfile,
-	      type_errors, verbose, samples);
+	      error_model, verbose, samples);
   
   loadCovariates(subgroup2covarfile, verbose, covariates);
   
@@ -2007,22 +1957,23 @@ void testForAssociations(
   const vector<string> & subgroups,
   const Samples & samples,
   const string & likelihood,
-  const string & type_analysis,
+  const string & analysis,
   const bool & need_qnorm,
   const Covariates & covariates,
   const Grid & iGridL,
   const Grid & iGridS,
-  const string & type_bfs,
-  const string & type_errors,
+  const string & bfs,
+  const string & error_model,
   const float & prop_cov_errors,
   const int & verbose,
   map<string,Gene> & gene2object)
 {
   if(verbose > 0){
-    cout << "look for association between each pair gene-SNP ..." << endl
-	 << "likelihood=" << likelihood
-	 << " errors=" << type_errors;
-    if(type_errors.compare("uvlr") != 0) // i.e. if 'mvlr' or 'hybrid'
+    cout << "test for association between each pair gene-SNP ..." << endl
+	 << "analysis=" << analysis
+	 << " likelihood=" << likelihood
+	 << " error_model=" << error_model;
+    if(error_model != "uvlr") // i.e. if 'mvlr' or 'hybrid'
       cout << " prop_cov_errors=" << prop_cov_errors;
     if(hasDataNotSstats)
       cout << " anchor=" << anchor << " radius=" << radius;
@@ -2052,18 +2003,18 @@ void testForAssociations(
       }
     }
     
-    if(type_analysis.compare("join") == 0 && type_errors.compare("uvlr") != 0
+    if(analysis == "join" && error_model != "uvlr"
        && ! itG->second.HasExplevelsInAllSubgroups(subgroups)){
       if(verbose > 1)
 	cerr << "WARNING: skip gene " << itG->second.GetName()
-	     << " because option --error " << type_errors
+	     << " because option --error " << error_model
 	     << " requires expression levels in all subgroups" << endl;
       continue;
     }
     itG->second.TestForAssociations(hasDataNotSstats, subgroups, samples,
-				    likelihood, type_analysis, need_qnorm,
-				    covariates, iGridL, iGridS, type_bfs,
-				    type_errors, prop_cov_errors, verbose-1);
+				    likelihood, analysis, need_qnorm,
+				    covariates, iGridL, iGridS, bfs,
+				    error_model, prop_cov_errors, verbose-1);
     ++nbAnalyzedGenes;
     nbAnalyzedPairs += itG->second.GetNbGeneSnpPairs();
   }
@@ -2087,13 +2038,13 @@ void makePermutationsSep(
   const size_t & seed,
   const int & trick,
   const size_t & trick_cutoff,
-  const int & type_perm_sep,
+  const int & perm_sep,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
   const int & verbose,
   map<string, Gene> & gene2object)
 {
-  if(type_perm_sep == 1){
+  if(perm_sep == 1){
     clock_t startTime = clock();
     gsl_rng_set(rngPerm, seed);
     if(trick != 0)
@@ -2119,7 +2070,7 @@ void makePermutationsSep(
       cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
 	   << " sec)" << endl << flush;
   }
-  else if(type_perm_sep == 2){
+  else if(perm_sep == 2){
     stringstream ss;
     for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
 	it_sbgrp != subgroups.end(); ++it_sbgrp){
@@ -2161,13 +2112,13 @@ void makePermutationsJoin(
   const Covariates & covariates,
   const Grid & iGridL,
   const Grid & iGridS,
-  const string & type_errors,
+  const string & error_model,
   const float & prop_cov_errors,
   const size_t & nb_permutations,
   const size_t & seed,
   const int & trick,
   const size_t & trick_cutoff,
-  const string & type_permbf,
+  const string & permbf,
   const bool & use_max_bf,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
@@ -2189,13 +2140,13 @@ void makePermutationsJoin(
       cerr << "gene " << itG->first << endl;
     if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup())
       continue;
-    if(type_errors.compare("uvlr") != 0 &&
+    if(error_model != "uvlr" &&
        ! itG->second.HasExplevelsInAllSubgroups(subgroups))
       continue;
     itG->second.MakePermutationsJoin(subgroups, samples, likelihood, need_qnorm,
-				     covariates, iGridL, iGridS, type_errors,
+				     covariates, iGridL, iGridS, error_model,
 				     prop_cov_errors, nb_permutations, trick,
-				     trick_cutoff, type_permbf, use_max_bf,
+				     trick_cutoff, permbf, use_max_bf,
 				     rngPerm, rngTrick);
   }
   
@@ -2209,19 +2160,19 @@ makePermutations(
   const vector<string> & subgroups,
   const Samples & samples,
   const string & likelihood,
-  const string & type_analysis,
+  const string & analysis,
   const bool & need_qnorm,
   const Covariates & covariates,
   const Grid & iGridL,
   const Grid & iGridS,
-  const string & type_errors,
+  const string & error_model,
   const float & prop_cov_errors,
   const size_t & nb_permutations,
   const size_t & seed,
   const int & trick,
   const size_t & trick_cutoff,
-  const int & type_perm_sep,
-  const string & type_permbf,
+  const int & perm_sep,
+  const string & permbf,
   const bool & use_max_bf,
   const int & verbose,
   map<string, Gene> & gene2object)
@@ -2234,10 +2185,10 @@ makePermutations(
       cout << " trick=" << trick
 	   << " trick_cutoff=" << trick_cutoff;
     }
-    if(type_analysis.compare("sep") == 0)
-      cout << " perm_sep=" << type_perm_sep;
-    else if(type_analysis.compare("join") == 0)
-      cout << " perm_bf=" << type_permbf;
+    if(analysis == "sep")
+      cout << " perm_sep=" << perm_sep;
+    else if(analysis == "join")
+      cout << " perm_bf=" << permbf;
     cout << " threads=" << omp_get_max_threads();
     cout << endl << flush;
   }
@@ -2257,15 +2208,15 @@ makePermutations(
     }
   }
   
-  if(type_analysis.compare("sep") == 0 && type_perm_sep != 0)
+  if(analysis == "sep" && perm_sep != 0)
     makePermutationsSep(subgroups, samples, likelihood, need_qnorm, covariates,
 			nb_permutations, seed, trick, trick_cutoff,
-			type_perm_sep, rngPerm, rngTrick,
+			perm_sep, rngPerm, rngTrick,
 			verbose, gene2object);
-  if(type_analysis.compare("join") == 0 && type_permbf.compare("none") != 0)
+  if(analysis == "join" && permbf != "none")
     makePermutationsJoin(subgroups, samples, likelihood, need_qnorm, covariates, iGridL,
-			 iGridS, type_errors, prop_cov_errors, nb_permutations,
-			 seed, trick, trick_cutoff, type_permbf, use_max_bf,
+			 iGridS, error_model, prop_cov_errors, nb_permutations,
+			 seed, trick, trick_cutoff, permbf, use_max_bf,
 			 rngPerm, rngTrick, verbose, gene2object);
   
   gsl_rng_free(rngPerm);
@@ -2453,7 +2404,7 @@ void writeResAbfsRaw(
   const size_t & nb_subgroups,
   const Grid & iGridL,
   const Grid & iGridS,
-  const string & type_bfs,
+  const string & bfs,
   const int & verbose)
 {
   if(verbose > 0)
@@ -2527,7 +2478,7 @@ void writeResAbfsRaw(
       gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
       
       // write the BFs for each config (small grid)
-      if(type_bfs.compare("gen") != 0){
+      if(bfs != "gen"){
       	for(size_t k = 1; k <= nb_subgroups; ++k){
       	  comb = gsl_combination_calloc(nb_subgroups, k);
       	  if(comb == NULL){
@@ -2557,7 +2508,7 @@ void writeResAbfsRaw(
       	    if(gsl_combination_next(comb) != GSL_SUCCESS)
       	      break;
       	  }
-      	  if(type_bfs.compare("sin") == 0)
+      	  if(bfs == "sin")
       	    break;
       	  gsl_combination_free(comb);
       	}
@@ -2572,8 +2523,8 @@ void writeResAbfsAvgGrids(
   const string & out_prefix,
   const map<string, Gene> & gene2object,
   const size_t & nb_subgroups,
-  const string & type_bfs,
-  const string & type_errors,
+  const string & bfs,
+  const string & error_model,
   const int & verbose)
 {
   if(verbose > 0)
@@ -2595,11 +2546,11 @@ void writeResAbfsAvgGrids(
   ssTxt << sep << "l10abf.gen"
 	<< sep << "l10abf.gen.fix"
 	<< sep << "l10abf.gen.maxh";
-  if(type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0)
+  if(bfs == "sin" || bfs == "all")
     ssTxt << sep << "l10abf.gen.sin";
-  if(type_bfs.compare("all") == 0)
+  if(bfs == "all")
     ssTxt << sep << "l10abf.all";
-  if(type_bfs.compare("gen") != 0){
+  if(bfs != "gen"){
     for(size_t k = 1; k <= nb_subgroups; ++k){
       comb = gsl_combination_calloc(nb_subgroups, k);
       if(comb == NULL){
@@ -2615,7 +2566,7 @@ void writeResAbfsAvgGrids(
 	  break;
       }
       gsl_combination_free(comb);
-      if(type_bfs.compare("sin") == 0)
+      if(bfs == "sin")
 	break;
     }
   }
@@ -2638,11 +2589,11 @@ void writeResAbfsAvgGrids(
 	    << sep << it_pair->GetWeightedAbf("gen")
 	    << sep << it_pair->GetWeightedAbf("gen-fix")
 	    << sep << it_pair->GetWeightedAbf("gen-maxh");
-      if(type_bfs.compare("sin") == 0 || type_bfs.compare("all") == 0)
+      if(bfs == "sin" || bfs == "all")
 	ssTxt << sep << it_pair->GetWeightedAbf("gen-sin");
-      if(type_bfs.compare("all") == 0)
+      if(bfs == "all")
 	ssTxt << sep << it_pair->GetWeightedAbf("all");
-      if(type_bfs.compare("gen") != 0){
+      if(bfs != "gen"){
 	for(size_t k = 1; k <= nb_subgroups; ++k){
 	  comb = gsl_combination_calloc(nb_subgroups, k);
 	  if(comb == NULL){
@@ -2661,7 +2612,7 @@ void writeResAbfsAvgGrids(
 	      break;
 	  }
 	  gsl_combination_free(comb);
-	  if(type_bfs.compare("sin") == 0)
+	  if(bfs == "sin")
 	    break;
 	}
       }
@@ -2678,7 +2629,7 @@ void writeResJoinPermPval(
   const string & out_prefix,
   const map<string,Gene> & gene2object,
   const size_t & seed,
-  const string & type_permbf,
+  const string & permbf,
   const bool & use_max_bf,
   const int & verbose)
 {
@@ -2696,7 +2647,7 @@ void writeResJoinPermPval(
   openFile (ssOutFile.str(), outStream, "wb");
   size_t nb_lines = 0;
   
-  ssTxt << "# perm.bf=" << type_permbf << " seed=" << seed << endl;
+  ssTxt << "# perm.bf=" << permbf << " seed=" << seed << endl;
   ++nb_lines;
   gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
@@ -2735,41 +2686,41 @@ void writeRes(
   const vector<string> & subgroups,
   const map<string, Gene> & gene2object,
   const map<string, Snp> & snp2object,
-  const string & type_analysis,
+  const string & analysis,
   const Grid & iGridL,
   const Grid & iGridS,
-  const string & type_bfs,
+  const string & bfs,
   const size_t & nb_permutations,
-  const int & type_perm_sep,
-  const string & type_errors,
+  const int & perm_sep,
+  const string & error_model,
   const size_t & seed,
-  const string & type_permbf,
+  const string & permbf,
   const bool & use_max_bf,
   const int & verbose)
 {
-  if(type_analysis.compare("sep") == 0 ||
-     (type_analysis.compare("join") == 0 && save_sstats &&
-      (type_errors.compare("mvlr") != 0)))
+  if(analysis == "sep" ||
+     (analysis == "join" && save_sstats &&
+      error_model != "mvlr"))
     writeResSstats(out_prefix, subgroups, gene2object, snp2object, verbose);
   
-  if(type_analysis.compare("sep") == 0 && nb_permutations > 0 &&
-     type_perm_sep != 0){
-    if(type_perm_sep == 1)
+  if(analysis == "sep" && nb_permutations > 0 &&
+     perm_sep != 0){
+    if(perm_sep == 1)
       writeResSepPermPval(out_prefix, gene2object, seed, verbose);
-    else if(type_perm_sep == 2)
+    else if(perm_sep == 2)
       writeResSepPermPval(out_prefix, gene2object, subgroups, seed, verbose);;
   }
   
-  if(type_analysis.compare("join") == 0){
+  if(analysis == "join"){
     writeResAbfsRaw(out_prefix, gene2object, subgroups.size(), iGridL, iGridS,
-		    type_bfs, verbose);
+		    bfs, verbose);
     if(save_weighted_abfs)
-      writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), type_bfs,
-			   type_errors, verbose);
+      writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), bfs,
+			   error_model, verbose);
   }
   
-  if(type_analysis.compare("join") == 0 && nb_permutations > 0)
-    writeResJoinPermPval(out_prefix, gene2object, seed, type_permbf,
+  if(analysis == "join" && nb_permutations > 0)
+    writeResJoinPermPval(out_prefix, gene2object, seed, permbf,
 			 use_max_bf, verbose);
 }
 
@@ -2784,21 +2735,21 @@ void run(const string & file_genopaths,
 	 const bool & save_sstats,
 	 const bool & save_weighted_abfs,
 	 const string & likelihood,
-	 const string & type_analysis,
+	 const string & analysis,
 	 const bool & need_qnorm,
 	 const float & min_maf,
 	 const string & file_covarpaths,
 	 const string & file_largegrid,
 	 const string & file_smallgrid,
-	 const string & type_bfs,
-	 const string & type_errors,
+	 const string & bfs,
+	 const string & error_model,
 	 const float & prop_cov_errors,
 	 const size_t & nb_permutations,
 	 const size_t & seed,
 	 const int & trick,
 	 const size_t & trick_cutoff,
-	 const int & type_perm_sep,
-	 const string & type_permbf,
+	 const int & perm_sep,
+	 const string & permbf,
 	 const bool & use_max_bf,
 	 const int & nb_threads,
 	 const string & file_snpstokeep,
@@ -2822,7 +2773,7 @@ void run(const string & file_genopaths,
   if(file_sstats.empty())
     loadRawInputData(file_genopaths, file_snpcoords, file_exppaths,
 		     file_genecoords, anchor, radius, min_maf, file_covarpaths,
-		     type_errors, subgroups_tokeep, sSnpsToKeep, verbose,
+		     error_model, subgroups_tokeep, sSnpsToKeep, verbose,
 		     subgroups, samples, snp2object, mChr2VecPtSnps,
 		     covariates, gene2object);
   else
@@ -2834,45 +2785,45 @@ void run(const string & file_genopaths,
   Grid iGridS(file_smallgrid, false, verbose);
   
   testForAssociations(file_sstats.empty(), mChr2VecPtSnps, anchor, radius,
-		      subgroups, samples, likelihood, type_analysis,
-		      need_qnorm, covariates, iGridL, iGridS, type_bfs,
-		      type_errors, prop_cov_errors, verbose, gene2object);
+		      subgroups, samples, likelihood, analysis,
+		      need_qnorm, covariates, iGridL, iGridS, bfs,
+		      error_model, prop_cov_errors, verbose, gene2object);
   if(nb_permutations > 0 &&
-     (type_perm_sep != 0 || type_permbf.compare("none") != 0)){
+     (perm_sep != 0 || permbf != "none")){
     omp_set_num_threads(nb_threads);
-    makePermutations(subgroups, samples, likelihood, type_analysis, need_qnorm,
-		     covariates, iGridL, iGridS, type_errors, prop_cov_errors,
-		     nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
-		     type_permbf, use_max_bf, verbose, gene2object);
+    makePermutations(subgroups, samples, likelihood, analysis, need_qnorm,
+		     covariates, iGridL, iGridS, error_model, prop_cov_errors,
+		     nb_permutations, seed, trick, trick_cutoff, perm_sep,
+		     permbf, use_max_bf, verbose, gene2object);
   }
   
   writeRes(out_prefix, save_sstats, save_weighted_abfs, subgroups, gene2object,
-	   snp2object, type_analysis, iGridL, iGridS, type_bfs, nb_permutations,
-	   type_perm_sep, type_errors, seed, type_permbf, use_max_bf, verbose);
+	   snp2object, analysis, iGridL, iGridS, bfs, nb_permutations,
+	   perm_sep, error_model, seed, permbf, use_max_bf, verbose);
 }
 
 int main(int argc, char ** argv)
 {
-  int verbose = 1, trick = 0, type_perm_sep = 0, nb_threads = 1;
-  size_t radius = 100000, nb_permutations = 0, seed = string::npos,
-    trick_cutoff = 10;
+  int verbose = 1, trick = 0, perm_sep = 0, nb_threads = 1;
+  size_t radius = 100000, nb_types = string::npos, nb_permutations = 0,
+    seed = string::npos, trick_cutoff = 10;
   float min_maf = 0.0, prop_cov_errors = 0.5;
   bool save_sstats = false, save_weighted_abfs = false, need_qnorm = false,
     use_max_bf = false;
   string file_genopaths, file_snpcoords, file_exppaths, file_genecoords,
     anchor = "TSS", file_sstats, out_prefix, likelihood = "normal",
-    type_analysis, file_covarpaths, file_largegrid, file_smallgrid,
-    type_bfs = "gen", type_errors = "uvlr", type_permbf = "none",
+    analysis, file_covarpaths, file_largegrid, file_smallgrid,
+    bfs = "gen", error_model = "uvlr", permbf = "none",
     file_snpstokeep;
   vector<string> subgroups_tokeep;
   
   parseCmdLine(argc, argv, file_genopaths, file_snpcoords, file_exppaths,
 	       file_genecoords, anchor, radius, file_sstats, out_prefix,
-	       save_sstats, save_weighted_abfs, likelihood, type_analysis,
+	       save_sstats, save_weighted_abfs, likelihood, analysis,
 	       need_qnorm, min_maf, file_covarpaths, file_largegrid,
-	       file_smallgrid, type_bfs, type_errors, prop_cov_errors,
-	       nb_permutations, seed, trick, trick_cutoff, type_perm_sep,
-	       type_permbf, use_max_bf, nb_threads, file_snpstokeep,
+	       file_smallgrid, bfs, error_model, prop_cov_errors, nb_types,
+	       nb_permutations, seed, trick, trick_cutoff, perm_sep,
+	       permbf, use_max_bf, nb_threads, file_snpstokeep,
 	       subgroups_tokeep, verbose);
   
   time_t time_start, time_end;
@@ -2888,9 +2839,9 @@ int main(int argc, char ** argv)
   
   run(file_genopaths, file_snpcoords, file_exppaths, file_genecoords, anchor,
       radius, file_sstats, out_prefix, save_sstats, save_weighted_abfs,
-      likelihood, type_analysis, need_qnorm, min_maf, file_covarpaths,
-      file_largegrid, file_smallgrid, type_bfs, type_errors, prop_cov_errors,
-      nb_permutations, seed, trick, trick_cutoff, type_perm_sep, type_permbf,
+      likelihood, analysis, need_qnorm, min_maf, file_covarpaths,
+      file_largegrid, file_smallgrid, bfs, error_model, prop_cov_errors,
+      nb_permutations, seed, trick, trick_cutoff, perm_sep, permbf,
       use_max_bf, nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
   
   if(verbose > 0){

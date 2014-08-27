@@ -119,14 +119,14 @@ namespace quantgen {
     double GetExplevel(const std::string & subgroup, const size_t & idx) const;
     std::vector<GeneSnpPair>::iterator AddGeneSnpPair(
       const std::string & snp_name,
-      const std::string & analysis_type);
+      const std::string & error_model);
     std::vector<GeneSnpPair>::iterator FindGeneSnpPair(
       const size_t & idx_snp);
     void TestForAssociations(const bool & hasDataNotSstats,
 			     const std::vector<std::string> & subgroups,
 			     const Samples & samples,
 			     const std::string & likelihood,
-			     const std::string & type_analysis,
+			     const std::string & analysis,
 			     const bool & need_qnorm,
 			     const Covariates & covariates,
 			     const Grid & iGridL,

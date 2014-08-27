@@ -239,9 +239,9 @@ namespace quantgen {
 
   vector<GeneSnpPair>::iterator Gene::AddGeneSnpPair(
     const string & snp_name,
-    const string & analysis_type)
+    const string & error_model)
   {
-    gene_snp_pairs_.push_back(GeneSnpPair(name_, snp_name, analysis_type));
+    gene_snp_pairs_.push_back(GeneSnpPair(name_, snp_name, error_model));
     return gene_snp_pairs_.end() - 1;
   }
 
@@ -256,13 +256,13 @@ namespace quantgen {
     const vector<string> & subgroups,
     const Samples & samples,
     const string & likelihood,
-    const string & type_analysis,
+    const string & analysis,
     const bool & need_qnorm,
     const Covariates & covariates,
     const Grid & iGridL,
     const Grid & iGridS,
     const string & whichBfs,
-    const string & type_errors,
+    const string & error_model,
     const float & prop_cov_errors,
     const int & verbose)
   {
@@ -282,13 +282,13 @@ namespace quantgen {
 	     << " subgroups)" << endl;
     
       if(hasDataNotSstats)
-	it_gsp = AddGeneSnpPair(pt_snp->name_, type_analysis);
+	it_gsp = AddGeneSnpPair(pt_snp->name_, analysis);
       else
 	it_gsp = FindGeneSnpPair(idx_snp);
       perm = NULL;
     
-      if(type_analysis.compare("sep") == 0 ||
-	 (type_analysis.compare("join") == 0 && type_errors.compare("uvlr") == 0)){
+      if(analysis.compare("sep") == 0 ||
+	 (analysis.compare("join") == 0 && error_model.compare("uvlr") == 0)){
 	if(hasDataNotSstats){
 	  for(vector<string>::const_iterator it = subgroups.begin();
 	      it != subgroups.end(); ++it){
@@ -299,7 +299,7 @@ namespace quantgen {
 					 perm);
 	  }
 	}
-	if(type_analysis.compare("join") == 0)
+	if(analysis.compare("join") == 0)
 	  it_gsp->CalcAbfsUvlr(subgroups, whichBfs, iGridL, iGridS);
       }
       else{ // if mvlr or hybrid
@@ -310,11 +310,11 @@ namespace quantgen {
 		 << " requires genotypes in all subgroups" << endl;
 	  continue;
 	}
-	if(type_errors.compare("mvlr") == 0)
+	if(error_model.compare("mvlr") == 0)
 	  it_gsp->CalcAbfsMvlr(subgroups, samples, *this, *pt_snp,
 			       covariates, need_qnorm, whichBfs, iGridL,
 			       iGridS, prop_cov_errors, perm);
-	else if(type_errors.compare("hybrid") == 0)
+	else if(error_model.compare("hybrid") == 0)
 	  it_gsp->CalcAbfsHybrid(subgroups, samples, *this, *pt_snp,
 				 covariates, need_qnorm, whichBfs, iGridL,
 				 iGridS, prop_cov_errors, perm);
@@ -587,7 +587,7 @@ namespace quantgen {
 				  const Covariates & covariates,
 				  const Grid & iGridL,
 				  const Grid & iGridS,
-				  const string & type_errors,
+				  const string & error_model,
 				  const float & prop_cov_errors,
 				  const size_t & nb_permutations,
 				  const int & trick,
@@ -635,7 +635,7 @@ namespace quantgen {
       for(int idx_snp = 0; idx_snp < (int) snps_.size(); ++idx_snp){
 	const Snp * pt_snp = snps_[idx_snp];
 	GeneSnpPair gene_snp_pair(name_, pt_snp->name_);
-	if(type_errors.compare("uvlr") == 0){
+	if(error_model.compare("uvlr") == 0){
 	  for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
 	      it_sbgrp != subgroups.end(); ++it_sbgrp)
 	    if(HasExplevels(*it_sbgrp) && pt_snp->HasGenotypes(*it_sbgrp))
@@ -647,11 +647,11 @@ namespace quantgen {
 	else{ // if mvlr or hybrid
 	  if(! pt_snp->HasGenotypesInAllSubgroups(subgroups))
 	    continue;
-	  if(type_errors.compare("mvlr") == 0)
+	  if(error_model.compare("mvlr") == 0)
 	    gene_snp_pair.CalcAbfsMvlr(subgroups, samples, *this, *pt_snp,
 				       covariates, need_qnorm, whichPermBf,
 				       iGridL, iGridS, prop_cov_errors, perm);
-	  else if(type_errors.compare("hybrid") == 0)
+	  else if(error_model.compare("hybrid") == 0)
 	    gene_snp_pair.CalcAbfsHybrid(subgroups, samples, *this, *pt_snp,
 					 covariates, need_qnorm, whichPermBf,
 					 iGridL, iGridS, prop_cov_errors, perm);
