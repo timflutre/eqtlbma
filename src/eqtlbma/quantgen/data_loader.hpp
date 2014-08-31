@@ -26,6 +26,7 @@
 #include <iomanip>
 
 #include "utils/utils_io.hpp"
+
 #include "quantgen/samples.hpp"
 #include "quantgen/gene.hpp"
 #include "quantgen/snp.hpp"
@@ -121,15 +122,15 @@ namespace quantgen {
     std::map<std::string, Snp> & snp2object,
     std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
   
-  // void loadSnpInfo(const std::string & file_snpcoords,
-  // 		   const std::string & file_snpcoords_idx,
-  // 		   const std::set<std::string> & sSnpsToKeep,
-  // 		   const std::map<std::string,Gene> gene2object,
-  // 		   const std::string & anchor,
-  // 		   const size_t & radius,
-  // 		   const int & verbose,
-  // 		   std::map<std::string, Snp> & snp2object,
-  // 		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
+  void loadSnpInfo(const std::string & file_snpcoords,
+  		   const std::string & file_snpcoords_idx,
+  		   const std::set<std::string> & sSnpsToKeep,
+  		   const std::map<std::string,Gene> gene2object,
+  		   const std::string & anchor,
+  		   const size_t & radius,
+  		   const int & verbose,
+  		   std::map<std::string, Snp> & snp2object,
+  		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
   
   void loadSnpInfo(const std::string & snpCoordsFile,
 		   const std::set<std::string> & sSnpsToKeep,
@@ -137,14 +138,14 @@ namespace quantgen {
 		   std::map<std::string, Snp> & snp2object,
 		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
   
-  // void loadSnpInfo(const std::string & file_snpcoords,
-  // 		   const std::set<std::string> & sSnpsToKeep,
-  // 		   const std::map<std::string,Gene> gene2object,
-  // 		   const std::string & anchor,
-  // 		   const size_t & radius,
-  // 		   const int & verbose,
-  // 		   std::map<std::string, Snp> & snp2object,
-  // 		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
+  void loadSnpInfo(const std::string & file_snpcoords,
+  		   const std::set<std::string> & sSnpsToKeep,
+  		   const std::map<std::string,Gene> gene2object,
+  		   const std::string & anchor,
+  		   const size_t & radius,
+  		   const int & verbose,
+  		   std::map<std::string, Snp> & snp2object,
+  		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
   
   void loadGenos(
     const std::map<std::string, std::string> & subgroup2genofile,
@@ -171,25 +172,25 @@ namespace quantgen {
     const int & verbose,
     Covariates & covariates);
   
-  // void loadRawInputData(
-  //   const std::string & file_genopaths,
-  //   const std::string & file_snpcoords,
-  //   const std::string & file_exppaths,
-  //   const std::string & file_genecoords,
-  //   const std::string & anchor,
-  //   const size_t & radius,
-  //   const float & min_maf,
-  //   const std::string & file_covarpaths,
-  //   const std::string & error_model,
-  //   const std::vector<std::string> & subgroups_tokeep,
-  //   const std::set<std::string> & sSnpsToKeep,
-  //   const int & verbose,
-  //   std::vector<std::string> & subgroups,
-  //   Samples & samples,
-  //   std::map<std::string,Snp> & snp2object,
-  //   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps,
-  //   Covariates & covariates,
-  //   std::map<std::string, Gene> & gene2object);
+  void loadRawInputData(
+    const std::string & file_genopaths,
+    const std::string & file_snpcoords,
+    const std::string & file_exppaths,
+    const std::string & file_genecoords,
+    const std::string & anchor,
+    const size_t & radius,
+    const float & min_maf,
+    const std::string & file_covarpaths,
+    const std::string & error_model,
+    const std::vector<std::string> & subgroups_tokeep,
+    const std::set<std::string> & sSnpsToKeep,
+    const int & verbose,
+    std::vector<std::string> & subgroups,
+    Samples & samples,
+    std::map<std::string,Snp> & snp2object,
+    std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps,
+    Covariates & covariates,
+    std::map<std::string, Gene> & gene2object);
   
   void loadListSstatsFile(
     const std::string & file_sstats,

@@ -17,6 +17,8 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <sys/stat.h>
+
 #include <algorithm>
 
 #include "quantgen/data_loader.hpp"
@@ -1061,6 +1063,57 @@ namespace quantgen {
 	     << " covariates" << endl;
   }
   
+  void loadRawInputData(
+    const string & file_genopaths,
+    const string & file_snpcoords,
+    const string & file_exppaths,
+    const string & file_genecoords,
+    const string & anchor,
+    const size_t & radius,
+    const float & min_maf,
+    const string & file_covarpaths,
+    const string & error_model,
+    const vector<string> & subgroups_tokeep,
+    const set<string> & sSnpsToKeep,
+    const int & verbose,
+    vector<string> & subgroups,
+    Samples & samples,
+    map<string,Snp> & snp2object,
+    map<string,vector<Snp*> > & mChr2VecPtSnps,
+    Covariates & covariates,
+    map<string,Gene> & gene2object)
+  {
+    map<string,string> subgroup2genofile, subgroup2explevelfile,
+      subgroup2covarfile;
+    loadListsGenoExplevelAndCovarFiles(file_genopaths, file_exppaths,
+				       file_covarpaths, subgroups_tokeep,
+				       error_model, verbose, subgroup2genofile,
+				       subgroup2explevelfile,
+				       subgroup2covarfile, subgroups);
+    
+    loadSamples(subgroup2genofile, subgroup2explevelfile, subgroup2covarfile,
+		error_model, verbose, samples);
+    
+    loadCovariates(subgroup2covarfile, verbose, covariates);
+    
+    map<string,vector<Gene*> > mChr2VecPtGenes;
+    loadGeneInfo(file_genecoords, verbose, gene2object, mChr2VecPtGenes);
+    loadExplevels(subgroup2explevelfile, verbose, gene2object);
+    if(gene2object.empty())
+      return;
+    
+    if(file_snpcoords.empty())
+      loadGenosAndSnpInfo(subgroup2genofile, min_maf, sSnpsToKeep,
+			  mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
+    else{
+      loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
+		  verbose, snp2object, mChr2VecPtSnps);
+      loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
+    }
+    if(snp2object.empty())
+      return;
+  }
+  
   void loadListSstatsFile(
     const string & file_sstats,
     const int & verbose,
@@ -1192,6 +1245,111 @@ namespace quantgen {
     
     fillGeneSnpPairsWithSstats(subgroup2sstatsfile, verbose, gene2object,
 			       snp2object);
+  }
+  
+  /** \brief Parse the tabix-indexed BED file
+   */
+  void loadSnpInfo(const string & file_snpcoords,
+		   const string & file_snpcoords_idx,
+		   const set<string> & sSnpsToKeep,
+		   const map<string, Gene> gene2object,
+		   const string & anchor,
+		   const size_t & radius,
+		   const int & verbose,
+		   map<string, Snp> & snp2object,
+		   map<string, vector<Snp*> > & mChr2VecPtSnps)
+  {
+    struct stat stat_bed, stat_tbi;
+    stat(file_snpcoords.c_str(), &stat_bed);
+    stat(file_snpcoords_idx.c_str(), &stat_tbi);
+    if(stat_bed.st_mtime > stat_tbi.st_mtime){
+      cerr << "ERROR: index file (" << file_snpcoords_idx
+	   << ") is older than data file (" << file_snpcoords << ")" << endl;
+      exit(EXIT_FAILURE);
+    }
+    
+    tabix_t * t;
+    if((t = ti_open(file_snpcoords.c_str(), 0)) == 0){
+      cerr << "ERROR: fail to open the data file (tabix)" << endl;
+      exit(EXIT_FAILURE);
+    }
+    if(ti_lazy_index_load(t) < 0){
+      cerr << "ERROR: failed to load the index file (tabix)" << endl;
+      exit(EXIT_FAILURE);
+    }
+    
+    const char *s;
+    ti_iter_t iter;
+    vector<string> tokens;
+    for(map<string,Gene>::const_iterator it = gene2object.begin();
+	it != gene2object.end(); ++it){
+      int t_id, t_beg, t_end, len;
+      if(ti_parse_region(t->idx, it->second.GetRegionInTabixFormat(anchor, radius).c_str(),
+			 &t_id, &t_beg, &t_end) == 0){
+	iter = ti_queryi(t, t_id, t_beg, t_end);
+	while((s = ti_read(t, iter, &len)) != 0){
+	  
+	  split(string(s), "\t", tokens);
+	  if(! sSnpsToKeep.empty() && sSnpsToKeep.find(tokens[3])
+	     == sSnpsToKeep.end())
+	    continue;
+	  if(snp2object.find(tokens[3]) != snp2object.end())
+	    continue; // in case of redundancy
+	  Snp snp(tokens[3], tokens[0], tokens[2]);
+	  snp2object.insert(make_pair(snp.GetName(), snp));
+	  
+	}
+	ti_iter_destroy(iter);
+      }
+    }
+    ti_close(t);
+  }
+  
+  /** \brief Parse the BED file (indexed or not)
+   */
+  void loadSnpInfo(const string & file_snpcoords,
+		   const set<string> & sSnpsToKeep,
+		   const map<string,Gene> gene2object,
+		   const string & anchor,
+		   const size_t & radius,
+		   const int & verbose,
+		   map<string, Snp> & snp2object,
+		   map<string, vector<Snp*> > & mChr2VecPtSnps)
+  {
+    if(verbose > 0)
+      cout << "load SNP coordinates";
+    clock_t startTime = clock();
+    
+    stringstream file_snpcoords_idx;
+    file_snpcoords_idx << file_snpcoords << ".tbi";
+    if(doesFileExist(file_snpcoords_idx.str())){
+      cout << " (tabix-indexed BED file) ..." << endl << flush;
+      loadSnpInfo(file_snpcoords, file_snpcoords_idx.str(), sSnpsToKeep,
+		  gene2object, anchor, radius, verbose, snp2object,
+		  mChr2VecPtSnps);
+    }
+    else{
+      cout << " (unindexed BED file) ..." << endl << flush;
+      loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose,
+		  snp2object, mChr2VecPtSnps);
+    }
+    
+    for(map<string, Snp>::const_iterator it = snp2object.begin();
+	it != snp2object.end(); ++it){
+      if(mChr2VecPtSnps.find(it->second.GetChromosome()) == mChr2VecPtSnps.end())
+	mChr2VecPtSnps.insert(make_pair(it->second.GetChromosome(), vector<Snp*>()));
+      mChr2VecPtSnps[it->second.GetChromosome()].push_back(&(snp2object[it->second.GetName()]));
+    }
+    
+    // sort the SNPs per chr
+    for(map<string,vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
+	it != mChr2VecPtSnps.end(); ++it)
+      sort(it->second.begin(), it->second.end(), pt_snp_lt_pt_snp);
+    
+    if(verbose > 0)
+      cout << "total nb of SNPs with coordinates: " << snp2object.size()
+	   << " (loaded in " << fixed << setprecision(2)
+	   << getElapsedTime(startTime) << " sec)" << endl;
   }
   
 } // namespace quantgen
