@@ -157,6 +157,7 @@ where ``~/src/eqtlbma'' is supposed to be the path corresponding to where the pa
 
 You can track the progress of the program by looking into the file ``stdout_tutorial_eqtlbma.txt''.
 Simulating data with R can be slow, but you can use option @option{--cores} to speed this up (adapt to the number of cores available on your machine).
+Note also that the script ``tutorial_eqtlbma.R'' contains many options one can play with to make the data more realistic (e.g. having SNPs with low MAF via option @option{--rare}).
 
 As you can now see in the directory, several files were generated in such formats that it should be easy for you to prepare your own data similarly.
 
@@ -212,7 +213,7 @@ zcat out_eqtlbma_hm.txt.gz | grep "#config" \
 Finally we can launch the third program, @command{eqtlbma_avg_bfs}.
 To obtain the posterior probabilities, we need an estimate of the probability for a gene to have no eQTL in any tissue, @math{\pi_0}.
 As this quantity is hard to estimate accurately with the EM algorithm, we usually perform permutations using @command{eqtlbma_bf} (see below).
-But for now, as this can take some time, we will use its true value, 0.3:
+But for now, as this can take some time, we will use its true value, as indicated in the output file ``stdout_tutorial_eqtlbma.txt''.
 
 @verbatim
 eqtlbma_avg_bfs \

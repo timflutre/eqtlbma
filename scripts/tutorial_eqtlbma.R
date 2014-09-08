@@ -59,7 +59,7 @@ help <- function(){
     txt <- paste0(txt, "     --fsg\tfixed nb of cis SNPs per gene (or use --asg)\n")
     txt <- paste0(txt, "     --asg\taverage nb of cis SNPs per gene (default=50)\n")
     txt <- paste0(txt, "     --maf\tminor allele frequency (default=0.3)\n")
-    txt <- paste0(txt, "     --rare\tproportion of SNPs with rare alleles (with MAF=0.02, default=0.1)\n")
+    txt <- paste0(txt, "     --rare\tproportion of SNPs with rare alleles (with MAF=0.02, default=0.0)\n")
     ## txt <- paste0(txt, "     --related\tsimulate genotypes for related individuals\n")
     ## txt <- paste0(txt, "\t\tusing the \"popgen\" package from J. Marchini\n")
     ## txt <- paste0(txt, "\t\tsome SNPs can be fixed\n")
@@ -805,7 +805,7 @@ main <- function(){
                    fixed.nb.snps.per.gene=NULL,
                    avg.nb.snps.per.gene=50,
                    maf=0.3,
-                   prop.rare=0.1,
+                   prop.rare=0.0,
                    related=FALSE,
                    pi0=0.3,
                    coverr=1,
