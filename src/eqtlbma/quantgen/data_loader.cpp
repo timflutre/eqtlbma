@@ -872,6 +872,9 @@ namespace quantgen {
 	}
 	if(snp2object.find(tokens[0]) == snp2object.end())
 	  continue; // skip if no coordinate
+	if(find(tokens.begin(), tokens.end(), "NA") != tokens.end()){
+	  continue; // skip if missing genotype(s)
+	}
 	snp2object[tokens[0]].AddSubgroup(it->first, tokens.begin()+1,
 					  tokens.end(), "dose");
 	++nb_snps_tokeep_per_subgroup;
@@ -888,6 +891,20 @@ namespace quantgen {
 	     << " SNPs (to keep: " << nb_snps_tokeep_per_subgroup << ", loaded in "
 	     << fixed << setprecision(2) << getElapsedTime(startTime) << " sec)"
 	     << endl << flush;
+    }
+    
+    if(verbose > 0)
+      cout << "discard SNPs with missing values ..." << endl << flush;
+    map<string,Snp>::iterator it = snp2object.begin();
+    while(it != snp2object.end()){
+      it->second.EraseIfMissingValuesPerSubgroup();
+      if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
+	if(verbose > 0)
+	  cerr << "WARNING: skip SNP " << it->second.GetName()
+	       << " because it has missing values in each subgroup" << endl;
+	snp2object.erase(it++);
+      } else
+	++it;
     }
     
     if(min_maf > 0){

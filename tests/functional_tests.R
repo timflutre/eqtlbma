@@ -240,6 +240,7 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
   nb.chrs <- 2
   nb.genes <- 10 # 5 with 2 SNP, 4 with 1 SNP, 1 with no SNP
   nb.snps <- 15  # 14 with 1 gene, 1 with no gene
+  ## nb.snps <- 16  # 14 with 1 gene, 1 with missing genotypes, 1 with no gene
   params$len.cis <- 5 # in bp
   gene.coords <- data.frame(chr=c(rep("chr1", 6),
                               rep("chr2", 4)),
@@ -253,8 +254,10 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
                             stringsAsFactors=FALSE)
   snp.coords <- data.frame(chr=c(rep("chr1", 11),
                              rep("chr2", 4)),
+                             ## rep("chr2", 5)),
                            start=c(9,12, 59,62, 109,112, 159,162, 209,212,
                              259, 13, 63, 113, 666),
+                             ## 259, 13, 14, 63, 113, 666),
                            end=NA,
                            id=paste0("snp", 1:nb.snps),
                            stringsAsFactors=FALSE)
@@ -271,6 +274,7 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
                           replace=TRUE, prob=freq.hwe(maf))),
                         nrow=nb.snps, ncol=nb.inds, byrow=TRUE,
                         dimnames=list(snp=snp.coords$id, ind=inds$id))
+  ## geno.counts["snp13", 2] <- NA
   
   nb.subgroups <- 3
   truth <- data.frame(gene=rep("", nb.pairs), snp="", config="", pve.g=0.0,
@@ -306,9 +310,13 @@ getSimulatedData <- function(rmvGenesFromSbgrp=FALSE, rmvIndsFromSbgrp=FALSE,
          snp.coords$start[p] < gene.coords$start[g] - params$len.cis ||
          snp.coords$start[p] > gene.coords$start[g] + params$len.cis)
         next # SNP not in cis
+      if(any(is.na(geno.counts[p,])))
+          next # SNP has missing data
       gs.pair <- gs.pair + 1
       truth[gs.pair,"gene"] <- gene.coords$id[g]
       truth[gs.pair,"snp"] <- snp.coords$id[p]
+      ## print(gs.pair)
+      ## print(c(gene.coords$id[g], snp.coords$id[p]))
       if(null.pairs[gs.pair]){ # pair is not an eQTL
         truth[gs.pair,"config"] <- paste(rep("0", nb.subgroups),
                                          collapse="")
@@ -586,6 +594,8 @@ calcSstatsOnSimulatedData <- function(data=NULL, withCovars=FALSE,
          data$snp.coords$start[p] < data$gene.coords$start[g] - data$params$len.cis ||
          data$snp.coords$start[p] > data$gene.coords$start[g] + data$params$len.cis)
         next # SNP not in cis
+      if(any(is.na(data$geno.counts[p,])))
+          next # SNP has missing data
       if(verbose > 0)
         message(paste(data$gene.coords$id[g], data$snp.coords$id[p]))
       i <- i + 1
@@ -1215,6 +1225,8 @@ calcRawAbfsOnSimulatedData <- function(data=NULL, sstats=NULL, grids=NULL,
         ! data$gene.coords$id[g] %in% rownames(X)}))
       if(mvlr && any(isAbsentInSbgrp))
         next # gene unexpressed in some subgroups
+      if(any(is.na(data$geno.counts[p,])))
+          next # SNP has missing data
       nbCovars <- 0
       if(withCovars && "sex" %in% names(data$inds))
         nbCovars <-  1
@@ -1329,6 +1341,8 @@ calcAvgAbfsOnSimulatedData <- function(data=NULL, l10abfs.raw=NULL, mvlr=FALSE,
         ! data$gene.coords$id[g] %in% rownames(X)}))
       if(mvlr && any(isAbsentInSbgrp))
         next # gene unexpressed in some subgroups
+      if(any(is.na(data$geno.counts[p,])))
+          next # SNP has missing data
       if(verbose > 0)
         message(paste(data$gene.coords$id[g], data$snp.coords$id[p]))
       
