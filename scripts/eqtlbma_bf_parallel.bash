@@ -48,7 +48,7 @@ function help () {
     msg+="\t\tdefault=100000\n"
     msg+="      --out\tprefix for the output files\n"
     msg+="\t\tdefault=out_eqtlbma\n"
-    msg+="      --type\ttype of analysis to perform (sep/join)\n"
+    msg+="      --analys\tanalysis to perform (sep/join)\n"
     msg+="\t\tdefault=sep\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
     msg+="      --outw\twrite the output file with the ABFs averaged over the grid\n"
@@ -116,7 +116,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,type:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,analys:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -137,7 +137,7 @@ function parseArgs () {
 	    --anchor) anchor=$2; shift 2;;
 	    --cis) cis=$2; shift 2;;
 	    --out) out=$2; shift 2;;
-	    --type) type=$2; shift 2;;
+	    --analys) analysis=$2; shift 2;;
 	    --outss) outss=true; shift;;
 	    --outw) outw=true; shift;;
 	    --qnorm) qnorm=true; shift;;
@@ -212,7 +212,7 @@ exp="list_expressions.txt"
 anchor="TSS"
 cis=100000
 out="out_eqtlbma"
-type="sep"
+analysis="sep"
 outss=false
 outw=false
 qnorm=false
@@ -264,7 +264,7 @@ cmd+=" --gcoord ${gcoord}"
 cmd+=" --anchor ${anchor}"
 cmd+=" --cis ${cis}"
 cmd+=" --out ${out}_${split}"
-cmd+=" --type ${type}"
+cmd+=" --analys ${analysis}"
 if $outss; then
     cmd+=" --outss"
 fi
@@ -278,7 +278,7 @@ cmd+=" --maf ${maf}"
 if [ ! -z "${covar}" ]; then
     cmd+=" --covar ${covar}"
 fi
-if [ "x${type}" == "xjoin" ]; then
+if [ "x${analysis}" == "xjoin" ]; then
     cmd+=" --gridL ${gridL}"
     cmd+=" --gridS ${gridS}"
     cmd+=" --bfs ${bfs}"

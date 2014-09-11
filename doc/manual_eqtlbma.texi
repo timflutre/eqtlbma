@@ -172,7 +172,7 @@ eqtlbma_bf \
 --anchor TSS \
 --cis 1000 \
 --out out_eqtlbma \
---type join \
+--analys join \
 --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt \
 --gridS grid_phi2_oma2_with-configs.txt \
@@ -286,7 +286,7 @@ For the gene-level p-values, we can now perform permutations in parallel (note a
 echo "eqtlbma_bf_parallel.bash --p2b ~/bin/eqtlbma_bf --geneD lists_genes \
 --snpD lists_snps --seedF list_seeds.txt.gz --geno list_genotypes.txt \
 --scoord snp_coords.bed.gz --exp list_explevels.txt --anchor TSS --cis 1000 \
---out out_eqtlbma --type join --covar list_covariates.txt \
+--out out_eqtlbma --analys join --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt --gridS grid_phi2_oma2_with-configs.txt \
 --bfs all --error mvlr --nperm 10000 --trick 2 --tricut 10 --pbf all --thread 4" \
 | qsub -cwd -j y -V -l h_vmem=8g -N stdout_eqtlbma_bf-perm -t 1-100 -pe simple_pe 4
@@ -351,7 +351,7 @@ For the QBF procedure, the @command{eqtlbma} package performs permutations to ge
 echo "eqtlbma_bf_parallel.bash --p2b ~/bin/eqtlbma_bf --geneD lists_genes \
 --snpD lists_snps --seedF list_seeds.txt.gz --geno list_genotypes.txt \
 --scoord snp_coords.bed.gz --exp list_explevels.txt --anchor TSS --cis 1000 \
---out out_eqtlbma --type join --covar list_covariates.txt \
+--out out_eqtlbma --analys join --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt --gridS grid_phi2_oma2_with-configs.txt \
 --bfs all --error mvlr --nperm 250 --pbf all --thread 4" \
 | qsub -cwd -j y -V -l h_vmem=8g -N stdout_eqtlbma_bf-permed -t 1-100 -pe simple_pe 4
@@ -572,8 +572,8 @@ Moreover, all output files are directly written in a compressed mode using @url{
 That is, all output files are readable by @command{gzip} and @command{zcat}.
 
 The program @command{eqtlbma_bf} can perform several types of analysis.
-The option @option{--type sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
-The option @option{--type join} means that the gene-SNP pairs will be tested for association using all subgroups jointly, which is more powerful in the context of eQTL studies, as shown in Flutre @emph{et al}.
+The option @option{--analys sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
+The option @option{--analys join} means that the gene-SNP pairs will be tested for association using all subgroups jointly, which is more powerful in the context of eQTL studies, as shown in Flutre @emph{et al}.
 
 At the beginning of each step, summary statistics are computed in each subgroup 
 (estimates of effect sizes, standard errors, p-values, etc).
@@ -588,7 +588,7 @@ If the option @option{--outw} is not specified, only the raw Bayes factors will 
 as they are needed to fit the hierarchical model with the @command{eqtlbma_hm} program.
 If it's specificed, the program will also save the Bayes factors per configuration, averaged over the grid using uniformly equal weights.
 
-When using option @option{--type join}, we need to specify the options @option{--gridL} and @option{--gridS},
+When using option @option{--analys join}, we need to specify the options @option{--gridL} and @option{--gridS},
 along with two files containing the grids over which the Bayes factors are averaged.
 A grid has two columns, 
 the first contains values of @math{\phi^2} (prior variance of the standardized effects @math{b_s}'s in each subgroup) 
@@ -693,7 +693,7 @@ to use the exact same permutations for both.
 Yet we may also want to use the ``trick''.
 Specifying @option{--trick 2} allows to do just that and is therefore recommended in this setting.
 
-Finally, the option @option{--pbf} specifies which BF is used as a test statistic when @option{--type join}.
+Finally, the option @option{--pbf} specifies which BF is used as a test statistic when @option{--analys join}.
 The BF called ``BMA'' in Flutre @emph{et al} corresponds to @option{--pbf all},
 and the BF called ``BMAlite'' corresponds to @option{--pbf gen-sin}.
 
@@ -725,7 +725,7 @@ eqtlbma_bf_parallel.bash \
 --scoord snp_coords.bed.gz \
 --exp list_expressions.txt \
 --out out_eqtlbma \
---type join \
+--analys join \
 --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt.gz \
 --gridS grid_phi2_oma2_with-configs.txt.gz \
@@ -760,7 +760,7 @@ echo -e '#!/usr/bin/env bash\n'''eqtlbma_bf_parallel.bash \
 --scoord snp_coords.bed.gz \
 --exp list_expressions.txt \
 --out out_eqtlbma \
---type join \
+--analys join \
 --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt \
 --gridS grid_phi2_oma2_with-configs.txt \
