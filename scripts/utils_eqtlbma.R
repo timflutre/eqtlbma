@@ -186,10 +186,11 @@ findCisSnpsPerGene <- function(gene.coords.bed, snp.coords.bed, anchor,
     gn2sn <- sapply(split(idx.gs.pairs[,2],
                           names(cis.regions.gr)[idx.gs.pairs[,1]]),
                     function(i) names(snp.coords.gr)[i])
-    ## summary(sapply(gn2sn, length))
     
-    if(verbose > 0)
+    if(verbose > 0){
+        message("nb of gene(s) with at least one cis SNP: ", length(gn2sn))
         message("nb of gene-SNP pairs: ", sum(sapply(gn2sn, length)))
+    }
     
     return(gn2sn)
 }

@@ -26,9 +26,9 @@ R.v.min.1 <- as.numeric(strsplit(R.version$minor, "\\.")[[1]][1])
 if(R.v.maj < 3 || (R.v.maj == 3 && R.v.min.1 < 0))
     stop("require R >= 3.0 (for built-in mclapply)", call.=FALSE)
 
-suppressPackageStartupMessages(require("parallel")) # for built-in mclapply
-suppressPackageStartupMessages(require("GenomicRanges")) # from Bioconductor
-suppressPackageStartupMessages(require("MASS")) # for mvrnorm
+suppressPackageStartupMessages(library("parallel")) # for built-in mclapply
+suppressPackageStartupMessages(library("GenomicRanges")) # from Bioconductor
+suppressPackageStartupMessages(library("MASS")) # for mvrnorm
 
 ##' Display the help on stdout
 ##'
@@ -61,8 +61,6 @@ help <- function(){
     txt <- paste0(txt, "     --maf\tminor allele frequency (default=0.3)\n")
     txt <- paste0(txt, "     --rare\tproportion of SNPs with rare alleles (with MAF=0.02, default=0.0)\n")
     ## txt <- paste0(txt, "     --related\tsimulate genotypes for related individuals\n")
-    ## txt <- paste0(txt, "\t\tusing the \"popgen\" package from J. Marchini\n")
-    ## txt <- paste0(txt, "\t\tsome SNPs can be fixed\n")
     txt <- paste0(txt, "     --pi0\tprior proba for a gene to have no eQTL in any subgroup (default=0.3)\n")
     txt <- paste0(txt, "     --coverr\terror covariance between subgroups (default=1)\n")
     txt <- paste0(txt, "\t\t0: the SxS covariance matrix is diagonal, same for all genes\n")
@@ -234,8 +232,7 @@ checkParams <- function(params){
     }
     
     if(params$related){
-        require(popgen)
-        require(MASS)
+        library(popgen)
     }
     
     return(params)
@@ -342,7 +339,8 @@ simulGeneCoordinates <- function(nb.genes, avg.gene.length,
                        to=length(interval.lengths)-1, by=2)],
                    end=cumsum(interval.lengths)[seq(from=2,
                        to=length(interval.lengths), by=2)],
-                   name=paste0("gene", 1:nb.genes),
+                   name=sprintf(paste0("gene%0", log10(nb.genes)+1, "i"),
+                       1:nb.genes),
                    score=rep(1000, nb.genes),
                    strand=rep("+", nb.genes),
                    ## strand=sample(x=c("+", "-"), size=nb.genes, replace=TRUE),
@@ -384,11 +382,13 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
         p <- ((S.x^2 * E.x + 4) - sqrt((S.x^2 * E.x + 4)^2 - 16)) / 2
         n <- (E.x * p) / (1 - p)
         nb.cis.snps.per.gene <- rnbinom(n=nb.genes, size=n, prob=p)
-        if(verbose > 0)
-            message(paste0("total nb of SNPs (in cis of at least one gene): ",
-                           sum(nb.cis.snps.per.gene)))
+    }
+    if(verbose > 0){
+        message(paste0("total nb of SNPs (in cis of at least one gene): ",
+                       sum(nb.cis.snps.per.gene)))
         ## summary(nb.cis.snps.per.gene)
-        ## sum(nb.cis.snps.per.gene == 0)
+        message(paste0("nb of gene(s) with no cis SNPs: ",
+                       sum(nb.cis.snps.per.gene == 0)))
     }
     
     snp.loci <- do.call(c, lapply(1:nb.genes, function(g){
@@ -411,11 +411,13 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
         }
     }))
     
-    snp.coords.bed <- data.frame(chr="chr1",
-                                 start=snp.loci - 1,
-                                 end=snp.loci,
-                                 name=paste0("snp", 1:length(snp.loci)),
-                                 stringsAsFactors=FALSE)
+    snp.coords.bed <-
+        data.frame(chr="chr1",
+                   start=snp.loci - 1,
+                   end=snp.loci,
+                   name=sprintf(paste0("snp%0", log10(length(snp.loci))+1, "i"),
+                       1:length(snp.loci)),
+                   stringsAsFactors=FALSE)
     
     return(snp.coords.bed)
 }
@@ -818,16 +820,26 @@ main <- function(){
     params <- checkParams(params)
     
     if(params$verbose > 0){
-        message(paste0("START ", prog.name, " ",
-                       format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+        start.time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+        message(paste0("START ", prog.name, " ", start.time))
         message(paste0("cwd: ", getwd()))
     }
     
     system.time(run(params))
     
     if(params$verbose > 0){
-        message(paste0("END ", prog.name, " ",
-                       format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+        end.time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
+        difft <- as.numeric(
+            difftime(as.POSIXct(end.time, format="%Y-%m-%d %H:%M:%S"),
+                     as.POSIXct(start.time, format="%Y-%m-%d %H:%M:%S"),
+                     units="days"))
+        difft.d <- floor(difft)
+        difft.h <- floor(((difft - difft.d) * 24) %% 24)
+        difft.m <- floor(((difft - difft.d - difft.h/24) * 24*60) %% (24 * 60))
+        difft.s <- floor(((difft - difft.d - difft.h/24 - difft.m/(24*60)) *
+                          24*60*60) %% (24 * 60 * 60))
+        run.length <- sprintf("%02i:%02i:%02i", difft.h, difft.m, difft.s)
+        message(paste0("END ", prog.name, " ", end.time, " (", run.length, ")"))
         ## print(object.size(x=lapply(ls(), get)), units="Kb") # return an error I don't understand
     }
 }
