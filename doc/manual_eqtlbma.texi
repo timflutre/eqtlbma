@@ -243,7 +243,7 @@ The remaining of this section briefly describes how to estimate @math{\pi_0}, vi
 
 As permutations take time, we will run them in parallel, which hence requires to prepare the data in batches (@pxref{Frequently asked questions} for more explanations).
 
-First we keep only the TSS of each gene:
+First we keep only the transcription start site (TSS) of each gene:
 @verbatim
 zcat gene_coords.bed.gz \
 | awk 'BEGIN{OFS="\t"} \
@@ -271,7 +271,7 @@ parallel 'i={}; bedtools window -w 1000 \
 cut -f10 | sort -V | uniq | gzip > lists_snps/list_snps_${i}.txt.gz'
 @end verbatim
 
-Finally we draw one seed per batch:
+Finally we draw one seed per batch (to make permutations reproducible):
 @verbatim
 nbSeeds=$(ls lists_genes/* | wc -l); \
 echo "set.seed(1859); x <- sample.int(n=1000000, size=${nbSeeds}); \
@@ -377,6 +377,20 @@ called.nulls.qbf <- ! controlBayesFdr(log10.bfs=gene.bfs$gene.log10.bf[!duplicat
 
 We can now use this estimate of @math{\pi_0} to compute the various posterior probabilities of interest with @command{eqtlbma_avg_bfs} as shown above.
 
+@sp 1
+
+As shown in the preprint of Wen (2013), the EBF/QBF procedures are much less computationally intensive than obtaining p-values by permutations, hence being tractable even for large datasets, while still conservatively controlling a given FDR level.
+
+As a quick example, the table below summarizes results for the tutorial data obtained with all commands listed above, for which the true @math{\pi_0} is 0.287, the true number of eGenes is 713 and the FDR is controlled at 0.05:
+
+@multitable @columnfractions .3 .175 .175 .175 .175
+@headitem Method @tab @math{\pi_0} (estim.) @tab eGenes (#) @tab FDP @tab FNP
+@item p-values (with trick) @tab 0.439 @tab 602 @tab 0.0266 @tab 0.3191
+@item p-values (without trick) @tab 0.394 @tab 609 @tab 0.0328 @tab 0.3171
+@item EBF @tab 0.476 @tab 617 @tab 0.0324 @tab 0.3029
+@item QBF @tab 0.400 @tab 627 @tab 0.0447 @tab 0.3056
+@end multitable
+
 @c=============================================================================
 
 @node Computing Bayes factors
@@ -455,7 +469,7 @@ followed by a file containing the SNP coordinate in the @url{http://genome.ucsc.
 This means that the start coordinate is 0-based, there is no header line and the column separator is a tabulation.
 
 When parallelizing an analyzis over genes, we may want to only load the SNPs in @emph{cis} of the genes in the given job.
-In order to speed-up this, the code uses the @url{https://github.com/samtools/tabix,tabix} library (Li, 2011).
+In order to speed-up this, the eQtlBma package uses some code from @url{https://github.com/samtools/tabix,TABIX} described in @url{http://dx.doi.org/10.1093/bioinformatics/btq671,this paper} (Li, 2011).
 More specifically, if a bgzip-compressed BED file named ``snp_coords.bed.gz'' is given to the option @option{--scoord},
 the code will look for a tabix-indexed file named ``snp_coords.bed.gz.tbi'' 
 and use it to only load the SNPs in @emph{cis} of the genes specified by the option @option{--gcoord}.
@@ -565,13 +579,13 @@ assuming that the start and end coordinates correspond to the TSS.
 At some point we will have to improve the code to also handle the strand, if specified.
 
 
-@subsection Types of analysis
+@subsection Possible analyzes
 
 The option @option{--out} requires a character string which will be used as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
 That is, all output files are readable by @command{gzip} and @command{zcat}.
 
-The program @command{eqtlbma_bf} can perform several types of analysis.
+The program @command{eqtlbma_bf} can perform several analyzes.
 The option @option{--analys sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
 The option @option{--analys join} means that the gene-SNP pairs will be tested for association using all subgroups jointly, which is more powerful in the context of eQTL studies, as shown in Flutre @emph{et al}.
 
@@ -696,6 +710,9 @@ Specifying @option{--trick 2} allows to do just that and is therefore recommende
 Finally, the option @option{--pbf} specifies which BF is used as a test statistic when @option{--analys join}.
 The BF called ``BMA'' in Flutre @emph{et al} corresponds to @option{--pbf all},
 and the BF called ``BMAlite'' corresponds to @option{--pbf gen-sin}.
+
+However, permutations to obtain gene-level p-values are computationally intensive, perhaps prohibitively so for large datasets.
+@xref{Tutorial}, in the end of the chapter, for efficient, yet powerful alternatives, namely the EBF and QBF procedures proposed in @url{http://arxiv.org/abs/1311.3981,this preprint} by Wen (2013).
 
 
 @section Computing in parallel
