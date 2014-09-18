@@ -49,6 +49,7 @@ help <- function(){
     txt <- paste0(txt, "\t\tthey are diploid (allele dose in {0,1,2})\n")
     txt <- paste0(txt, "\t\tsame individuals in all subgroups\n")
     txt <- paste0(txt, "     --ngenes\tnb of genes (default=1000)\n")
+    txt <- paste0(txt, "     --nchrs\tnb of chromosome(s) (default=1)\n")
     txt <- paste0(txt, "     --agl\taverage gene length (default=10000)\n")
     txt <- paste0(txt, "     --ail\taverage intergenic length (default=50000)\n")
     txt <- paste0(txt, "     --nsnps\tnb of SNPs (default=10000)\n")
@@ -130,6 +131,10 @@ parseCmdLine <- function(params){
         }
         else if(args[i] == "--ngenes"){
             params$nb.genes <- as.numeric(args[i+1])
+            i <- i + 1
+        }
+        else if(args[i] == "--nchrs"){
+            params$nb.chrs <- as.numeric(args[i+1])
             i <- i + 1
         }
         else if(args[i] == "--agl"){
@@ -279,14 +284,22 @@ simulSubgroups <- function(nb.subgroups, inds, verbose=1){
 ##' In the BED format, all on one chromosome
 ##' @title Coordinates
 ##' @param nb.genes number of genes
+##' @param nb.chrs number of chromosomes
 ##' @param avg.gene.length average gene length
 ##' @param avg.intergenic.length average length of intergenic regions
 ##' @param verbose verbosity level (0/default=1/2)
 ##' @return Data.frame with gene in rows
-simulGeneCoordinates <- function(nb.genes, avg.gene.length,
+simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
                                  avg.intergenic.length, verbose=1){
     if(verbose > 0)
-        message(paste0("simulate coordinates for ", nb.genes, " genes ..."))
+        message(paste0("simulate coordinates for ", nb.genes, " genes (",
+                       nb.chrs, " chr", ifelse(nb.chrs > 1, "s", ""), ") ..."))
+    
+    chr.names <- sprintf(paste0("chr%0", floor(log10(nb.chrs))+1, "i"),
+                         1:nb.chrs)
+    tmp <- round(seq(0, nb.genes, length.out=nb.chrs + 1))
+    nb.genes.chrs <- rev(rev(tmp)[-length(tmp)] - rev(tmp)[-1])
+    names(nb.genes.chrs) <- chr.names
     
     ## explore negative binomial distribution for various parameters
     ## http://www.math.uah.edu/stat/bernoulli/NegativeBinomial.html
@@ -310,7 +323,11 @@ simulGeneCoordinates <- function(nb.genes, avg.gene.length,
     S.x <- 1.0
     p <- ((S.x^2 * E.x + 4) - sqrt((S.x^2 * E.x + 4)^2 - 16)) / 2
     n <- (E.x * p) / (1 - p)
-    gene.lengths <- rnbinom(n=nb.genes, size=n, prob=p)
+    gene.length.chrs <- lapply(nb.genes.chrs, function(ngc){
+        rnbinom(n=ngc, size=n, prob=p)
+    })
+    names(gene.length.chrs) <- chr.names
+    gene.lengths <- do.call(c, gene.length.chrs)
     if(verbose > 0)
         message(paste0("gene lengths: mean=", format(mean(gene.lengths), scientific=TRUE, digits=2),
                        " sd=", format(sd(gene.lengths), scientific=TRUE, digits=2),
@@ -323,7 +340,11 @@ simulGeneCoordinates <- function(nb.genes, avg.gene.length,
     S.x <- 1.2
     p <- ((S.x^2 * E.x + 4) - sqrt((S.x^2 * E.x + 4)^2 - 16)) / 2
     n <- (E.x * p) / (1 - p)
-    intergenic.lengths <- rnbinom(n=nb.genes, size=n, prob=p)
+    intergenic.length.chrs <- lapply(nb.genes.chrs, function(ngc){
+        rnbinom(n=ngc, size=n, prob=p)
+    })
+    names(intergenic.length.chrs) <- chr.names
+    intergenic.lengths <- do.call(c, intergenic.length.chrs)
     if(verbose > 0)
         message(paste0("intergenic lengths: mean=", format(mean(intergenic.lengths), scientific=TRUE, digits=2),
                        " sd=", format(sd(intergenic.lengths), scientific=TRUE, digits=2),
@@ -331,20 +352,28 @@ simulGeneCoordinates <- function(nb.genes, avg.gene.length,
                        " med=", format(median(intergenic.lengths), scientific=TRUE, digits=2),
                        " max=", format(max(intergenic.lengths), scientific=TRUE, digits=2)))
     
-    interval.lengths <- c(rbind(intergenic.lengths, gene.lengths))
+    interval.length.chrs <- lapply(chr.names, function(chr){
+        c(rbind(intergenic.length.chrs[[chr]], gene.length.chrs[[chr]]))
+    })
+    names(interval.length.chrs) <- chr.names
     
-    gene.coords.bed <-
-        data.frame(chr=rep("chr1", nb.genes),
-                   start=cumsum(interval.lengths)[seq(from=1,
-                       to=length(interval.lengths)-1, by=2)],
-                   end=cumsum(interval.lengths)[seq(from=2,
-                       to=length(interval.lengths), by=2)],
-                   name=sprintf(paste0("gene%0", floor(log10(nb.genes))+1, "i"),
-                       1:nb.genes),
-                   score=rep(1000, nb.genes),
-                   strand=rep("+", nb.genes),
-                   ## strand=sample(x=c("+", "-"), size=nb.genes, replace=TRUE),
+    gene.coords.bed <- do.call(rbind, lapply(chr.names, function(chr){
+        idx <- which(chr.names == chr)
+        data.frame(chr=rep(chr, nb.genes.chrs[chr]),
+                   start=cumsum(interval.length.chrs[[chr]])[seq(from=1,
+                       to=length(interval.length.chrs[[chr]])-1, by=2)],
+                   end=cumsum(interval.length.chrs[[chr]])[seq(from=2,
+                       to=length(interval.length.chrs[[chr]]), by=2)],
+                   name=sprintf(paste0("gene%0",
+                       floor(log10(nb.genes.chrs[chr]))+1, "i"),
+                       (1+c(0, cumsum(nb.genes.chrs))[idx]):
+                           (c(0, cumsum(nb.genes.chrs))[idx+1])),
+                   score=rep(1000, nb.genes.chrs[chr]),
+                   strand=rep("+", nb.genes.chrs[chr]),
+                   ## strand=sample(x=c("+", "-"), size=nb.genes.chrs[c],
+                   ##     replace=TRUE),
                    stringsAsFactors=FALSE)
+    }))
     ## hist(x=gene.coords.bed$end - gene.coords.bed$start,
     ##      main="Gene lengths (in bp)", xlab="")
     
@@ -373,51 +402,74 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
         message("simulate SNP coordinates ...")
     
     nb.genes <- nrow(gene.coords.bed)
+    nb.genes.chrs <- tapply(gene.coords.bed$name,
+                            list(as.factor(gene.coords.bed$chr)),
+                            length)
+    nb.chrs <- length(nb.genes.chrs)
+    chr.names <- names(nb.genes.chrs)
     
     if(! is.null(fixed.nb.snps.per.gene)){
-        nb.cis.snps.per.gene <- rep(x=fixed.nb.snps.per.gene, times=nb.genes)
+        nb.cis.snps.per.gene <- lapply(names(nb.genes.chrs), function(chr){
+            rep(x=fixed.nb.snps.per.gene, times=nb.genes.chrs[chr])
+        })
     } else{ # draw nb of cis SNPs per gene from a negative binomial
         E.x <- avg.nb.snps.per.gene
         S.x <- 1 # skewness
         p <- ((S.x^2 * E.x + 4) - sqrt((S.x^2 * E.x + 4)^2 - 16)) / 2
         n <- (E.x * p) / (1 - p)
-        nb.cis.snps.per.gene <- rnbinom(n=nb.genes, size=n, prob=p)
+        nb.cis.snps.per.gene <- lapply(names(nb.genes.chrs), function(chr){
+            rnbinom(n=nb.genes.chrs[chr], size=n, prob=p)
+        })
     }
+    names(nb.cis.snps.per.gene) <- chr.names
+    nb.cis.snps.genes <- do.call(c, nb.cis.snps.per.gene)
+    nb.cis.snps.per.chr <- sapply(nb.cis.snps.per.gene, sum)
     if(verbose > 0){
         message(paste0("total nb of SNPs (in cis of at least one gene): ",
-                       sum(nb.cis.snps.per.gene)))
+                       sum(nb.cis.snps.genes)))
         ## summary(nb.cis.snps.per.gene)
         message(paste0("nb of gene(s) with no cis SNPs: ",
-                       sum(nb.cis.snps.per.gene == 0)))
+                       sum(nb.cis.snps.genes == 0)))
     }
     
-    snp.loci <- do.call(c, lapply(1:nb.genes, function(g){
-        if(gene.coords.bed$strand[g] == "+"){
-            coord.5p <- max(1, gene.coords.bed$start[g] + 1 - cis.radius.5p)
-            if(anchor == "TSS"){
-                coord.3p <- gene.coords.bed$start[g] + 1 + cis.radius.3p
-            } else # TSS+TES
-                coord.3p <- gene.coords.bed$end[g] + cis.radius.3p
-            sample(x=seq(from=coord.5p, to=coord.3p, by=1),
-                   size=nb.cis.snps.per.gene[g])
-        } else{ # "-" strand
-            coord.5p <- gene.coords.bed$end[g] + cis.radius.5p
-            if(anchor == "TSS"){
-                coord.3p <- gene.coords.bed$end[g] - cis.radius.3p
-            } else # TSS+TES
-                coord.3p <- max(1, gene.coords.bed$start[g] + 1 - cis.radius.3p)
-            sample(x=seq(from=coord.3p, to=coord.5p, by=1),
-                   size=nb.cis.snps.per.gene[g])
-        }
-    }))
+    snp.loci <- lapply(names(nb.genes.chrs), function(chr){
+        gene.coords.bed.chr <- gene.coords.bed[gene.coords.bed$chr == chr,]
+        do.call(c, lapply(1:nb.genes.chrs[chr], function(g){
+            if(gene.coords.bed.chr$strand[g] == "+"){
+                coord.5p <-
+                    max(1, gene.coords.bed.chr$start[g] + 1 - cis.radius.5p)
+                if(anchor == "TSS"){
+                    coord.3p <-
+                        gene.coords.bed.chr$start[g] + 1 + cis.radius.3p
+                } else # TSS+TES
+                    coord.3p <- gene.coords.bed.chr$end[g] + cis.radius.3p
+                sample(x=seq(from=coord.5p, to=coord.3p, by=1),
+                       size=nb.cis.snps.per.gene[[chr]][g])
+            } else{ # "-" strand
+                coord.5p <- gene.coords.bed.chr$end[g] + cis.radius.5p
+                if(anchor == "TSS"){
+                    coord.3p <- gene.coords.bed.chr$end[g] - cis.radius.3p
+                } else # TSS+TES
+                    coord.3p <-
+                        max(1, gene.coords.bed.chr$start[g] + 1 - cis.radius.3p)
+                sample(x=seq(from=coord.3p, to=coord.5p, by=1),
+                       size=nb.cis.snps.per.gene[[chr]][g])
+            }
+        }))
+    })
+    names(snp.loci) <- chr.names
     
-    snp.coords.bed <-
-        data.frame(chr="chr1",
-                   start=snp.loci - 1,
-                   end=snp.loci,
-                   name=sprintf(paste0("snp%0", floor(log10(length(snp.loci)))+1, "i"),
-                       1:length(snp.loci)),
+    snp.coords.bed <- do.call(rbind, lapply(chr.names, function(chr){
+        idx <- which(chr.names == chr)
+        data.frame(chr=rep(chr, nb.cis.snps.per.chr[chr]),
+                   start=snp.loci[[chr]] - 1,
+                   end=snp.loci[[chr]],
+                   name=sprintf(paste0("snp%0",
+                       floor(log10(length(snp.loci[[chr]])))+1, "i"),
+                       (1+c(0, cumsum(nb.cis.snps.per.chr))[idx]):
+                           (c(0, cumsum(nb.cis.snps.per.chr))[idx+1])),
                    stringsAsFactors=FALSE)
+    }))
     
     return(snp.coords.bed)
 }
@@ -751,6 +803,7 @@ run <- function(params){
     subgroups <- simulSubgroups(params$nb.subgroups, inds)
     
     gene.coords.bed <- simulGeneCoordinates(params$nb.genes,
+                                            params$nb.chrs,
                                             params$avg.gene.length,
                                             params$avg.intergenic.length,
                                             params$verbose)
@@ -799,6 +852,7 @@ main <- function(){
                    nb.subgroups=3,
                    nb.inds=200,
                    nb.genes=10^3,
+                   nb.chrs=1,
                    avg.gene.length=10^4,
                    avg.intergenic.length=5*10^4,
                    anchor="TSS",
