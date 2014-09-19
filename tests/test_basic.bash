@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Aim: launch a basic functional test for eqtlbma_bf
-# Author: Timothee Flutre
+# Author: Timothée Flutre
 # Not copyrighted -- provided to the public domain
 
 progVersion="1.0"
@@ -22,6 +22,8 @@ function help () {
     msg+="  -e, --p2e\tabsolute path to the 'eqtlbma_bf' binary\n"
     msg+="  -R, --p2R\tabsolute path to the 'functional_tests.R' script\n"
     msg+="  -n, --noclean\tkeep temporary directory with all files\n"
+    msg+="\n"
+    msg+="Report bugs to <eqtlbma-users@googlegroups.com>."
     echo -e "$msg"
 }
 
@@ -29,7 +31,7 @@ function help () {
 function version () {
     msg="${0##*/} ${progVersion}\n"
     msg+="\n"
-    msg+="Written by Timothee Flutre.\n"
+    msg+="Written by Timothée Flutre.\n"
     msg+="\n"
     msg+="Not copyrighted -- provided to the public domain\n"
     echo -e "$msg"
@@ -85,12 +87,12 @@ on your system, use -h for help"
         esac
     done
     if [ ! -f "${pathToBf}" ]; then
-	echo "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'\n"
+	echo -e "ERROR: can't find path to 'eqtlbma_bf' -> '${pathToBf}'\n" 1>&2
 	help
 	exit 1
     fi
     if [ ! -f "${pathToRscript}" ]; then
-	echo "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'\n"
+	echo -e "ERROR: can't find path to 'functional_tests.R' -> '${pathToRscript}'\n" 1>&2
 	help
 	exit 1
     fi
