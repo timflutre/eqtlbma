@@ -351,7 +351,7 @@ For the QBF procedure, the @command{eqtlbma} package performs permutations to ge
 echo "eqtlbma_bf_parallel.bash --p2b ~/bin/eqtlbma_bf --geneD lists_genes \
 --snpD lists_snps --seedF list_seeds.txt.gz --geno list_genotypes.txt \
 --scoord snp_coords.bed.gz --exp list_explevels.txt --anchor TSS --cis 1000 \
---out out_eqtlbma --analys join --covar list_covariates.txt \
+--out out_eqtlbma_qbf --analys join --covar list_covariates.txt \
 --gridL grid_phi2_oma2_general.txt --gridS grid_phi2_oma2_with-configs.txt \
 --bfs all --error mvlr --nperm 250 --pbf all --thread 4" \
 | qsub -cwd -j y -V -l h_vmem=8g -N stdout_eqtlbma_bf-permed -t 1-100 -pe simple_pe 4
@@ -366,7 +366,10 @@ if [ $(grep -c "END" $f) != 2 ]; then echo $f; fi; done
 Once we have these median Bayes factors, we can estimate @math{\pi_0} with the QBF procedure implemented in an R file in the @command{eqtlbma} package:
 @smallformat
 @verbatim
-perms.qbf <- read.table("out_eqtlbma_avg_bfs-permed.txt.gz", header=TRUE)
+f <- Sys.glob("out_eqtlbma_qbf_[0-9][0-9][0-9]_joinPermPvals.txt.gz")
+perms.qbf <- do.call(rbind, lapply(f, function(fi){
+  read.table(fi, header=TRUE, stringsAsFactor=FALSE)
+}))
 source("~/src/eqtlbma/scripts/utils_eqtlbma.R")
 pi0.qbf <- estimatePi0WithQbf(log10.bfs=perms.qbf$med.perm.log10.bf[!duplicated(perms.qbf$gene)],
                               gamma=0.5, verbose=1)
