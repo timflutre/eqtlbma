@@ -134,11 +134,11 @@ namespace quantgen {
     vector<string> tokens2, tokens3;
     for(size_t i = 0; i < nb_samples; ++i){
       split(*(begin+i), ":", tokens2);
-      if(tokens2[0].find(".") != string::npos) {
+      if(tokens2[1].find(".") != string::npos) {
 	minor_allele_freq = NaN;
       }
       else{
-	split(tokens2[0], "|/", tokens3);
+	split(tokens2[1], "|/", tokens3);
 	genotypes[i] = 0;
 	if(tokens3[0].compare("1") == 0)
 	  genotypes[i] += 1;
