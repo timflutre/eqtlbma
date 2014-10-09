@@ -135,7 +135,7 @@ function parseArgs () {
 	    --scoord) scoord=$2; shift 2;;
 	    --exp) exp=$2; shift 2;;
 	    --fcoord) fcoord=$2; shift 2;;
-	    --inss) inss=true; shift 2;;
+	    --inss) inss=$2; shift 2;;
 	    --anchor) anchor=$2; shift 2;;
 	    --cis) cis=$2; shift 2;;
 	    --out) out=$2; shift 2;;
