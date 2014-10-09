@@ -274,6 +274,7 @@ fi
 
 if $inss; then
     cmd+=" --inss ${inss}"
+fi
 
 if $outw; then
     cmd+=" --outw"
