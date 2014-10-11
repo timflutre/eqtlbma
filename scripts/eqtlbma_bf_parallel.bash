@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+progVersion="1.3"
+
 function help () {
     msg="\`${0##*/}' is used to launch eqtlbma_bf in parallel.\n"
     msg+="\n"
@@ -32,6 +34,9 @@ function help () {
     msg+="      --snpD\tdirectory with lists of SNPs to analyze (optional)\n"
     msg+="\t\tfile names have to be like '<anything>_<batchId>.<anything>'\n"
     msg+="\t\teach SNP file should correspond to a feature file, in the same order\n"
+    msg+="      --inssD\tdirectory with lists of files with absolute paths to files with summary statistics\n"
+    msg+="\t\tfile names have to be like '<anything>_<batchId>.<abything>'\n"
+    msg+="\t\tif --inssD is given, neither --geneD nor --snpD are used (nor --geno, --scoord, --exp, etc)\n"
     msg+="      --seedF\tfile with seeds (as many as files in --geneD)\n"
     msg+="\t\toptional, default=list_seeds.txt.gz (should be gzipped)\n"
     msg+="      --task\ttask identifier (not for SGE, for SLURM only)\n"
@@ -54,7 +59,6 @@ function help () {
     msg+="      --outw\twrite the output file with the ABFs averaged over the grid\n"
     msg+="      --qnorm\tquantile-normalize the expression levels to a N(0,1)\n"
     msg+="      --maf\tminimum minor allele frequency\n"
-    msg+="\t\tdefault=0\n"
     msg+="      --covar\tfile with absolute paths to covariate files\n"
     msg+="      --gridL\tfile with a 'large' grid for prior variances\n"
     msg+="\t\tdefault=grid_phi2_oma2_general.txt.gz\n"
@@ -87,9 +91,9 @@ function help () {
 }
 
 function version () {
-    msg="${0##*/} 1.2\n"
+    msg="${0##*/} ${progVersion}\n"
     msg+="\n"
-    msg+="Copyright (C) 2013 Timothée Flutre.\n"
+    msg+="Copyright (C) 2013-2014 Timothée Flutre.\n"
     msg+="License GPL-3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n"
     msg+="This is free software; see the source for copying conditions. There is NO\n"
     msg+="warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"
@@ -116,7 +120,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,analys:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,inssD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,analys:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -128,6 +132,7 @@ function parseArgs () {
 	    --p2b) pathToBin=$2; shift 2;;
 	    --geneD) geneDir=$2; shift 2;;
 	    --snpD) snpDir=$2; shift 2;;
+	    --inssD) inssDir=$2; shift 2;;
 	    --seedF) seedFile=$2; shift 2;;
 	    --task) task=$2; shift 2;;
 	    --geno) geno=$2; shift 2;;
@@ -175,18 +180,24 @@ function parseArgs () {
 	help
 	exit 1
     fi
-    if [ -z "${geneDir}" ]; then
-	echo -e "ERROR: missing compulsory option --geneDir\n"
-	help
-	exit 1
-    fi
-    if [ ! -d "${geneDir}" ]; then
-	echo -e "ERROR: can't find feature directory '${geneDir}'\n"
-	help
-	exit 1
-    fi
-    if [ ! -z "${snpDir}" -a ! -d "${snpDir}" ]; then
-	echo -e "ERROR: can't find SNP directory '${snpDir}'\n"
+    if [ -z "${inssDir}" ]; then
+	if [ -z "${geneDir}" ]; then
+	    echo -e "ERROR: missing compulsory option --geneDir\n"
+	    help
+	    exit 1
+	fi
+	if [ ! -d "${geneDir}" ]; then
+	    echo -e "ERROR: can't find feature directory '${geneDir}'\n"
+	    help
+	    exit 1
+	fi
+	if [ ! -z "${snpDir}" -a ! -d "${snpDir}" ]; then
+	    echo -e "ERROR: can't find SNP directory '${snpDir}'\n"
+	    help
+	    exit 1
+	fi
+    elif [ ! -d "${inssDir}" ]; then
+        echo -e "ERROR: can't find summary stats directory '${inssDir}'\n"
 	help
 	exit 1
     fi
@@ -204,19 +215,20 @@ verbose=1
 pathToBin=""
 geneDir=""
 snpDir=""
+inssDir=""
 seedFile=""
 task=""
-geno="list_genotypes.txt"
+geno=""
 scoord=""
-exp="list_expressions.txt"
+exp=""
 anchor="TSS"
 cis=100000
 out="out_eqtlbma"
-analysis="sep"
+analysis=""
 outss=false
 outw=false
 qnorm=false
-maf=0
+maf=""
 covar=""
 gridL="grid_phi2_oma2_general.txt.gz"
 gridS="grid_phi2_oma2_with-configs.txt.gz"
@@ -242,11 +254,16 @@ if [ $verbose -gt "0" ]; then
 fi
 
 # prepare the gene list + misc
-gcoord=$(ls ${geneDir}/* | awk -v i=${task} 'NR==i{print;exit}');
-split=$(echo ${gcoord} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
-snp=""
-if [ ! -z "${snpDir}" ]; then
-    snp=$(ls ${snpDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+if [ -z "${inssDir}" ]; then
+    gcoord=$(ls ${geneDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+    split=$(echo ${gcoord} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
+    snp=""
+    if [ ! -z "${snpDir}" ]; then
+	snp=$(ls ${snpDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+    fi
+else
+    inss=$(ls ${inssDir}/* | awk -v i=${task} 'NR==i{print;exit}');
+    split=$(echo ${inss} | awk '{n=split($0,a,"_"); split(a[n],b,"."); print b[1]}');
 fi
 seed=""
 if [ ! -z "${seedFile}" ]; then
@@ -255,14 +272,27 @@ fi
 
 # build the command-line
 cmd="${pathToBin}"
-cmd+=" --geno ${geno}"
+if [ ! -z "${geno}" ]; then
+    cmd+=" --geno ${geno}"
+fi
 if [ ! -z "${scoord}" ]; then
     cmd+=" --scoord ${scoord}"
 fi
-cmd+=" --exp ${exp}"
-cmd+=" --gcoord ${gcoord}"
-cmd+=" --anchor ${anchor}"
-cmd+=" --cis ${cis}"
+if [ ! -z "${exp}" ]; then
+    cmd+=" --exp ${exp}"
+fi
+if [ ! -z "${gcoord}" ]; then
+    cmd+=" --gcoord ${gcoord}"
+fi
+if [ ! -z "${anchor}" ]; then
+    cmd+=" --anchor ${anchor}"
+fi
+if [ ! -z "${cis}" ]; then
+    cmd+=" --cis ${cis}"
+fi
+if [ ! -z "${inss}" ]; then
+    cmd+=" --inss ${inss}"
+fi
 cmd+=" --out ${out}_${split}"
 cmd+=" --analys ${analysis}"
 if $outss; then
@@ -274,7 +304,9 @@ fi
 if $qnorm; then
     cmd+=" --qnorm"
 fi
-cmd+=" --maf ${maf}"
+if [ ! -z "${maf}" ]; then
+    cmd+=" --maf ${maf}"
+fi
 if [ ! -z "${covar}" ]; then
     cmd+=" --covar ${covar}"
 fi
