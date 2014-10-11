@@ -86,7 +86,6 @@ namespace quantgen {
   }
 
   void Snp::AddSubgroupFromImputeLine(
-    const string & subgroup,
     const vector<string>::const_iterator & begin,
     const vector<string>::const_iterator & end,
     vector<double> & genotypes,
@@ -122,23 +121,23 @@ namespace quantgen {
   }
 
   void Snp::AddSubgroupFromVcfLine(
-    const string & subgroup,
     const vector<string>::const_iterator & begin,
     const vector<string>::const_iterator & end,
+    const size_t & idx_gt,
     vector<double> & genotypes,
     double & minor_allele_freq)
   {
-    size_t nb_samples = static_cast<size_t>(end - begin + 1);
+    size_t nb_samples = static_cast<size_t>(end - begin);
     genotypes.assign(nb_samples, NaN);
     minor_allele_freq = 0.0;
     vector<string> tokens2, tokens3;
     for(size_t i = 0; i < nb_samples; ++i){
       split(*(begin+i), ":", tokens2);
-      if(tokens2[0].find(".") != string::npos) {
+      if(tokens2[idx_gt].find(".") != string::npos) {
 	minor_allele_freq = NaN;
       }
       else{
-	split(tokens2[0], "|/", tokens3);
+	split(tokens2[idx_gt], "|/", tokens3);
 	genotypes[i] = 0;
 	if(tokens3[0].compare("1") == 0)
 	  genotypes[i] += 1;
@@ -156,7 +155,6 @@ namespace quantgen {
   }
 
   void Snp::AddSubgroupFromDoseLine(
-    const string & subgroup,
     const vector<string>::const_iterator & begin,
     const vector<string>::const_iterator & end,
     vector<double> & genotypes,
@@ -186,20 +184,18 @@ namespace quantgen {
   void Snp::AddSubgroup(const string & subgroup,
 			const vector<string>::const_iterator & begin,
 			const vector<string>::const_iterator & end,
-			const string & format)
+			const string & format,
+			const size_t & idx_gt)
   {
     vector<double> genotypes;
     double minor_allele_freq;
     
     if(format.compare("impute") == 0)
-      AddSubgroupFromImputeLine(subgroup, begin, end,
-				genotypes, minor_allele_freq);
+      AddSubgroupFromImputeLine(begin, end, genotypes, minor_allele_freq);
     else if(format.compare("vcf") == 0)
-      AddSubgroupFromVcfLine(subgroup, begin, end,
-			     genotypes, minor_allele_freq);
+      AddSubgroupFromVcfLine(begin, end, idx_gt, genotypes, minor_allele_freq);
     else if(format.compare("dose") == 0)
-      AddSubgroupFromDoseLine(subgroup, begin, end,
-			      genotypes, minor_allele_freq);
+      AddSubgroupFromDoseLine(begin, end, genotypes, minor_allele_freq);
     else{
       cerr << "ERROR: genotype format '" << format << "' is not recognized" << endl;
       exit(EXIT_FAILURE);

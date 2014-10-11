@@ -531,7 +531,7 @@ namespace quantgen {
     const map<string, vector<Gene*> > & mChr2VecPtGenes,
     gzFile & genoStream,
     string & line,
-    size_t & nb_lines,
+    size_t & tot_nb_snps,
     size_t & nb_snps_tokeep_per_subgroup,
     map<string, Snp> & snp2object,
     map<string, vector<Snp*> > & mChr2VecPtSnps)
@@ -539,6 +539,7 @@ namespace quantgen {
     string subgroup = it_subgroup2genofile->first,
       genofile = it_subgroup2genofile->second;
     vector<string> tokens;
+    size_t nb_lines = 1; // header line already read
     split(line, " \t", tokens); // header line
     if((tokens.size() - 5) % 3 != 0){
       cerr << "ERROR: wrong number of columns on line " << nb_lines
@@ -549,6 +550,7 @@ namespace quantgen {
     
     while(getline(genoStream, line)){
       ++nb_lines;
+      ++tot_nb_snps;
       split(line, " \t", tokens);
       if(tokens.size() != 3 * nb_samples + 5){
 	cerr << "ERROR: not enough columns on line " << nb_lines << " of file "
@@ -578,14 +580,15 @@ namespace quantgen {
     const map<string, vector<Gene*> > & mChr2VecPtGenes,
     gzFile & genoStream,
     string & line,
-    size_t & nb_lines,
+    size_t & tot_nb_snps,
     size_t & nb_snps_tokeep_per_subgroup,
     map<string, Snp> & snp2object,
     map<string, vector<Snp*> > & mChr2VecPtSnps)
   {
     string subgroup = it_subgroup2genofile->first,
       genofile = it_subgroup2genofile->second;
-    vector<string> tokens, tokens2, tokens3;
+    vector<string> tokens, tokens2;
+    size_t nb_lines = 1; // header line already read
     
     // skip the first lines of meta-data
     while(getline(genoStream, line)){
@@ -598,6 +601,7 @@ namespace quantgen {
     
     while(getline(genoStream, line)){
       ++nb_lines;
+      ++tot_nb_snps;
       split(line, " \t", tokens);
       if(tokens.size() != nb_samples + 9){
 	cerr << "ERROR: not enough columns on line " << nb_lines
@@ -619,8 +623,15 @@ namespace quantgen {
 	Snp snp(tokens[2], tokens[0], tokens[1]);
 	snp2object.insert(make_pair(snp.GetName(), snp));
       }
+      split(tokens[8], ":", tokens2); // if several fields in column FORMAT
+      size_t idx_gt = 0;
+      while(idx_gt < tokens2.size()){
+	if(tokens2[idx_gt] == "GT")
+	  break;
+	++idx_gt;
+      }
       snp2object[tokens[2]].AddSubgroup(subgroup, tokens.begin()+9,
-					tokens.end(), "vcf");
+					tokens.end(), "vcf", idx_gt);
       ++nb_snps_tokeep_per_subgroup;
     }
   }
@@ -665,7 +676,7 @@ namespace quantgen {
     
     gzFile genoStream;
     string line;
-    size_t nb_lines, nb_snps_tokeep_per_subgroup;
+    size_t tot_nb_snps, nb_snps_tokeep_per_subgroup;
     
     bool same_files = false;
     for(map<string,string>::const_iterator it = subgroup2genofile.begin();
@@ -677,18 +688,17 @@ namespace quantgen {
       }
       
       clock_t startTime = clock();
+      tot_nb_snps = 0;
       nb_snps_tokeep_per_subgroup = 0;
-      nb_lines = 0;
       openFile(it->second, genoStream, "rb");
       if(! getline(genoStream, line)){
 	cerr << "ERROR: problem with the header of file " << it->second << endl;
 	exit(EXIT_FAILURE);
       }
-      ++nb_lines;
       
       if(line.find("##fileformat=VCF") != string::npos) // VCF format
 	loadGenosAndSnpInfoFromVcf(it, sSnpsToKeep, mChr2VecPtGenes,
-				   genoStream, line, nb_lines,
+				   genoStream, line, tot_nb_snps,
 				   nb_snps_tokeep_per_subgroup, snp2object,
 				   mChr2VecPtSnps);
       else if(line.find("chr") != string::npos
@@ -698,7 +708,7 @@ namespace quantgen {
 	      && line.find("a1") != string::npos
 	      && line.find("a2") != string::npos) // IMPUTE format
 	loadGenosAndSnpInfoFromImpute(it, sSnpsToKeep, mChr2VecPtGenes,
-				      genoStream, line, nb_lines,
+				      genoStream, line, tot_nb_snps,
 				      nb_snps_tokeep_per_subgroup,
 				      snp2object, mChr2VecPtSnps);
       else if(line.compare(0, 2, "id") == 0 || line.compare(0, 2, "Id") == 0
@@ -722,7 +732,7 @@ namespace quantgen {
       
       closeFile(it->second , genoStream);
       if(verbose > 0)
-	cout << it->first << " (" << it->second << "): " << (nb_lines-1)
+	cout << it->first << " (" << it->second << "): " << tot_nb_snps
 	     << " SNPs (to keep: " << nb_snps_tokeep_per_subgroup << ", loaded in "
 	     << fixed << setprecision(2) << getElapsedTime(startTime) << " sec)"
 	     << endl << flush;

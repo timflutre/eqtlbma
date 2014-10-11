@@ -1,5 +1,6 @@
 TESTS = test_basic.bash \
 	test_basic_imp.bash \
+	test_basic_vcf.bash \
 	test_genes-absent-in-some-subgroups.bash \
 	test_genes-absent-in-some-subgroups-and-individuals.bash \
 	test_with-covariates.bash \
@@ -10,6 +11,7 @@ TESTS = test_basic.bash \
 EXTRA_DIST = functional_tests.R \
 	test_basic.bash \
 	test_basic_imp.bash \
+	test_basic_vcf.bash \
 	test_genes-absent-in-some-subgroups.bash \
 	test_genes-absent-in-some-subgroups-and-individuals.bash \
 	test_with-covariates.bash \

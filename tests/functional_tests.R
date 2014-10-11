@@ -145,7 +145,7 @@ checkParams <- function(params){
   stopifnot(! is.null(params$dir.name),
             file.exists(params$dir.name),
             params$lik %in% c("norm","pois","qpois"),
-            params$geno.format %in% c("custom","impute"))
+            params$geno.format %in% c("custom","impute","vcf"))
 }
 
 print.mat2 <- function(mat, a, b){
@@ -425,9 +425,42 @@ writeSimulatedData <- function(data=NULL, geno.format="custom",
     write.table(x=tmp, file="list_genotypes.txt", quote=FALSE,
                 row.names=FALSE, col.names=FALSE)
   } else if(geno.format == "vcf"){
-    message("ERROR: saving genotypes in VCF is not yet implemented")
+    tmp <- c("##fileformat=VCFv4.1",
+             paste0("##fileDate=", format(Sys.time(), "%Y%m%d")),
+             "##source=eqtlbma/tests/functional_tests.R",
+             "##reference=fake",
+             "##phasing=no",
+             "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality\">",
+             "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
+             paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t",
+                    paste(colnames(data$geno.counts), collapse="\t")))
+    write.table(x=tmp, file="genotypes.vcf",
+                quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+    tmp <- data.frame(CHROM=data$snp.coords$chr,
+                      POS=data$snp.coords$end,
+                      ID=data$snp.coords$id,
+                      REF=rep("A", nrow(data$geno.counts)),
+                      ALT=rep("C", nrow(data$geno.counts)),
+                      QUAL=rep(50, nrow(data$geno.counts)),
+                      FILTER=rep("PASS", nrow(data$geno.counts)),
+                      INFO=rep(".", nrow(data$geno.counts)),
+                      FORMAT=rep("GQ:GT", nrow(data$geno.counts)))
+    for(i in 1:ncol(data$geno.counts)){
+      gt <- rep(".", length(data$geno.counts[,i]))
+      gt[data$geno.counts[,i] == 0] <- ".:0/0"
+      gt[data$geno.counts[,i] == 1] <- ".:0/1"
+      gt[data$geno.counts[,i] == 2] <- ".:1/1"
+      tmp[[colnames(data$geno.counts)[i]]] <- gt
+    }
+    write.table(x=tmp, file="genotypes.vcf", append=TRUE,
+                quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+    system("gzip genotypes.vcf")
+    tmp <- data.frame(subgroup=names(data$phenos),
+                      file=rep("genotypes.vcf.gz",
+                        length(data$phenos)))
+    write.table(x=tmp, file="list_genotypes.txt", quote=FALSE,
+                row.names=FALSE, col.names=FALSE)
   } else if(geno.format == "impute"){
-    message("ERROR: saving genotypes in IMPUTE is not yet implemented")
     tmp <- data.frame(chr=data$snp.coords$chr,
                       name=data$snp.coords$id,
                       coord=data$snp.coords$end,

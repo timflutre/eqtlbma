@@ -58,25 +58,24 @@ namespace quantgen {
     bool HasGenotypes(const std::string & subgroup) const;
     bool HasGenotypesInAllSubgroups(const std::vector<std::string> & subgroups) const;
     void Show(std::ostream & os);
-    void AddSubgroupFromImputeLine(const std::string & subgroup,
-				   const std::vector<std::string>::const_iterator & begin,
+    void AddSubgroupFromImputeLine(const std::vector<std::string>::const_iterator & begin,
 				   const std::vector<std::string>::const_iterator & end,
 				   std::vector<double> & genotypes,
 				   double & minor_allele_freq);
-    void AddSubgroupFromVcfLine(const std::string & subgroup,
-				const std::vector<std::string>::const_iterator & begin,
+    void AddSubgroupFromVcfLine(const std::vector<std::string>::const_iterator & begin,
 				const std::vector<std::string>::const_iterator & end,
+				const size_t & idx_gt,
 				std::vector<double> & genotypes,
 				double & minor_allele_freq);
-    void AddSubgroupFromDoseLine(const std::string & subgroup,
-				 const std::vector<std::string>::const_iterator & begin,
+    void AddSubgroupFromDoseLine(const std::vector<std::string>::const_iterator & begin,
 				 const std::vector<std::string>::const_iterator & end,
 				 std::vector<double> & genotypes,
 				 double & minor_allele_freq);
     void AddSubgroup(const std::string & subgroup,
 		     const std::vector<std::string>::const_iterator & begin,
 		     const std::vector<std::string>::const_iterator & end,
-		     const std::string & format);
+		     const std::string & format,
+		     const size_t & idx_gt = std::string::npos);
     void EraseIfMissingValuesPerSubgroup();
     void EraseIfLowMafPerSubgroup(const double & min_maf);
     void DuplicateGenotypesFromFirstSubgroup(const std::string & subgroup_old,

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Aim: launch a basic functional test for eqtlbma_bf with genotypes in the
-#      IMPUTE-like format
+#      VCF format
 # Author: Timothée Flutre
 # Not copyrighted -- provided to the public domain
 
@@ -12,7 +12,7 @@ progVersion="1.0"
 # Display the help on stdout.
 # The format complies with help2man (http://www.gnu.org/s/help2man)
 function help () {
-    msg="\`${0##*/}' launches a basic functional test for eqtlbma_bf with genotypes in the IMPUTE-like format.\n"
+    msg="\`${0##*/}' launches a basic functional test for eqtlbma_bf with genotypes in the VCF format.\n"
     msg+="\n"
     msg+="Usage: ${0##*/} [OPTIONS] ...\n"
     msg+="\n"
@@ -105,14 +105,14 @@ function simul_data_and_calc_exp_res () {
     if [ $verbose -gt "0" ]; then
 	echo "simulate data and calculate expected results ..."
     fi
-    ${pathToRscript} --verbose 1 --dir $(pwd) --gfmt impute >& stdout_simul_exp
+    ${pathToRscript} --verbose 1 --dir $(pwd) --gfmt vcf >& stdout_simul_exp
 }
 
 function calc_obs_res () {
     if [ $verbose -gt "0" ]; then
 	echo "analyze data to get observed results ..."
     fi
-    $pathToBf --geno list_genotypes.txt \ #--scoord snp_coords.bed.gz \
+    $pathToBf --geno list_genotypes.txt \
 	--exp list_phenotypes.txt --gcoord gene_coords.bed.gz --cis 5 \
 	--out obs_bf --outss --outw --analys join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
