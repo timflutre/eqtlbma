@@ -773,15 +773,18 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
         p2f <- paste0(dir, "/genotypes.txt.gz")
         write.table(x=genos.dose, file=gzfile(p2f), quote=F, sep="\t",
                     row.names=T, col.names=T)
+        tmp <- data.frame(subgroup=names(inds),
+                          file=rep(p2f, length(inds)))
     } else{ # different individuals between subgroups
         for(s in 1:nb.subgroups){
             p2f <- paste0(dir, "/genotypes_", names(inds)[s], ".txt.gz")
             write.table(x=genos.dose[,inds[[s]]$name], file=gzfile(p2f),
                         quote=F, sep="\t", row.names=T, col.names=T)
         }
+        tmp <- data.frame(subgroup=names(inds),
+                          file=paste0(dir, "/genotypes_", names(inds),
+                              ".txt.gz"))
     }
-    tmp <- data.frame(subgroup=names(inds),
-                      file=paste0(dir, "/genotypes_", names(inds), ".txt.gz"))
     p2f <- paste0(dir, "/list_genotypes.txt")
     write.table(x=tmp, file=p2f, quote=F, sep="\t", row.names=F, col.names=F)
     
@@ -809,6 +812,8 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
                       dimnames=list(covariates=c("sex"), inds=inds[[1]]$name))
         write.table(x=tmp, file=gzfile(p2f), quote=F, sep="\t", row.names=T,
                     col.names=T)
+        tmp <- data.frame(subgroup=names(inds),
+                          file=rep(p2f, length(inds)))
     } else{ # different individuals between subgroups
         for(s in 1:nb.subgroups){
             p2f <- paste0(dir, "/covariates_", names(inds)[s], ".txt.gz")
@@ -818,9 +823,10 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
             write.table(x=tmp, file=gzfile(p2f), quote=F, sep="\t", row.names=T,
                         col.names=T)
         }
+        tmp <- data.frame(subgroup=names(inds),
+                          file=paste0(dir, "/covariates_", names(inds),
+                              ".txt.gz"))
     }
-    tmp <- data.frame(subgroup=names(inds),
-                      file=paste0(dir, "/covariates_", names(inds), ".txt.gz"))
     p2f <- paste0(dir, "/list_covariates.txt")
     write.table(x=tmp, file=p2f, quote=F, sep="\t", row.names=F, col.names=F)
     
