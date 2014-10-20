@@ -62,6 +62,7 @@ public:
   size_t dim_; // nb of configs or nb of types
   vector<string> config_names_;
   double thresh_; // on log-lik, to stop EM
+  size_t max_nb_iters_; // to stop EM
   map<string,bool> param2fixed_;
   int nb_threads_; 
   int verbose_;
@@ -102,6 +103,7 @@ public:
   Controller(const size_t & nb_subgroups, const string & model,
 	     const size_t & grid_size,
 	     const size_t & dim, const double & thresh,
+	     const size_t & max_nb_iters,
 	     const double & fixed_pi0, const int & nb_threads,
 	     const int & verbose);
   
@@ -162,6 +164,7 @@ Controller::Controller(const size_t & nb_subgroups,
 		       const size_t & gsize,
 		       const size_t & dim,
 		       const double & thresh,
+		       const size_t & max_nb_iters,
 		       const double & fixed_pi0,
 		       const int & nb_threads,
 		       const int & verbose)
@@ -210,6 +213,7 @@ Controller::Controller(const size_t & nb_subgroups,
   param2fixed_.insert(make_pair("subgroups-per-type", false));
   
   thresh_ = thresh;
+  max_nb_iters_ = max_nb_iters;
   nb_threads_ = nb_threads;
   verbose_ = verbose;
 }
@@ -946,7 +950,8 @@ void Controller::run_EM()
 	      new_log10_obs_lik_, log10_obs_lik_);
       exit(EXIT_FAILURE);
     }
-    if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_)
+    if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_ ||
+       (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
     log10_obs_lik_ = new_log10_obs_lik_;
@@ -1399,6 +1404,8 @@ void help(char ** argv)
        << "      --rand\trandom initialization" << endl
        << "      --seed\tseed used with --rand, otherwise use time" << endl
        << "      --thresh\tthreshold to stop the EM (default=0.05)" << endl
+       << "      --maxit\tmaximum number of iterations (optional)" << endl
+       << "\t\tuseful if wall-time limit (see also --init)" << endl
        << "      --thread\tnumber of threads (default=1)" << endl
        << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
        << "      --getci\tcompute the confidence intervals (single thread, thus slow)" << endl
@@ -1439,6 +1446,7 @@ void parseCmdLine(
   bool & rand_init,
   size_t & seed,
   double & thresh,
+  size_t & max_nb_iters,
   int & nb_threads,
   string & file_ci,
   vector<string> & configs_tokeep,
@@ -1463,6 +1471,7 @@ void parseCmdLine(
       {"rand", no_argument, 0, 0},
       {"seed", required_argument, 0, 0},
       {"thresh", required_argument, 0, 0},
+      {"maxit", required_argument, 0, 0},
       {"thread", required_argument, 0, 0},
       {"ci", required_argument, 0, 0},
       {"configs", required_argument, 0, 0},
@@ -1514,6 +1523,10 @@ void parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "seed") == 0){
 	seed = atol(optarg);
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "maxit") == 0){
+	max_nb_iters = atol(optarg);
 	break;
       }
       if(strcmp(long_options[option_index].name, "thresh") == 0){
@@ -1667,6 +1680,7 @@ void run(
   const string & file_init,
   const size_t & seed,
   const double & thresh,
+  const size_t & max_nb_iters,
   const int & nb_threads,
   const string & file_ci,
   const vector<string> & configs_tokeep,
@@ -1676,7 +1690,7 @@ void run(
   const int & verbose)
 {
   Controller controller(nb_subgroups, model, nb_grid_points, dim, thresh,
-			fixed_pi0, nb_threads, verbose);
+			max_nb_iters, fixed_pi0, nb_threads, verbose);
   
   controller.load_data(file_pattern, configs_tokeep);
   
@@ -1714,15 +1728,16 @@ int main(int argc, char **argv)
   int verbose = 1, nb_threads = 1;
   string file_pattern, model = "configs", out_file, file_init, file_ci;
   size_t nb_subgroups = string::npos, dim = string::npos,
-    nb_grid_points = string::npos, seed = string::npos;
+    nb_grid_points = string::npos, seed = string::npos,
+    max_nb_iters = string::npos;
   double thresh = 0.05, fixed_pi0 = NaN;
   vector<string> configs_tokeep;
   bool rand_init = false, skip_ci = true, skip_bf = true;
   
   parseCmdLine(argc, argv, file_pattern, nb_subgroups, model, dim,
 	       nb_grid_points, out_file, file_init, rand_init, seed, thresh,
-	       nb_threads, file_ci, configs_tokeep, skip_ci, skip_bf,
-	       fixed_pi0, verbose);
+	       max_nb_iters, nb_threads, file_ci, configs_tokeep, skip_ci,
+	       skip_bf, fixed_pi0, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -1736,7 +1751,7 @@ int main(int argc, char **argv)
   }
   
   run(file_pattern, nb_subgroups, model, dim, nb_grid_points,
-      out_file, file_init, seed, thresh, nb_threads,
+      out_file, file_init, seed, thresh, max_nb_iters, nb_threads,
       file_ci, configs_tokeep, skip_ci, skip_bf, fixed_pi0, verbose);
   
   if(verbose > 0){
