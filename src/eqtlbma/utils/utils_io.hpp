@@ -25,6 +25,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -140,6 +141,15 @@ namespace utils {
   {
     for(typename M::const_iterator it = m.begin(); it != m.end(); ++it)
       v.push_back(it->first);
+  }
+
+  /** \brief Return true if the vector contains only unique items
+   *  \note http://stackoverflow.com/q/2769174/597069
+   */
+  template <class T>
+  bool is_unique(std::vector<T> v) {
+    std::set<T> s(v.begin(), v.end());
+    return v.size() == s.size();
   }
 
 } // namespace utils
