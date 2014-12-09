@@ -264,29 +264,33 @@ checkParams <- function(params){
 simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
     tot.nb.inds <- ifelse(length(nb.inds) == 1, nb.inds, sum(nb.inds))
     if(verbose > 0){
-        msg <- paste0("simulate ", tot.nb.inds, " individuals")
+        msg <- paste0("simulate ", tot.nb.inds, " individuals and ",
+                      nb.subgroups, " subgroup",
+                      ifelse(nb.subgroups > 1, "s", ""))
         if(length(nb.inds) == 1){
-            msg <- paste0(msg, " (same in all subgroups) ...")
+            msg <- paste0(msg, " (same individuals in all subgroups) ...")
         } else
-            msg <- paste0(msg, " (different between subgroups) ...")
+            msg <- paste0(msg, " (different individuals between subgroups) ...")
         message(msg)
     }
     
     inds <- list("1"=data.frame(name=paste0("ind", 1:nb.inds[1]),
                      sex=sample(c(0, 1), nb.inds[1], replace=TRUE),
                      stringsAsFactors=FALSE))
-    if(length(nb.inds) == 1){
+    if(nb.subgroups > 1){
+      if(length(nb.inds) == 1){
         for(s in 2:nb.subgroups)
-            inds[[as.character(s)]] <- inds[["1"]]
+          inds[[as.character(s)]] <- inds[["1"]]
         names(inds) <- paste0("tissue", 1:nb.subgroups)
-    } else{
+      } else{
         for(s in 2:nb.subgroups)
-            inds[[as.character(s)]] <-
-                data.frame(name=paste0("ind", (sum(nb.inds[1:(s-1)])+1):
-                                           (sum(nb.inds[1:(s-1)])+nb.inds[s])),
-                           sex=sample(c(0, 1), nb.inds[s], replace=TRUE),
-                           stringsAsFactors=FALSE)
+          inds[[as.character(s)]] <-
+            data.frame(name=paste0("ind", (sum(nb.inds[1:(s-1)])+1):
+                                     (sum(nb.inds[1:(s-1)])+nb.inds[s])),
+                       sex=sample(c(0, 1), nb.inds[s], replace=TRUE),
+                       stringsAsFactors=FALSE)
         names(inds) <- paste0("pop", 1:nb.subgroups)
+      }
     }
     
     return(inds)
@@ -611,9 +615,13 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
     col.idx.betas <- grep("beta", colnames(truth))
     
     configs <- getBinaryConfigs(nb.subgroups) # first row is null config
-    prior.configs <- c(0.0, # conditional on being an eQTL in at least one
-                       rep((1-0.3)/(nrow(configs)-2), nrow(configs)-2),
-                       0.3) # fully active config assumed most frequent
+    prior.configs <- c()
+    if(nb.subgroups == 1){
+      prior.configs <- c(0.0, 1.0)
+    } else
+      prior.configs <- c(0.0, # conditional on being an eQTL in at least one
+                         rep((1-0.3)/(nrow(configs)-2), nrow(configs)-2),
+                         0.3) # fully active config assumed most frequent
     stopifnot(all.equal(sum(prior.configs[2:length(prior.configs)]), 1.0))
     
     if(nb.cores == 1)
