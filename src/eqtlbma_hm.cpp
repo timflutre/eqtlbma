@@ -1,7 +1,7 @@
 /** \file eqtlbma_hm.cpp
  *
  *  `eqtlbma_hm' implements the EM algorithm to fit the hierarchical model from eQtlBma.
- *  Copyright (C) 2012-2013 Xiaoquan Wen, Timothee Flutre
+ *  Copyright (C) 2012-2014 Xiaoquan Wen, Timothee Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,8 +51,9 @@ using namespace utils;
 class Controller
 {
   void load_data_one_file(const string & file,
-			  const vector<string> & configs_tokeep,
-			  vector<string> & lines);
+                          const vector<string> & configs_tokeep,
+                          const bool & keep_gen_abfs,
+                          vector<string> & lines);
   
 public:
   vector<gene_eQTL> genes_;
@@ -108,7 +109,8 @@ public:
 	     const int & verbose);
   
   void load_data(const string & file_pattern,
-		 const vector<string> & configs_tokeep);
+                 const vector<string> & configs_tokeep,
+                 const bool & keep_gen_abfs);
   
   void init_params(const size_t & seed);
   void init_params(const string & init_file);
@@ -221,6 +223,7 @@ Controller::Controller(const size_t & nb_subgroups,
 void Controller::load_data_one_file(
   const string & file,
   const vector<string> & configs_tokeep,
+  const bool & keep_gen_abfs,
   vector<string> & lines)
 {
   // load the whole file at once (supposedly quicker)
@@ -252,10 +255,12 @@ void Controller::load_data_one_file(
     snp_id = string(pch);
     pch = strtok(NULL, " \t,");
     config = string(pch);
-    if(config.find("gen") != string::npos // skip meta-analysis BFs
+    if((! keep_gen_abfs & config.find("gen") != string::npos)
        || (! configs_tokeep.empty()
-	   && find(configs_tokeep.begin(), configs_tokeep.end(), config)
-	   == configs_tokeep.end()))
+           && find(configs_tokeep.begin(), configs_tokeep.end(), config)
+           == configs_tokeep.end()))
+      continue;
+    if(keep_gen_abfs & (config == "gen-fix" || config == "gen-maxh"))
       continue;
     
     // record config names once (for output)
@@ -303,7 +308,8 @@ void Controller::load_data_one_file(
 
 void Controller::load_data(
   const string & file_pattern,
-  const vector<string> & configs_tokeep)
+  const vector<string> & configs_tokeep,
+  const bool & keep_gen_abfs)
 {
   if(verbose_ > 0)
     fprintf(stderr, "load data ...\n");
@@ -330,7 +336,7 @@ void Controller::load_data(
       progressBar("", i+1, files.size());
     else if(verbose_ > 1)
       cout << "file " << (i+1) << " " << files[i] << endl;
-    load_data_one_file(files[i], configs_tokeep, lines);
+    load_data_one_file(files[i], configs_tokeep, keep_gen_abfs, lines);
     lines.clear();
     // vector<string>().swap(lines);
   }
@@ -1408,6 +1414,7 @@ void help(char ** argv)
        << "\t\tuseful if wall-time limit (see also --init)" << endl
        << "      --thread\tnumber of threads (default=1)" << endl
        << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
+       << "      --keepgen\tkeep 'general' ABFs (useful for BMAlite)" << endl
        << "      --getci\tcompute the confidence intervals (single thread, thus slow)" << endl
        << "      --getbf\tcompute the Bayes Factors using the estimated weights" << endl
        << "\t\tcan take some time, otherwise only the estimated weights are reported" << endl
@@ -1422,7 +1429,7 @@ void version(char ** argv)
 {
   cout << argv[0] << " " << VERSION << endl
        << endl
-       << "Copyright (C) 2012-2013 Xiaoquan Wen and Timothee Flutre." << endl
+       << "Copyright (C) 2012-2014 Xiaoquan Wen and Timothee Flutre." << endl
        << "License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>" << endl
        << "This is free software; see the source for copying conditions.  There is NO" << endl
        << "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE." << endl
@@ -1450,6 +1457,7 @@ void parseCmdLine(
   int & nb_threads,
   string & file_ci,
   vector<string> & configs_tokeep,
+  bool & keep_gen_abfs,
   bool & skip_ci,
   bool & skip_bf,
   double & fixed_pi0,
@@ -1475,6 +1483,7 @@ void parseCmdLine(
       {"thread", required_argument, 0, 0},
       {"ci", required_argument, 0, 0},
       {"configs", required_argument, 0, 0},
+      {"keepgen", no_argument, 0, 0},
       {"getci", no_argument, 0, 0},
       {"getbf", no_argument, 0, 0},
       {"pi0", required_argument, 0, 0},
@@ -1543,6 +1552,10 @@ void parseCmdLine(
       }
       if(strcmp(long_options[option_index].name, "configs") == 0){
 	split(optarg, "|", configs_tokeep);
+	break;
+      }
+      if(strcmp(long_options[option_index].name, "keepgen") == 0){
+	keep_gen_abfs = true;
 	break;
       }
       if(strcmp(long_options[option_index].name, "getci") == 0){
@@ -1684,6 +1697,7 @@ void run(
   const int & nb_threads,
   const string & file_ci,
   const vector<string> & configs_tokeep,
+  const bool & keep_gen_abfs,
   const bool & skip_ci,
   const bool & skip_bf,
   const double & fixed_pi0,
@@ -1692,7 +1706,7 @@ void run(
   Controller controller(nb_subgroups, model, nb_grid_points, dim, thresh,
 			max_nb_iters, fixed_pi0, nb_threads, verbose);
   
-  controller.load_data(file_pattern, configs_tokeep);
+  controller.load_data(file_pattern, configs_tokeep, keep_gen_abfs);
   
   if(! file_ci.empty()){
     controller.init_params(file_ci);
@@ -1732,12 +1746,13 @@ int main(int argc, char **argv)
     max_nb_iters = string::npos;
   double thresh = 0.05, fixed_pi0 = NaN;
   vector<string> configs_tokeep;
-  bool rand_init = false, skip_ci = true, skip_bf = true;
+  bool rand_init = false, keep_gen_abfs = false, skip_ci = true,
+    skip_bf = true;
   
   parseCmdLine(argc, argv, file_pattern, nb_subgroups, model, dim,
-	       nb_grid_points, out_file, file_init, rand_init, seed, thresh,
-	       max_nb_iters, nb_threads, file_ci, configs_tokeep, skip_ci,
-	       skip_bf, fixed_pi0, verbose);
+               nb_grid_points, out_file, file_init, rand_init, seed, thresh,
+               max_nb_iters, nb_threads, file_ci, configs_tokeep,
+               keep_gen_abfs, skip_ci, skip_bf, fixed_pi0, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -1752,7 +1767,8 @@ int main(int argc, char **argv)
   
   run(file_pattern, nb_subgroups, model, dim, nb_grid_points,
       out_file, file_init, seed, thresh, max_nb_iters, nb_threads,
-      file_ci, configs_tokeep, skip_ci, skip_bf, fixed_pi0, verbose);
+      file_ci, configs_tokeep, keep_gen_abfs, skip_ci, skip_bf, fixed_pi0,
+      verbose);
   
   if(verbose > 0){
     time (&time_end);
