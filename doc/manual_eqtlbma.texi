@@ -1188,6 +1188,34 @@ zcat out_eqtlbma_hm.txt.gz | grep "#" | sed 's/#//g' | sed 1d \
 @sp 1
 
 @item
+@strong{How do I extract ABFs for a subset of genes after eqtlbma_bf?}
+
+First, you have to write in a file the list of genes you are interested in.
+This file, below assumed to be called "list_genes_tokeep.txt", should have a single column and a single gene identifier per line.
+
+Then, assuming that you ran eqtlbma_bf in parallel, use the following command-line to (1) list all ABF files, and then, for each of them, (2) retrieve the file prefix, (3) extract the genes of interest into another file, and (4) compress it:
+@verbatim
+ls *_l10abfs_raw.txt.gz | while read f; do \
+  echo $f; f2="${f%.txt.*}"; echo $f2; \
+  rm -f ${f2}_filter.txt; \
+  zcat $f | head -1 > ${f2}_filter.txt; \
+  zcat $f | sed 1d | grep -f list_genes_tokeep.txt >> ${f2}_filter.txt;
+  gzip ${f2}_filter.txt
+done
+@end verbatim
+
+As it can take some time, we can use @url{http://www.gnu.org/software/parallel/,GNU parallel} to speed this up:
+@verbatim
+ls *_l10abfs_raw.txt.gz | \
+parallel 'f={}; f2="${f%.txt.*}"; rm -f ${f2}_filter2.txt; \
+zcat $f | head -1 > ${f2}_filter2.txt; \
+zcat $f | sed 1d | grep -f list_genes_tokeep.txt >> ${f2}_filter2.txt;
+gzip ${f2}_filter2.txt'
+@end verbatim
+
+@sp 1
+
+@item
 @strong{Is this packaged tested?}
 
 We implemented some R code in order to perform @url{https://en.wikipedia.org/wiki/Functional_testing,functional tests} on @command{eqtlbma_bf} and @command{eqtlbma_hm}.
