@@ -816,9 +816,9 @@ void Controller::show_state_EM(const size_t & iter)
   fprintf(stdout, "iter %4zu", iter);
   
   if(iter == 0)
-    fprintf(stdout, "  loglik %7.4e", log10_obs_lik_);
+    fprintf(stdout, "  loglik %f", log10_obs_lik_);
   else
-    fprintf(stdout, "  loglik %7.4e", new_log10_obs_lik_);
+    fprintf(stdout, "  loglik %f", new_log10_obs_lik_);
   
   fprintf(stdout, "  pi0 %7.4e", pi0_);
   
@@ -952,7 +952,7 @@ void Controller::run_EM()
       show_state_EM(iter);
     
     if(new_log10_obs_lik_ < log10_obs_lik_){
-      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%7.4e < %7.4e)\n" ,
+      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
 	      new_log10_obs_lik_, log10_obs_lik_);
       exit(EXIT_FAILURE);
     }
