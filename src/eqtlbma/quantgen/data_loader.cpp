@@ -592,6 +592,11 @@ namespace quantgen {
         Snp snp(tokens[1], tokens[0], tokens[2]);
         snp2object.insert(make_pair(snp.GetName(), snp));
       }
+      if(snp2object[tokens[1]].HasGenotypes(subgroup)){
+        cerr << "ERROR: SNP " << tokens[1] << " is duplicated in file "
+             << genofile << endl;
+        exit(EXIT_FAILURE);
+      }
       snp2object[tokens[1]].AddSubgroup(subgroup, tokens.begin()+5,
                                         tokens.end(), "impute");
       ++nb_snps_tokeep_per_subgroup;
@@ -654,6 +659,11 @@ namespace quantgen {
         if(tokens2[idx_gt] == "GT")
           break;
         ++idx_gt;
+      }
+      if(snp2object[tokens[2]].HasGenotypes(subgroup)){
+        cerr << "ERROR: SNP " << tokens[2] << " is duplicated in file "
+             << genofile << endl;
+        exit(EXIT_FAILURE);
       }
       snp2object[tokens[2]].AddSubgroup(subgroup, tokens.begin()+9,
                                         tokens.end(), "vcf", idx_gt);
@@ -907,8 +917,12 @@ namespace quantgen {
         }
         if(snp2object.find(tokens[0]) == snp2object.end())
           continue; // skip if no coordinate
-        if(find(tokens.begin(), tokens.end(), "NA") != tokens.end()){
+        if(find(tokens.begin(), tokens.end(), "NA") != tokens.end())
           continue; // skip if missing genotype(s)
+        if(snp2object[tokens[0]].HasGenotypes(it->first)){
+          cerr << "ERROR: SNP " << tokens[0] << " is duplicated in file "
+               << it->second << endl;
+          exit(EXIT_FAILURE);
         }
         snp2object[tokens[0]].AddSubgroup(it->first, tokens.begin()+1,
                                           tokens.end(), "dose");
