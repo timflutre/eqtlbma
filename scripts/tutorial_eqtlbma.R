@@ -53,9 +53,6 @@ help <- function(){
     txt <- paste0(txt, "     --nchrs\tnb of chromosome(s) (default=1)\n")
     txt <- paste0(txt, "     --agl\taverage gene length (default=10000)\n")
     txt <- paste0(txt, "     --ail\taverage intergenic length (default=50000)\n")
-    txt <- paste0(txt, "     --nsnps\tnb of SNPs (default=10000)\n")
-    txt <- paste0(txt, "\t\tuniformly distributed along the genome\n")
-    txt <- paste0(txt, "\t\tgenotypes coded as allele dose in {0,1,2}\n")
     txt <- paste0(txt, "     --anchor\tanchor for cis region (default=TSS/TSS+TES)\n")
     txt <- paste0(txt, "     --cr5\tradius of cis region in 5' (default=1000)\n")
     txt <- paste0(txt, "     --cr3\tradius of cis region in 3' (default=1000)\n")
@@ -102,7 +99,7 @@ version <- function(){
 parseCmdLine <- function(params){
     args <- commandArgs(trailingOnly=TRUE)
     ## print(args)
-    
+
     i <- 0
     while(i < length(args)){ # use "while" loop for options with no argument
         i <- i + 1
@@ -200,7 +197,7 @@ parseCmdLine <- function(params){
             quit("no", status=1)
         }
     }
-    
+
     return(params)
 }
 
@@ -220,7 +217,7 @@ checkParams <- function(params){
         quit("no", status=1)
     }
     source(paste0(params$pkg, "/scripts/utils_eqtlbma.R"))
-    
+
     if(length(params$nb.inds) > 1 &
        length(params$nb.inds) != params$nb.subgroups){
         write(paste0(prog.name, ": --ninds should correspond to --nsbgrps\n"),
@@ -228,7 +225,10 @@ checkParams <- function(params){
         help()
         quit("no", status=1)
     }
-    
+
+    if(! is.null(params$fixed.nb.snps.per.gene))
+        params$avg.nb.snps.per.gene <- NULL
+
     if(! params$coverr %in% c(0,1,2)){
         write(paste0(prog.name, ": --coverr should be 0, 1 or 2\n"),
               stderr())
@@ -242,7 +242,7 @@ checkParams <- function(params){
         help()
         quit("no", status=1)
     }
-    
+
     if(params$prop.rare < 0 || params$prop.rare > 1){
         write(paste0(prog.name, ": --rare ", params$prop.rare,
                      " should be between 0 and 1\n"),
@@ -250,7 +250,7 @@ checkParams <- function(params){
         help()
         quit("no", status=1)
     }
-    
+
     return(params)
 }
 
@@ -273,7 +273,7 @@ simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
             msg <- paste0(msg, " (different individuals between subgroups) ...")
         message(msg)
     }
-    
+
     inds <- list("1"=data.frame(name=paste0("ind", 1:nb.inds[1]),
                      sex=sample(c(0, 1), nb.inds[1], replace=TRUE),
                      stringsAsFactors=FALSE))
@@ -292,7 +292,7 @@ simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
         names(inds) <- paste0("pop", 1:nb.subgroups)
       }
     }
-    
+
     return(inds)
 }
 
@@ -309,15 +309,16 @@ simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
 simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
                                  avg.intergenic.length, verbose=1){
     if(verbose > 0)
-        message(paste0("simulate coordinates for ", nb.genes, " genes (",
+        message(paste0("simulate coordinates for ", nb.genes, " gene",
+                       ifelse(nb.genes > 1, "s", ""), " (",
                        nb.chrs, " chr", ifelse(nb.chrs > 1, "s", ""), ") ..."))
-    
+
     chr.names <- sprintf(paste0("chr%0", floor(log10(nb.chrs))+1, "i"),
                          1:nb.chrs)
     tmp <- round(seq(0, nb.genes, length.out=nb.chrs + 1))
     nb.genes.chrs <- rev(rev(tmp)[-length(tmp)] - rev(tmp)[-1])
     names(nb.genes.chrs) <- chr.names
-    
+
     ## explore negative binomial distribution for various parameters
     ## http://www.math.uah.edu/stat/bernoulli/NegativeBinomial.html
     debug <- FALSE
@@ -327,14 +328,14 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
         S.X <- function(n, p){(2 - p) / sqrt(n * (1 - p))}
         n <- 10^(1); p <- 10^(-3)
         E.X(n, p); V.X(n, p); S.X(n, p)
-        tmp <- rnbinom(n=1000, size=n, prob=p) 
+        tmp <- rnbinom(n=1000, size=n, prob=p)
         summary(tmp); IQR(tmp)
         hist(x=tmp, main=paste0("n=", format(n,digits=2,scientific=TRUE), " p=", format(p,digits=2,scientific=TRUE), " min=", format(min(tmp),digits=2,scientific=TRUE), " max=", format(max(tmp),digits=2,scientific=TRUE)), breaks=100, xlab="gene lengths (bp)")
         abline(v=E.X(n,p), lwd=2)
         abline(v=E.X(n,p) - 2 * sqrt(V.X(n,p)), lwd=2, lty=2)
         abline(v=E.X(n,p) + 2 * sqrt(V.X(n,p)), lwd=2, lty=2)
     }
-    
+
     ## X ~ NB(n,p) is "gene length"
     E.x <- avg.gene.length
     S.x <- 1.0
@@ -351,7 +352,7 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
                        " min=", format(min(gene.lengths), scientific=TRUE, digits=2),
                        " med=", format(median(gene.lengths), scientific=TRUE, digits=2),
                        " max=", format(max(gene.lengths), scientific=TRUE, digits=2)))
-    
+
     ## X ~ NB(n,p) is "intergenic length"
     E.x <- avg.intergenic.length
     S.x <- 1.2
@@ -368,12 +369,12 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
                        " min=", format(min(intergenic.lengths), scientific=TRUE, digits=2),
                        " med=", format(median(intergenic.lengths), scientific=TRUE, digits=2),
                        " max=", format(max(intergenic.lengths), scientific=TRUE, digits=2)))
-    
+
     interval.length.chrs <- lapply(chr.names, function(chr){
         c(rbind(intergenic.length.chrs[[chr]], gene.length.chrs[[chr]]))
     })
     names(interval.length.chrs) <- chr.names
-    
+
     gene.coords.bed <- do.call(rbind, lapply(chr.names, function(chr){
         idx <- which(chr.names == chr)
         data.frame(chr=rep(chr, nb.genes.chrs[chr]),
@@ -393,7 +394,7 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
     }))
     ## hist(x=gene.coords.bed$end - gene.coords.bed$start,
     ##      main="Gene lengths (in bp)", xlab="")
-    
+
     return(gene.coords.bed)
 }
 
@@ -414,17 +415,17 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
     stopifnot(anchor %in% c("TSS", "TSS+TES"),
               xor(is.null(fixed.nb.snps.per.gene),
                   is.null(avg.nb.snps.per.gene)))
-    
+
     if(verbose > 0)
         message("simulate SNP coordinates ...")
-    
+
     nb.genes <- nrow(gene.coords.bed)
     nb.genes.chrs <- tapply(gene.coords.bed$name,
                             list(as.factor(gene.coords.bed$chr)),
                             length)
     nb.chrs <- length(nb.genes.chrs)
     chr.names <- names(nb.genes.chrs)
-    
+
     if(! is.null(fixed.nb.snps.per.gene)){
         nb.cis.snps.per.gene <- lapply(names(nb.genes.chrs), function(chr){
             rep(x=fixed.nb.snps.per.gene, times=nb.genes.chrs[chr])
@@ -448,7 +449,7 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
         message(paste0("nb of gene(s) with no cis SNPs: ",
                        sum(nb.cis.snps.genes == 0)))
     }
-    
+
     snp.loci <- lapply(names(nb.genes.chrs), function(chr){
         gene.coords.bed.chr <- gene.coords.bed[gene.coords.bed$chr == chr,]
         do.call(c, lapply(1:nb.genes.chrs[chr], function(g){
@@ -475,7 +476,7 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
         }))
     })
     names(snp.loci) <- chr.names
-    
+
     snp.coords.bed <- do.call(rbind, lapply(chr.names, function(chr){
         idx <- which(chr.names == chr)
         data.frame(chr=rep(chr, nb.cis.snps.per.chr[chr]),
@@ -487,7 +488,7 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
                            (c(0, cumsum(nb.cis.snps.per.chr))[idx+1])),
                    stringsAsFactors=FALSE)
     }))
-    
+
     return(snp.coords.bed)
 }
 
@@ -505,7 +506,7 @@ simulGenotypes <- function(snp.coords.bed, nb.inds, inds, maf, prop.rare,
                            verbose=1){
     if(verbose > 0)
         message("simulate genotypes (maf=", maf, " rare=", prop.rare, ") ...")
-    
+
     nb.snps <- nrow(snp.coords.bed)
     tot.nb.inds <- ifelse(length(nb.inds) == 1, nb.inds, sum(nb.inds))
     tot.ind.names <- c()
@@ -513,7 +514,7 @@ simulGenotypes <- function(snp.coords.bed, nb.inds, inds, maf, prop.rare,
         tot.ind.names <- inds[[1]]$name
     } else
         tot.ind.names <- unlist(lapply(inds, function(x){x$name}))
-    
+
     freq.hwe <- function(maf){ # Hardy-Weinberg equilibrium
         f2 <- maf^2 # proba of having 2 copies of minor allele
         f1 <- 2 * maf * (1-maf) # one copy
@@ -540,7 +541,7 @@ simulGenotypes <- function(snp.coords.bed, nb.inds, inds, maf, prop.rare,
                          byrow=TRUE,
                          dimnames=list(snp=snp.coords.bed$name[(nb.snps.common+1):nb.snps],
                              ind=tot.ind.names)))
-    
+
     return(genos.dose)
 }
 
@@ -560,16 +561,16 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                                pi0, coverr, nb.cores=1, verbose=1){
     if(verbose > 0)
         message("simulate gene expression levels ...")
-    
+
     nb.subgroups <- length(inds)
     tot.nb.inds <- ifelse(length(nb.inds) == 1, nb.inds, sum(nb.inds))
     nb.genes <- length(gn2sn)
-    
+
     ## intercepts and other covariates (e.g. sex)
     ## use inverse-Gamma prior on variance
     Sigma.beta.c <- diag(x=1 / rgamma(nb.subgroups, 2, 1),
                          nrow=nb.subgroups, ncol=nb.subgroups)
-    
+
     ## genotype effect sizes (a single SNP)
     ## use "meta-analysis" prior (prior grid of variances)
     oma2.plus.phi2 <- 0.8^2 # prior variance of subgroup SNP effect
@@ -578,7 +579,7 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
     phi2 <- oma2.plus.phi2 * (1 - oma2.over.oma2.plus.phi2) # prior var of subgroup SNP effect, given avg effect
     Sigma.beta.g <- matrix(rep(oma2, nb.subgroups^2), nb.subgroups, nb.subgroups) +
         diag(rep(phi2, nb.subgroups), nb.subgroups, nb.subgroups)
-    
+
     ## errors: variance-covariance within-between subgroups
     if(coverr == 0 | coverr == 1){
         r <- ceiling(0.1 * tot.nb.inds) # "r small relative to sample size"
@@ -597,10 +598,10 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
         message("covariance matrix of the errors (same for all genes):")
         print(cov.err.S)
     }
-    
+
     ## errors: covariance between individuals (assumed unrelated)
     cov.err.I <- diag(tot.nb.inds)
-    
+
     truth <- data.frame(gene=do.call(c, lapply(names(gn2sn), function(n){rep(n, length(gn2sn[[n]]))})),
                         snp=do.call(c, lapply(names(gn2sn), function(n){gn2sn[[n]]})),
                         config=rep(0, sum(sapply(gn2sn, length))),
@@ -613,7 +614,7 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
     colnames(truth)[seq(4+nb.subgroups, 4+2*nb.subgroups-1)] <-
         paste0("beta.g.", 1:nb.subgroups)
     col.idx.betas <- grep("beta", colnames(truth))
-    
+
     configs <- getBinaryConfigs(nb.subgroups) # first row is null config
     prior.configs <- c()
     if(nb.subgroups == 1){
@@ -623,22 +624,22 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                          rep((1-0.3)/(nrow(configs)-2), nrow(configs)-2),
                          0.3) # fully active config assumed most frequent
     stopifnot(all.equal(sum(prior.configs[2:length(prior.configs)]), 1.0))
-    
+
     if(nb.cores == 1)
         pb <- txtProgressBar(min=0, max=nb.genes, style=3)
     explevels <- mclapply(1:nb.genes, function(g){
         if(nb.cores == 1)
             setTxtProgressBar(pb, g)
-        
+
         gene <- names(gn2sn)[g]
-        
+
         if(length(nb.inds) == 1){ # same individuals in all subgroups
             X.c <- cbind(rep(1, nb.inds[1]),
                          inds[[1]]$sex)
             B.c <- matrix(mvrnorm(n=2, mu=rep(0, nb.subgroups),
                                   Sigma=Sigma.beta.c),
                           nrow=2, ncol=nb.subgroups)
-            
+
             ## having a cov.err.S per gene sometimes creates E with NAs (because of singular V %x% U)
             ## cov.err.S <- solve(rWishart(n=1, df=m.i,
             ##                             Sigma=(1/nu.i)*solve(H.i))[,,1])
@@ -651,7 +652,7 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
             }
             truth[which(truth$gene == gene), col.idx.sigmas] <<-
                 rep(sqrt(diag(cov.err.S)), each=sum(truth$gene == gene))
-            
+
             if(runif(1) < pi0){
                 X <- X.c
                 B <- B.c
@@ -671,7 +672,7 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                 X <- cbind(X.c, X.g)
                 B <- rbind(B.c, B.g)
             }
-            
+
             Y <- X %*% B + E
             rownames(Y) <- inds[[1]]$name
             colnames(Y) <- names(inds)
@@ -690,18 +691,18 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                 truth[which(truth$gene == gene & truth$snp == eqtn),
                       col.idx.betas] <<- B.g
             }
-            
+
             Y <- lapply(1:nb.subgroups, function(s){
                 X.c.s <- cbind(rep(1, nb.inds[s]),
                                inds[[s]]$sex)
                 B.c.s <- matrix(rnorm(n=2, mean=0,
                                       sd=sqrt(diag(Sigma.beta.c)[s])))
-                
+
                 E.s <- matrix(rnorm(n=nb.inds[s], mean=0,
                                     sd=sqrt(diag(cov.err.S)[s])))
                 truth[which(truth$gene == gene), paste0("sigma.",s)] <<-
                     sqrt(diag(cov.err.S)[s])
-                
+
                 if(config[s] == 0){
                     X.s <- X.c.s
                     B.s <- B.c.s
@@ -711,20 +712,20 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                     X.s <- cbind(X.c.s, X.g.s)
                     B.s <- rbind(B.c.s, B.g.s)
                 }
-                
+
                 Y.s <- X.s %*% B.s + E.s
                 rownames(Y.s) <- inds[[s]]$name
                 colnames(Y.s) <- names(inds)[s]
                 Y.s
             })
         }
-        
+
         Y
     }, mc.cores=nb.cores)
     names(explevels) <- names(gn2sn)
     if(nb.cores == 1)
         close(pb)
-    
+
     if(verbose > 0){
         null.genes <- tapply(truth$config, list(truth$gene), function(configs){
             all(configs == "0")
@@ -734,7 +735,7 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
         print(table(truth$config[truth$config != "0"]) /
               sum(truth$config != "0"))
     }
-    
+
     return(list(explevels=explevels, truth=truth))
 }
 
@@ -752,31 +753,31 @@ getGrids <- function(){
 ##' Write simulated data to files
 ##'
 ##' @title Write data
-##' @param dir 
-##' @param nb.inds 
-##' @param inds 
-##' @param gene.coords.bed 
-##' @param snp.coords.bed 
-##' @param genos.dose 
-##' @param explevels.genes 
-##' @param grids 
-##' @param gn2sn 
-##' @param verbose 
+##' @param dir
+##' @param nb.inds
+##' @param inds
+##' @param gene.coords.bed
+##' @param snp.coords.bed
+##' @param genos.dose
+##' @param explevels.genes
+##' @param grids
+##' @param gn2sn
+##' @param verbose
 writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
                       genos.dose, explevels.genes, grids, gn2sn, verbose=1){
     if(verbose > 0)
         message("write data ...")
-    
+
     nb.subgroups <- length(inds)
-    
+
     p2f <- paste0(dir, "/gene_coords.bed.gz")
     write.table(x=gene.coords.bed, file=gzfile(p2f), quote=F, sep="\t",
                 row.names=F, col.names=F)
-    
+
     p2f <- paste0(dir, "/snp_coords.bed.gz")
     write.table(x=snp.coords.bed, file=gzfile(p2f), quote=F, sep="\t",
                 row.names=F, col.names=F)
-    
+
     if(length(nb.inds) == 1){
         p2f <- paste0(dir, "/genotypes.txt.gz")
         write.table(x=genos.dose, file=gzfile(p2f), quote=F, sep="\t",
@@ -795,7 +796,7 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
     }
     p2f <- paste0(dir, "/list_genotypes.txt")
     write.table(x=tmp, file=p2f, quote=F, sep="\t", row.names=F, col.names=F)
-    
+
     tmp <- lapply(1:nb.subgroups, function(s){
         explevels.s <-
             do.call(rbind, lapply(explevels.genes$explevels, function(Y.g){
@@ -813,7 +814,7 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
                       file=paste0(dir, "/explevels_", names(inds), ".txt.gz"))
     p2f <- paste0(dir, "/list_explevels.txt")
     write.table(x=tmp, file=p2f, quote=F, sep="\t", row.names=F, col.names=F)
-    
+
     if(length(nb.inds) == 1){
         p2f <- paste0(dir, "/covariates.txt.gz")
         tmp <- matrix(inds[[1]]$sex, nrow=1, ncol=nrow(inds[[1]]),
@@ -837,50 +838,56 @@ writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
     }
     p2f <- paste0(dir, "/list_covariates.txt")
     write.table(x=tmp, file=p2f, quote=F, sep="\t", row.names=F, col.names=F)
-    
+
     p2f <- paste0(dir, "/grid_phi2_oma2_general.txt")
     write.table(x=grids$gridL, file=p2f, quote=F, sep="\t", row.names=F,
                 col.names=F)
     p2f <- paste0(dir, "/grid_phi2_oma2_with-configs.txt")
     write.table(x=grids$gridS, file=p2f, quote=F, sep="\t", row.names=F,
                 col.names=F)
-    
+
     p2f <- paste0(dir, "/truth.txt.gz")
     write.table(x=explevels.genes$truth, file=gzfile(p2f), quote=F, sep="\t",
                 row.names=F, col.names=T)
-    
+
     if(length(nb.inds) == 1){
-        pdf("hist_maf.pdf")
-        plotHistMinAllelFreq(genos.dose, main="Tutorial of eQtlBma",
-                             breaks=50, col="grey", border="white")
-        dev.off()
-    } else{ # different individuals between subgroups
-        for(s in 1:nb.subgroups){
-            pdf(paste0("hist_maf_", names(inds)[s], ".pdf"))
-            plotHistMinAllelFreq(genos.dose[,inds[[s]]$name],
-                                 main=paste0("Tutorial of eQtlBma (",
-                                     names(inds)[s], ")"),
+        if(nrow(genos.dose) > 1){
+            pdf("hist_maf.pdf")
+            plotHistMinAllelFreq(genos.dose, main="Tutorial of eQtlBma",
                                  breaks=50, col="grey", border="white")
             dev.off()
         }
+    } else{ # different individuals between subgroups
+        for(s in 1:nb.subgroups){
+            if(nrow(genos.dose[,inds[[s]]$name]) > 1){
+                pdf(paste0("hist_maf_", names(inds)[s], ".pdf"))
+                plotHistMinAllelFreq(genos.dose[,inds[[s]]$name],
+                                     main=paste0("Tutorial of eQtlBma (",
+                                         names(inds)[s], ")"),
+                                     breaks=50, col="grey", border="white")
+                dev.off()
+            }
+        }
     }
-    
-    pdf("hist_cis-snps-per-gene.pdf")
-    plotHistCisSnpsPerGene(gn2sn)
-    dev.off()
+
+    if(length(gn2sn) > 1){
+        pdf("hist_cis-snps-per-gene.pdf")
+        plotHistCisSnpsPerGene(gn2sn)
+        dev.off()
+    }
 }
 
 run <- function(params){
     set.seed(params$seed)
-    
+
     inds <- simulIndividuals(params$nb.inds, params$nb.subgroups)
-    
+
     gene.coords.bed <- simulGeneCoordinates(params$nb.genes,
                                             params$nb.chrs,
                                             params$avg.gene.length,
                                             params$avg.intergenic.length,
                                             params$verbose)
-    
+
     snp.coords.bed <- simulSnpCoordinates(gene.coords.bed,
                                           params$anchor,
                                           params$cis.radius.5p,
@@ -888,21 +895,21 @@ run <- function(params){
                                           params$fixed.nb.snps.per.gene,
                                           params$avg.nb.snps.per.gene,
                                           params$verbose)
-    
+
     gn2sn <- findCisSnpsPerGene(gene.coords.bed,
                                 snp.coords.bed,
                                 params$anchor,
                                 params$cis.radius.5p,
                                 params$cis.radius.3p,
                                 params$verbose)
-    
+
     genos.dose <- simulGenotypes(snp.coords.bed,
                                  params$nb.inds,
                                  inds,
                                  params$maf,
                                  params$prop.rare,
                                  params$verbose)
-    
+
     explevels.genes <- simulGeneExpLevels(params$nb.inds,
                                           inds,
                                           genos.dose,
@@ -911,9 +918,9 @@ run <- function(params){
                                           params$coverr,
                                           params$nb.cores,
                                           params$verbose)
-    
+
     grids <- getGrids()
-    
+
     writeData(params$dir, params$nb.inds, inds, gene.coords.bed,
               snp.coords.bed, genos.dose, explevels.genes, grids, gn2sn)
 }
@@ -939,19 +946,19 @@ main <- function(){
                    seed=1859,
                    dir=getwd(),
                    nb.cores=1)
-    
+
     params <- parseCmdLine(params)
-    
+
     params <- checkParams(params)
-    
+
     if(params$verbose > 0){
         start.time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
         message(paste0("START ", prog.name, " ", start.time))
         message(paste0("cwd: ", getwd()))
     }
-    
+
     system.time(run(params))
-    
+
     if(params$verbose > 0){
         end.time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
         difft <- as.numeric(
