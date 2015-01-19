@@ -1,7 +1,7 @@
 /** \file gene.hpp
  *
  *  `Gene' is a class 
- *  Copyright (C) 2013 Timothee Flutre
+ *  Copyright (C) 2013-2015 Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -107,6 +107,7 @@ namespace quantgen {
     bool HasExplevelsInAllSubgroups(const std::vector<std::string> & subgroups) const;
     bool HasAtLeastOneCisSnpInAtLeastOneSubgroup(void) const;
     bool HasAtLeastOneCisSnp(const std::string & subgroup) const;
+    void GetSubgroupsWithExpLevels(std::vector<std::string> & subgroups_with_exp);
     void AddSubgroup(const std::string & subgroup,
 		     const std::vector<std::string>::const_iterator & begin,
 		     const std::vector<std::string>::const_iterator & end);

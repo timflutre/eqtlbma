@@ -1,7 +1,7 @@
 /** \file gene.cpp
  *
  *  `Gene' is a class 
- *  Copyright (C) 2013 Timothee Flutre
+ *  Copyright (C) 2013-2015 Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -230,6 +230,15 @@ namespace quantgen {
       }
     }
     return res;
+  }
+
+  void Gene::GetSubgroupsWithExpLevels(vector<string> & subgroups_with_exp)
+  {
+    subgroups_with_exp.clear();
+    for(map<string,vector<double> >::const_iterator it =
+          subgroup2explevels_.begin(); it != subgroup2explevels_.end(); ++it)
+      if(HasExplevels(it->first))
+        subgroups_with_exp.push_back(it->first);
   }
 
   double Gene::GetExplevel(const string & subgroup, const size_t & idx) const

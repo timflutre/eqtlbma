@@ -1,7 +1,7 @@
 /** \file data_loader.cpp
  *
  *  `data_loader' gathers functions useful to load gen-etics/-omics data
- *  Copyright (C) 2011-2014 Timothée Flutre
+ *  Copyright (C) 2011-2015 Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -218,9 +218,12 @@ namespace quantgen {
             subgroup2samples.begin(); it != subgroup2samples.end(); ++it){
         cout << it->first << ": " << it->second.size() << " samples" << endl;
         if(verbose > 1){
+          size_t count = 0;
           for(vector<string>::const_iterator itS = it->second.begin();
-              itS != it->second.end(); ++itS)
-            cout << *itS << endl;
+              itS != it->second.end(); ++itS){
+            ++count;
+            cout << count << "/" << it->second.size() << " " << *itS << endl;
+          }
         }
       }
     }
@@ -507,6 +510,19 @@ namespace quantgen {
     
     if(verbose > 0)
       cout << "total nb of genes to analyze: " << gene2object.size() << endl;
+    if(verbose > 1){
+      vector<string> tmp;
+      size_t count = 0;
+      for(map<string,Gene>::iterator it = gene2object.begin();
+          it != gene2object.end(); ++it){
+        ++count;
+        cout << count << "/" << gene2object.size() << " " << it->first << ":";
+        it->second.GetSubgroupsWithExpLevels(tmp);
+        for(size_t i = 0; i < tmp.size(); ++i)
+          cout << " " << tmp[i];
+        cout << endl;
+      }
+    }
   }
   
   void loadSnpsToKeep(const string & file_snpstokeep, const int & verbose,
