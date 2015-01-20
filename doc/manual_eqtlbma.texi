@@ -612,21 +612,22 @@ the first contains values of @math{\phi^2} (prior variance of the standardized e
 and the second values of @math{\omega^2} (prior variance of the average standardized effect @math{\bar{b}}).
 
 The option @option{--gridL} specifies a ``large'' grid.
-It is typically used for meta-analysis (see this preprint by Wen & Stephens on @url{http://arxiv.org/abs/1111.1210,arXiv}),
-or for the BMAlite analysis (see the article by Flutre @emph{et al}).
+It is typically used for meta-analysis (see Wen & Stephens, AoAS 2014),
+or for the BMAlite analysis (see Flutre @emph{et al}, 2013).
 The option @option{--gridS} specifies a ``small'' grid used with configurations (see Flutre @emph{et al}).
 An FAQ entry below shows how to produce such files in R.
 
 The option @option{--bfs} allows to specify which Bayes factors we want to compute.
 The acronym ``abf'' is used to mean ``approximated Bayes factor'' because the Bayes factor
-can't be calculated analytically and therefore has to be approximated using Laplace's method.
-This approximation is very accurate, see the article by Wen & Stephens in 
-the Annals of Applied Statistics (2013) for more details.
+can't be calculated analytically and therefore has to be approximated.
+The article from Wen & Stephens in AoAS 2014 detailed different ways to do that.
+However, @option{--bfs} only implements the ABF with the ES model using Laplace's method.
+Moreover, the small sample size correction is also implemented (Wen & Stephens, AoAs 2014, appendix C).
 
 Specifying @option{--bfs gen} computes the ``general'' BF 
 corresponding to the consistent configuration using the large grid.
 This ``general'' BF is useful in a meta-analysis setting, and fixed-effect 
-and maximum-heterogeneity BFs are also calculated (see Wen & Stephens).
+and maximum-heterogeneity BFs are also calculated (see Wen & Stephens, AoAS 2014).
 
 Specifying @option{--bfs sin} also computes the BF for each singleton, 
 that is for configurations (100), (010) and (001) if there are 3 subgroups.
@@ -640,21 +641,21 @@ Using @option{--bfs all} can be too costly when the number of subgroups exceeds 
 
 The model implemented in this package is based on a linear regression, and there are several ways of
 specifying the variance-covariance matrix of the errors.
-If the subgroups contain different individuals, we can choose @option{--error uvlr} (for univariate linear regression).
-If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr} (for multivariate linear regression, see Wen's preprint on @url{http://arxiv.org/abs/1208.4621,arXiv}, accepted in Biometrics).
+If the subgroups contain different individuals, we can choose @option{--error uvlr}, for univariate linear regression, as in Wen & Stephens, AoAS 2014.
+If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr}, for multivariate linear regression, as in Wen, Biometrics 2014.
 If the subgroups contain some individuals in common and some not, we can choose @option{--error hybrid}.
 For the latter, the effect sizes and their variance are estimated using all individuals in each subgroup,
 whereas their covariance are estimated using each pair of subgroups with only individuals in common.
 
 When using @option{--error mvlr} or @option{--error hybrid}, the option @option{--fiterr} is set by default at 0.5.
-See Wen's preprint for the rationale.
+See Wen, Biometrics 2014, for the rationale.
 Also, with @option{--error mvlr}, the summary statistics per subgroup are not exported (in theory it's possible but the current code doesn't allow it easily).
 So in this case, if we want to make forest plots, we will have to also launch @command{eqtlbma_bf} with option @option{--error uvlr}.
 
 
 @subsection Summary statistics
 
-Sometimes it is not possible to access the ``raw'' data (say, confidential genotypes in human genetics).
+Sometimes it is not possible to access the ``raw'' data, as in human genetics where genotypes often are confidential.
 In such a case, @command{eqtlbma_bf} can still computes the Bayes factors using summary statistics.
 Note that, for the moment, it only works with @option{--error uvlr}.
 
