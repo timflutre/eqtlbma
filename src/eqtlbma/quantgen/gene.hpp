@@ -117,6 +117,7 @@ namespace quantgen {
 		    const std::string & anchor, const size_t & radius);
     bool HasCisSnp(const Snp * pt_snp);
     size_t FindIdxSnp(const Snp * pt_snp);
+    size_t GetNbCisSnps(void) { return snps_.size(); };
     double GetExplevel(const std::string & subgroup, const size_t & idx) const;
     std::vector<GeneSnpPair>::iterator AddGeneSnpPair(
       const std::string & snp_name,

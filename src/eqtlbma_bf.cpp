@@ -717,15 +717,17 @@ void testForAssociations(
     if(verbose == 1)
       progressBar("", countGenes, gene2object.size());
     if(verbose > 1)
-      cerr << "gene " << itG->first << endl;
+      cout << "gene " << itG->first << endl;
     
     if(hasDataNotSstats){
       itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
+      if(verbose > 1)
+        cout << itG->second.GetNbCisSnps() << " cis SNP(s)" << endl;
       if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
-	if(verbose > 1)
-	  cerr << "WARNING: skip gene " << itG->second.GetName()
-	       << " because it has no SNP in cis" << endl;
-	continue;
+        if(verbose > 1)
+          cerr << "WARNING: skip gene " << itG->second.GetName()
+               << " because it has no SNP in cis" << endl;
+        continue;
       }
     }
     
