@@ -276,7 +276,7 @@ namespace quantgen {
 	double sigmahat = fabs(subgroup2sstats_[subgroup][0])
 	  / (fabs(t) * sebhat);
 	bhat = subgroup2sstats_[subgroup][0] / sigmahat,
-	  sebhat = bhat / t;
+	  sebhat = fabs(bhat / t);
       }
       else {
 	bhat = 0;

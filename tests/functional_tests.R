@@ -734,7 +734,7 @@ getStdSstatsAndCorrSmallSampleSize <- function(data, sstats, g, p,
         if(abs(t) > 10^(-8)){
           sigmahat <- abs(betahat) / (abs(t) * sebhat)
           bhat <- betahat / sigmahat
-          sebhat <- bhat / t
+          sebhat <- abs(bhat / t)
         } else{ # abs(t) <= 10^(-8)
           bhat <- 0
           sebhat <- Inf
