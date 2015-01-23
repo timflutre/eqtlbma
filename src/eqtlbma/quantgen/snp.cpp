@@ -109,7 +109,8 @@ namespace quantgen {
       }
       else{
 	genotypes[i] = 0 * AA + 1 * AB + 2 * BB;
-	minor_allele_freq += genotypes[i];
+  if(! isNan(minor_allele_freq))
+    minor_allele_freq += genotypes[i];
       }
     }
     if(! isNan(minor_allele_freq)){
@@ -143,7 +144,8 @@ namespace quantgen {
 	  genotypes[i] += 1;
 	if(tokens3[1].compare("1") == 0)
 	  genotypes[i] += 1;
-	minor_allele_freq += genotypes[i];
+  if(! isNan(minor_allele_freq))
+    minor_allele_freq += genotypes[i];
       }
     }
     if(! isNan(minor_allele_freq)){
@@ -170,7 +172,8 @@ namespace quantgen {
       }
       else{
 	genotypes[i] = atof((begin+i)->c_str());
-	minor_allele_freq += genotypes[i];
+  if(! isNan(minor_allele_freq))
+    minor_allele_freq += genotypes[i];
       }
     }
     if(! isNan(minor_allele_freq)){
