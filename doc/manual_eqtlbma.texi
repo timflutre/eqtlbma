@@ -479,7 +479,8 @@ and use it to only load the SNPs in @emph{cis} of the genes specified by the opt
 If the index file is not present, all SNPs will be loaded which will be slower and use more memory.
 @xref{Frequently asked questions} to know how to build the index for the BED file.
 
-The option @option{--maf} allows to skip SNPs if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
+@c the following line is commented because the test for this option doesn't succeed yet
+@c The option @option{--maf} allows to skip SNPs if their minor allele frequency in the genotype file is below a given threshold, for instance 0.05.
 
 The option @option{--covar} requires a file as argument.
 This file has two columns separated by a space or a tabulation, and one line per subgroup.

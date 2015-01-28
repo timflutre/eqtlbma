@@ -126,7 +126,7 @@ void help(char ** argv)
        << "      --outw\twrite the output file with the ABFs averaged over the grid" << endl
        << "\t\tgrid weights are uniformly equal" << endl
        << "      --qnorm\tquantile-normalize the exp levels to a N(0,1)" << endl
-       << "      --maf\tminimum minor allele frequency (default=0.0)" << endl
+       // << "      --maf\tminimum minor allele frequency (default=0.0)" << endl
        << "      --covar\tfile with absolute paths to covariate files" << endl
        << "\t\ttwo columns: subgroup identifier<space/tab>path to file" << endl
        << "\t\tcan be a single line (single subgroup)" << endl
