@@ -1,7 +1,7 @@
 /** \file eqtlbma_hm.cpp
  *
  *  `eqtlbma_hm' implements the EM algorithm to fit the hierarchical model from eQtlBma.
- *  Copyright (C) 2012-2014 Xiaoquan Wen, Timothee Flutre
+ *  Copyright (C) 2012-2015 Xiaoquan Wen, Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -64,6 +64,7 @@ public:
   vector<string> config_names_;
   double thresh_; // on log-lik, to stop EM
   size_t max_nb_iters_; // to stop EM
+  bool squarem_; // to speed-up EM
   map<string,bool> param2fixed_;
   int nb_threads_; 
   int verbose_;
@@ -102,11 +103,12 @@ public:
   
   Controller();
   Controller(const size_t & nb_subgroups, const string & model,
-	     const size_t & grid_size,
-	     const size_t & dim, const double & thresh,
-	     const size_t & max_nb_iters,
-	     const double & fixed_pi0, const int & nb_threads,
-	     const int & verbose);
+             const size_t & grid_size,
+             const size_t & dim, const double & thresh,
+             const size_t & max_nb_iters,
+             const bool & squarem,
+             const double & fixed_pi0, const int & nb_threads,
+             const int & verbose);
   
   void load_data(const string & file_pattern,
                  const vector<string> & configs_tokeep,
@@ -119,11 +121,11 @@ public:
   
   // params as args allows to calc lik with mix of old and new params
   double compute_log10_obs_lik(const double & pi0,
-			       const vector<double> & grid_wts,
-			       const vector<double> & config_prior,
-			       const vector<double> & type_prior,
-			       const vector<vector<double> > & subgroup_prior,
-			       const bool & keep);
+                               const vector<double> & grid_wts,
+                               const vector<double> & config_prior,
+                               const vector<double> & type_prior,
+                               const vector<vector<double> > & subgroup_prior,
+                               const bool & keep);
   
   void em_update_pi0();
   void em_update_config();
@@ -136,6 +138,8 @@ public:
   
   void show_state_EM(const size_t & iter);
   
+  void run_EM_classic();
+  void run_EM_square();
   void run_EM();
   
   void compute_log10_ICL();
@@ -143,15 +147,15 @@ public:
   void compute_posterior();
   
   void estimate_profile_ci_pi0(const double & tick,
-			       const double & max_l10_obs_lik);
+                               const double & max_l10_obs_lik);
   void estimate_profile_ci_configs(const double & tick,
-				   const double & max_l10_obs_lik);
+                                   const double & max_l10_obs_lik);
   void estimate_profile_ci_types(const double & tick,
-				 const double & max_l10_obs_lik);
+                                 const double & max_l10_obs_lik);
   void estimate_profile_ci_subgroups(const double & tick,
-				     const double & max_l10_obs_lik);
+                                     const double & max_l10_obs_lik);
   void estimate_profile_ci_grids(const double & tick,
-				 const double & max_l10_obs_lik);
+                                 const double & max_l10_obs_lik);
   void estimate_profile_ci();
   
   void save_result(const string & out_file, const bool & skip_bf);
@@ -162,14 +166,15 @@ Controller::Controller()
 }
 
 Controller::Controller(const size_t & nb_subgroups,
-		       const string & model,
-		       const size_t & gsize,
-		       const size_t & dim,
-		       const double & thresh,
-		       const size_t & max_nb_iters,
-		       const double & fixed_pi0,
-		       const int & nb_threads,
-		       const int & verbose)
+                       const string & model,
+                       const size_t & gsize,
+                       const size_t & dim,
+                       const double & thresh,
+                       const size_t & max_nb_iters,
+                       const bool & squarem,
+                       const double & fixed_pi0,
+                       const int & nb_threads,
+                       const int & verbose)
 {
   grid_size_ = gsize;
   model_ = model;
@@ -216,6 +221,7 @@ Controller::Controller(const size_t & nb_subgroups,
   
   thresh_ = thresh;
   max_nb_iters_ = max_nb_iters;
+  squarem_ = squarem;
   nb_threads_ = nb_threads;
   verbose_ = verbose;
 }
@@ -269,10 +275,10 @@ void Controller::load_data_one_file(
     
     if(gene_id.compare(curr_gene) != 0){ // if new gene
       if(! geq.name_.empty()){
-	geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
-				      nb_subgroups_,
-				      (model_ == "types" ? dim_ : 0)));
-	genes_.push_back(geq);
+        geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
+                                     nb_subgroups_,
+                                     (model_ == "types" ? dim_ : 0)));
+        genes_.push_back(geq);
       }
       curr_gene = gene_id;
       geq = gene_eQTL(curr_gene, nb_subgroups_, dim_, grid_size_, &pi0_);
@@ -281,9 +287,9 @@ void Controller::load_data_one_file(
     
     if(snp_id.compare(curr_snp) != 0){ // if same gene but new snp
       if(! raw_log10_bfs.empty())
-	geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
-				      nb_subgroups_,
-				      (model_ == "types" ? dim_ : 0)));
+        geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
+                                     nb_subgroups_,
+                                     (model_ == "types" ? dim_ : 0)));
       curr_snp = snp_id;
       raw_log10_bfs.clear();
     }
@@ -301,8 +307,8 @@ void Controller::load_data_one_file(
   }
   
   geq.snps_.push_back(snp_eQTL(curr_snp, raw_log10_bfs,
-				nb_subgroups_,
-				(model_ == "types" ? dim_ : 0))); // last snp
+                               nb_subgroups_,
+                               (model_ == "types" ? dim_ : 0))); // last snp
   genes_.push_back(geq); // last gene
 }
 
@@ -347,23 +353,23 @@ void Controller::load_data(
   gene_wts_ones_.assign(genes_.size(), 1.0);
   grid_genes_ =
     vector<vector<double> >(grid_size_,
-			    vector<double>(genes_.size(), NaN));
+                            vector<double>(genes_.size(), NaN));
   if(model_ == "configs"){
     config_genes_ = 
       vector<vector<double> >(dim_,
-			      vector<double>(genes_.size(), NaN));
+                              vector<double>(genes_.size(), NaN));
   }
   else if(model_ == "types"){
     type_genes_ = 
       vector<vector<double> >(dim_,
-			      vector<double>(genes_.size(), NaN));
+                              vector<double>(genes_.size(), NaN));
     subgroup_num_genes_ =
       vector<vector<vector<double> > >(dim_,
-				       vector<vector<double> >(nb_subgroups_,
-							       vector<double>(genes_.size(), NaN)));
+                                       vector<vector<double> >(nb_subgroups_,
+                                                               vector<double>(genes_.size(), NaN)));
     subgroup_denom_genes_ =
       vector<vector<double> >(dim_,
-			      vector<double>(genes_.size(), NaN));;
+                              vector<double>(genes_.size(), NaN));;
   }
   
   if(verbose_ > 0){
@@ -372,10 +378,10 @@ void Controller::load_data(
     for(int g = 0; g < (int)genes_.size(); ++g)
       nb_pairs += genes_[g].snps_.size();
     fprintf(stderr, "finish loading %zu genes and %zu gene-snp pairs (%f sec, %s)\n",
-	    genes_.size(),
-	    nb_pairs,
-	    getElapsedTime(startTime),
-	    getMaxMemUsedByProcess2Str().c_str());
+            genes_.size(),
+            nb_pairs,
+            getElapsedTime(startTime),
+            getMaxMemUsedByProcess2Str().c_str());
   }
 }
 
@@ -402,45 +408,45 @@ void Controller::init_params(const string & init_file)
     if(tokens[0].find("pi0") != string::npos){
       pi0_ = atof(tokens[1].c_str());
       if(tokens.size() == 3 && (tokens[2] == "TRUE" || tokens[2] == "true"))
-	param2fixed_["pi0"] = true;
+        param2fixed_["pi0"] = true;
     }
     else if(tokens[0].find("grid") != string::npos){
       grid_wts_[idx_grid] = atof(tokens[1].c_str());
       ++idx_grid;
       if(tokens.size() == 3 && (tokens[2] == "TRUE" || tokens[2] == "true"))
-	param2fixed_["grid-points"] = true;
+        param2fixed_["grid-points"] = true;
     }
     else if(tokens[0].find("config") != string::npos){
       config_prior_[idx_config] = atof(tokens[1].c_str());
       ++idx_config;
       if(tokens.size() == 3 && (tokens[2] == "TRUE" || tokens[2] == "true"))
-	param2fixed_["configs"] = true;
+        param2fixed_["configs"] = true;
     }
     else if(tokens[0].find("type") != string::npos){
       type_prior_[idx_type] = atof(tokens[1].c_str());
       ++idx_type;
       if(tokens.size() == 3 && (tokens[2] == "TRUE" || tokens[2] == "true"))
-	param2fixed_["types"] = true;
+        param2fixed_["types"] = true;
     }
     else if(tokens[0].find("subgroup") != string::npos){
       if(idx_subgroup2 == nb_subgroups_){
-	idx_subgroup2 = 0;
-	++idx_subgroup1;
+        idx_subgroup2 = 0;
+        ++idx_subgroup1;
       }
       subgroup_prior_[idx_subgroup1][idx_subgroup2] = atof(tokens[1].c_str());
       ++idx_subgroup2;
       if(tokens.size() == 3 && (tokens[2] == "TRUE" || tokens[2] == "true"))
-	param2fixed_["subgroups-per-type"] = true;
+        param2fixed_["subgroups-per-type"] = true;
     }
   }
   
   if(verbose_ > 0){
     bool update_all = true;
     for(map<string,bool>::const_iterator it = param2fixed_.begin();
-	it != param2fixed_.end(); ++it){
+        it != param2fixed_.end(); ++it){
       if(it->second){
-	update_all = false;
-	break;
+        update_all = false;
+        break;
       }
     }
     if(update_all)
@@ -448,14 +454,14 @@ void Controller::init_params(const string & init_file)
     else{
       cout << "parameters to update:";
       for(map<string,bool>::const_iterator it = param2fixed_.begin();
-	  it != param2fixed_.end(); ++it){
-	if(model_ == "configs" && (it->first == "types"
-				   || it->first == "subgroups-per-type"))
-	  continue;
-	else if(model_ == "types" && it->first == "configs")
-	  continue;
-	if(! it->second)
-	  cout << " " << it->first;
+          it != param2fixed_.end(); ++it){
+        if(model_ == "configs" && (it->first == "types"
+                                   || it->first == "subgroups-per-type"))
+          continue;
+        else if(model_ == "types" && it->first == "configs")
+          continue;
+        if(! it->second)
+          cout << " " << it->first;
       }
       cout << endl;
     }
@@ -491,11 +497,11 @@ void Controller::randomize_parameter_sp(const size_t & seed)
     else{
       double sum = 0.0;
       for(size_t k = 0; k < dim_; ++k){
-	config_prior_[k] = gsl_ran_exponential(r, 1.0);
-	sum+= config_prior_[k];
+        config_prior_[k] = gsl_ran_exponential(r, 1.0);
+        sum+= config_prior_[k];
       }
       for(size_t k = 0; k < dim_; ++k)
-	config_prior_[k] /= sum;
+        config_prior_[k] /= sum;
     }
   }
   else if(model_ == "types"){
@@ -507,7 +513,7 @@ void Controller::randomize_parameter_sp(const size_t & seed)
     for(size_t k = 0; k < dim_; ++k){
       type_prior_[k] /= sum;
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	subgroup_prior_[k][s] = gsl_rng_uniform(r);
+        subgroup_prior_[k][s] = gsl_rng_uniform(r);
     } 
   }
   
@@ -532,18 +538,18 @@ void Controller::init_params(const size_t & seed)
     
     if(model_ == "configs"){
       if(dim_ == 1){
-	config_prior_[0] = 1.0;
-	new_config_prior_[0] = 1.0;
+        config_prior_[0] = 1.0;
+        new_config_prior_[0] = 1.0;
       }
       else
-	for(size_t i = 0; i < dim_; ++i)
-	  config_prior_[i] = 1.0 / (double) dim_;
+        for(size_t i = 0; i < dim_; ++i)
+          config_prior_[i] = 1.0 / (double) dim_;
     }
     else if(model_ == "types"){
       for(size_t k = 0; k < dim_; ++k){
-	type_prior_[k] = 1.0 / (double) dim_;
-	for(size_t s = 0; s < nb_subgroups_; ++s)
-	  subgroup_prior_[k][s] = 0.5;
+        type_prior_[k] = 1.0 / (double) dim_;
+        for(size_t s = 0; s < nb_subgroups_; ++s)
+          subgroup_prior_[k][s] = 0.5;
       }
     }
   } // end of "non-random initialization"
@@ -564,13 +570,13 @@ double Controller::compute_log10_obs_lik(
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:l10_sum)
     for(int g = 0; g < (int)genes_.size(); ++g)
       l10_sum += genes_[g].compute_log10_obs_lik(pi0, grid_wts,
-						   config_prior, keep);
+                                                 config_prior, keep);
   }
   else if(model_ == "types"){
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:l10_sum)
     for(int g = 0; g < (int)genes_.size(); ++g)
       l10_sum += genes_[g].compute_log10_obs_lik(pi0, grid_wts, type_prior,
-						   subgroup_prior, keep);
+                                                 subgroup_prior, keep);
   }
   
   if(isNan(l10_sum)){
@@ -589,7 +595,7 @@ void Controller::em_update_snp_prior()
 {
 #pragma omp parallel for num_threads(nb_threads_)
   for (int i = 0; i < (int)genes_.size(); ++i)
-     genes_[i].em_update_snp_prior();
+    genes_[i].em_update_snp_prior();
 }
 
 void Controller::em_update_pi0()
@@ -623,20 +629,20 @@ void Controller::em_update_config()
       vector<double> new_config_prior_tmp(dim_, NaN);
       genes_[g].em_update_config(grid_wts_, new_config_prior_tmp);
       for(size_t k = 0; k < dim_; ++k)
-	config_genes_[k][g] = new_config_prior_tmp[k];
+        config_genes_[k][g] = new_config_prior_tmp[k];
     }
     
     // average the contribution of all genes per config
     for(size_t k = 0; k < dim_; ++k)
       new_config_prior_[k] = log10_weighted_sum(&(config_genes_[k][0]),
-						&(gene_wts_ones_[0]),
-						genes_.size())
-	+ log10(config_prior_[k]);
+                                                &(gene_wts_ones_[0]),
+                                                genes_.size())
+        + log10(config_prior_[k]);
     
     // compute the normalization constant (Lagrange multiplier)
     double l10_denom = log10_weighted_sum(&(new_config_prior_[0]),
-					  &(config_wts_ones_[0]),
-					  dim_);
+                                          &(config_wts_ones_[0]),
+                                          dim_);
     
     // compute each new config weight
     for(size_t k = 0; k < dim_; ++k)
@@ -661,27 +667,27 @@ void Controller::em_update_type()
       vector<double> new_type_prior_tmp(dim_, NaN);
       genes_[g].em_update_type(grid_wts_, subgroup_prior_, new_type_prior_tmp);
       for(size_t k = 0; k < dim_; ++k)
-	type_genes_[k][g] = new_type_prior_tmp[k];
+        type_genes_[k][g] = new_type_prior_tmp[k];
     }
 #ifdef DEBUG
     if(verbose_ > 1){
       for(size_t k = 0; k < dim_; ++k)
-	for(int g = 0; g < (int)genes_.size(); ++g)
-	  cout << "type " << k+1 << " gene" << g+1 << " " << type_genes_[k][g] << endl;
+        for(int g = 0; g < (int)genes_.size(); ++g)
+          cout << "type " << k+1 << " gene" << g+1 << " " << type_genes_[k][g] << endl;
     }
 #endif
     
     // average the contribution of all genes per type
     for(size_t k = 0; k < dim_; ++k)
       new_type_prior_[k] = log10_weighted_sum(&(type_genes_[k][0]),
-					      &(gene_wts_ones_[0]),
-					      genes_.size())
-	+ log10(type_prior_[k]);
+                                              &(gene_wts_ones_[0]),
+                                              genes_.size())
+        + log10(type_prior_[k]);
     
     // compute the normalization constant (Lagrange multiplier)
     double l10_denom = log10_weighted_sum(&(new_type_prior_[0]),
-					  &(type_wts_ones_[0]),
-					  dim_);
+                                          &(type_wts_ones_[0]),
+                                          dim_);
     
     // compute each new type weight
     for(size_t k = 0; k < dim_; ++k)
@@ -707,31 +713,31 @@ void Controller::em_update_subgroup()
       vector<double> exp_gpkl_gene(dim_, NaN);
       genes_[g].em_update_subgroup(grid_wts_, subgroup_prior_, exp_gpkls_gene, exp_gpkl_gene);
       for(size_t k = 0; k < dim_; ++k){
-	subgroup_denom_genes_[k][g] = exp_gpkl_gene[k];
-	for(size_t s = 0; s < nb_subgroups_; ++s)
-	  subgroup_num_genes_[k][s][g] = exp_gpkls_gene[k][s];
+        subgroup_denom_genes_[k][g] = exp_gpkl_gene[k];
+        for(size_t s = 0; s < nb_subgroups_; ++s)
+          subgroup_num_genes_[k][s][g] = exp_gpkls_gene[k][s];
       }
     }
     
     // average the contribution of all genes per "subgroup per type"
     for(size_t k = 0; k < dim_; ++k)
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	new_subgroup_prior_[k][s] = log10_weighted_sum(&(subgroup_num_genes_[k][s][0]),
-						       &(gene_wts_ones_[0]),
-						       genes_.size())
-	  + log10(subgroup_prior_[k][s]);
+        new_subgroup_prior_[k][s] = log10_weighted_sum(&(subgroup_num_genes_[k][s][0]),
+                                                       &(gene_wts_ones_[0]),
+                                                       genes_.size())
+          + log10(subgroup_prior_[k][s]);
     
     // compute the normalization constant
     vector<double> l10_denom(dim_, NaN);
     for(size_t k = 0; k < dim_; ++k)
       l10_denom[k] = log10_weighted_sum(&(subgroup_denom_genes_[k][0]),
-					&(gene_wts_ones_[0]),
-					genes_.size());
+                                        &(gene_wts_ones_[0]),
+                                        genes_.size());
     
     // compute each new weight per "subgroup per type"
     for(size_t k = 0; k < dim_; ++k)
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	new_subgroup_prior_[k][s] = pow(10, (new_subgroup_prior_[k][s] - l10_denom[k]));
+        new_subgroup_prior_[k][s] = pow(10, (new_subgroup_prior_[k][s] - l10_denom[k]));
   } // end of "if subgroups per type not fixed"
   else
     new_subgroup_prior_ = subgroup_prior_;
@@ -751,33 +757,33 @@ void Controller::em_update_grid()
     if(model_ == "configs"){
 #pragma omp parallel for num_threads(nb_threads_)
       for(int g = 0; g < (int)genes_.size(); ++g){
-	vector<double> new_grid_wts_tmp(grid_size_, NaN);
-	genes_[g].em_update_grid(config_prior_, new_grid_wts_tmp);
-	for(size_t l = 0; l < grid_size_; ++l)
-	  grid_genes_[l][g] = new_grid_wts_tmp[l];
+        vector<double> new_grid_wts_tmp(grid_size_, NaN);
+        genes_[g].em_update_grid(config_prior_, new_grid_wts_tmp);
+        for(size_t l = 0; l < grid_size_; ++l)
+          grid_genes_[l][g] = new_grid_wts_tmp[l];
       }
     }
     else if(model_ == "types"){
 #pragma omp parallel for num_threads(nb_threads_)
       for(int g = 0; g < (int)genes_.size(); ++g){
-	vector<double> new_grid_wts_tmp(grid_size_, NaN);
-	genes_[g].em_update_grid(type_prior_, subgroup_prior_, new_grid_wts_tmp);
-	for(size_t l = 0; l < grid_size_; ++l)
-	  grid_genes_[l][g] = new_grid_wts_tmp[l];
+        vector<double> new_grid_wts_tmp(grid_size_, NaN);
+        genes_[g].em_update_grid(type_prior_, subgroup_prior_, new_grid_wts_tmp);
+        for(size_t l = 0; l < grid_size_; ++l)
+          grid_genes_[l][g] = new_grid_wts_tmp[l];
       }
     }
     
     // average the contribution of all genes per grid weight
     for(size_t l = 0; l < grid_size_; ++l)
       new_grid_wts_[l] = log10_weighted_sum(&(grid_genes_[l][0]),
-					    &(gene_wts_ones_[0]),
-					    genes_.size())
-	+ log10(grid_wts_[l]);
+                                            &(gene_wts_ones_[0]),
+                                            genes_.size())
+        + log10(grid_wts_[l]);
     
     // compute the normalization constant (Lagrange multiplier)
     double l10_denom = log10_weighted_sum(&(new_grid_wts_[0]),
-					  &(grid_wts_ones_[0]),
-					  grid_size_);
+                                          &(grid_wts_ones_[0]),
+                                          grid_size_);
     
     // compute each new grid weight
     for(size_t l = 0; l < grid_size_; ++l)
@@ -794,13 +800,13 @@ void Controller::update_params()
   if(model_ == "configs"){
     if(dim_ > 1)
       for(size_t k = 0; k < dim_; ++k)
-	config_prior_[k] = new_config_prior_[k];
+        config_prior_[k] = new_config_prior_[k];
   }
   else if(model_ == "types"){
     for(size_t k = 0; k < dim_; ++k){
       type_prior_[k] = new_type_prior_[k];
       for(size_t s = 0; s < nb_subgroups_; ++s)
-	subgroup_prior_[k][s] = new_subgroup_prior_[k][s];
+        subgroup_prior_[k][s] = new_subgroup_prior_[k][s];
     }
   }
   
@@ -826,28 +832,28 @@ void Controller::show_state_EM(const size_t & iter)
     fprintf(stdout, "  configs");
     if(iter == 0)
       for(size_t i = 0; i < dim_; ++i)
-	fprintf(stdout, " %7.4e", config_prior_[i]);
+        fprintf(stdout, " %7.4e", config_prior_[i]);
     else
       for(size_t i = 0; i < dim_; ++i)
-	fprintf(stdout, " %7.4e", new_config_prior_[i]);
+        fprintf(stdout, " %7.4e", new_config_prior_[i]);
   } // end of "if model == configs"
   else if(model_ == "types"){
     fprintf(stdout, "  types");
     if(iter == 0){
       for(size_t i = 0; i < dim_; ++i)
-	fprintf(stdout, " %7.4e", type_prior_[i]);
+        fprintf(stdout, " %7.4e", type_prior_[i]);
       fprintf(stdout, "  subgroups-per-type");
       for(size_t i = 0; i < dim_; ++i)
-	for(size_t j = 0; j < nb_subgroups_; ++j)
-	  fprintf(stdout, " %7.4e", subgroup_prior_[i][j]);
+        for(size_t j = 0; j < nb_subgroups_; ++j)
+          fprintf(stdout, " %7.4e", subgroup_prior_[i][j]);
     }
     else{ // iter > 0
       for(size_t i = 0; i < dim_; ++i)
-	fprintf(stdout, " %7.4e", new_type_prior_[i]);
+        fprintf(stdout, " %7.4e", new_type_prior_[i]);
       fprintf(stdout, "  subgroups-per-type");
       for(size_t i = 0; i < dim_; ++i)
-	for(size_t j = 0; j < nb_subgroups_; ++j)
-	  fprintf(stdout, " %7.4e", new_subgroup_prior_[i][j]);
+        for(size_t j = 0; j < nb_subgroups_; ++j)
+          fprintf(stdout, " %7.4e", new_subgroup_prior_[i][j]);
     }
   } // end of "if model == types"
   
@@ -863,16 +869,11 @@ void Controller::show_state_EM(const size_t & iter)
   fflush(stdout);
 }
 
-void Controller::run_EM()
+void Controller::run_EM_classic()
 {
-  if(verbose_ > 0)
-    cout << "run EM algorithm ..." << endl << flush;
-  time_t startRawTime, endRawTime;
-  time (&startRawTime);
-  
   size_t iter = 0;
   log10_obs_lik_ = compute_log10_obs_lik(pi0_, grid_wts_, config_prior_,
-					 type_prior_, subgroup_prior_, true);
+                                         type_prior_, subgroup_prior_, true);
   if(verbose_)
     show_state_EM(iter);
   
@@ -882,14 +883,14 @@ void Controller::run_EM()
     em_update_pi0();
 #ifdef DEBUG
     double tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						     config_prior_,
-						     type_prior_,
-						     subgroup_prior_, false);
+                                                     config_prior_,
+                                                     type_prior_,
+                                                     subgroup_prior_, false);
     fprintf(stdout, "log obslik after pi0: %f\n", tmp_log10_obs_lik);
     fflush(stdout);
     if(tmp_log10_obs_lik < log10_obs_lik_){
       fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-	      tmp_log10_obs_lik, log10_obs_lik_);
+              tmp_log10_obs_lik, log10_obs_lik_);
       exit(EXIT_FAILURE);
     }
 #endif
@@ -898,15 +899,15 @@ void Controller::run_EM()
       em_update_config();
 #ifdef DEBUG
       tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						new_config_prior_,
-						type_prior_,
-						subgroup_prior_, false);
+                                                new_config_prior_,
+                                                type_prior_,
+                                                subgroup_prior_, false);
       fprintf(stdout, "log obslik after configs: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
       if(tmp_log10_obs_lik < log10_obs_lik_){
-	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(EXIT_FAILURE);
+        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+                tmp_log10_obs_lik, log10_obs_lik_);
+        exit(EXIT_FAILURE);
       }
 #endif
     }
@@ -914,29 +915,29 @@ void Controller::run_EM()
       em_update_type();
 #ifdef DEBUG
       tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						config_prior_,
-						new_type_prior_,
-						subgroup_prior_, false);
+                                                config_prior_,
+                                                new_type_prior_,
+                                                subgroup_prior_, false);
       fprintf(stdout, "log obslik after types: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
       if(tmp_log10_obs_lik < log10_obs_lik_){
-	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(EXIT_FAILURE);
+        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+                tmp_log10_obs_lik, log10_obs_lik_);
+        exit(EXIT_FAILURE);
       }
 #endif
       em_update_subgroup();
 #ifdef DEBUG
       tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						config_prior_,
-						new_type_prior_,
-						new_subgroup_prior_, false);
+                                                config_prior_,
+                                                new_type_prior_,
+                                                new_subgroup_prior_, false);
       fprintf(stdout, "log obslik after subgroups-per-type: %f\n", tmp_log10_obs_lik);
       fflush(stdout);
       if(tmp_log10_obs_lik < log10_obs_lik_){
-	fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-		tmp_log10_obs_lik, log10_obs_lik_);
-	exit(EXIT_FAILURE);
+        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+                tmp_log10_obs_lik, log10_obs_lik_);
+        exit(EXIT_FAILURE);
       }
 #endif
     }
@@ -945,15 +946,15 @@ void Controller::run_EM()
     em_update_snp_prior();
     update_params();
     new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-					       new_config_prior_,
-					       new_type_prior_,
-					       new_subgroup_prior_, true);
+                                               new_config_prior_,
+                                               new_type_prior_,
+                                               new_subgroup_prior_, true);
     if(verbose_)
       show_state_EM(iter);
     
     if(new_log10_obs_lik_ < log10_obs_lik_){
       fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-	      new_log10_obs_lik_, log10_obs_lik_);
+              new_log10_obs_lik_, log10_obs_lik_);
       exit(EXIT_FAILURE);
     }
     if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_ ||
@@ -976,18 +977,42 @@ void Controller::run_EM()
   em_update_snp_prior();
   update_params();
   new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-					     new_config_prior_,
-					     new_type_prior_,
-					     new_subgroup_prior_, true);
+                                             new_config_prior_,
+                                             new_type_prior_,
+                                             new_subgroup_prior_, true);
   if(verbose_)
     show_state_EM(iter);
+}
+
+void Controller::run_EM_square()
+{
+  // TODO
+}
+
+void Controller::run_EM()
+{
+  if(verbose_ > 0){
+    cout << "run EM algorithm (";
+    if(squarem_)
+      cout << "square";
+    else
+      cout << "classic";
+    cout << ") ..." << endl << flush;
+  }
+  time_t startRawTime, endRawTime;
+  time (&startRawTime);
+  
+  if(squarem_)
+    run_EM_square();
+  else
+    run_EM_classic();
   
   time (&endRawTime);
   cout << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl << flush;
 }
 
 void Controller::estimate_profile_ci_pi0(const double & tick,
-					 const double & max_l10_obs_lik)
+                                         const double & max_l10_obs_lik)
 {
   double pi0_mle = pi0_, curr_log10_obs_lik;
   left_pi0_ = pi0_;
@@ -1001,9 +1026,9 @@ void Controller::estimate_profile_ci_pi0(const double & tick,
     }
     pi0_ = left_pi0_;
     curr_log10_obs_lik = compute_log10_obs_lik(pi0_, new_grid_wts_,
-					       new_config_prior_,
-					       new_type_prior_,
-					       new_subgroup_prior_, true);
+                                               new_config_prior_,
+                                               new_type_prior_,
+                                               new_subgroup_prior_, true);
     if(curr_log10_obs_lik / log10(exp(1))
        < max_l10_obs_lik / log10(exp(1)) - 2.0){  
       left_pi0_ += tick;
@@ -1018,9 +1043,9 @@ void Controller::estimate_profile_ci_pi0(const double & tick,
     }
     pi0_ = right_pi0_;  
     curr_log10_obs_lik = compute_log10_obs_lik(pi0_, new_grid_wts_,
-					       new_config_prior_,
-					       new_type_prior_,
-					       new_subgroup_prior_, true);
+                                               new_config_prior_,
+                                               new_type_prior_,
+                                               new_subgroup_prior_, true);
     if(curr_log10_obs_lik / log10(exp(1))
        < max_l10_obs_lik / log10(exp(1)) - 2.0){
       right_pi0_ -= tick;
@@ -1032,7 +1057,7 @@ void Controller::estimate_profile_ci_pi0(const double & tick,
 }
 
 void Controller::estimate_profile_ci_configs(const double & tick,
-					     const double & max_l10_obs_lik)
+                                             const double & max_l10_obs_lik)
 {
   double curr_log10_obs_lik;
   vector<double> config_mle(config_prior_);
@@ -1045,47 +1070,47 @@ void Controller::estimate_profile_ci_configs(const double & tick,
     while(left_configs_[i] >= 0){
       left_configs_[i] -= tick;
       if(left_configs_[i] < 0){
-	left_configs_[i] = 0;
-	break;
+        left_configs_[i] = 0;
+        break;
       }
       double diff = cp_mle - left_configs_[i];
       for(size_t j = 0; j < config_prior_.size(); ++j){
-	if(j == i)
-	  continue;
-	config_prior_[j] = config_mle[j] + diff*config_mle[j]/st;
+        if(j == i)
+          continue;
+        config_prior_[j] = config_mle[j] + diff*config_mle[j]/st;
       }
       config_prior_[i] = left_configs_[i];
       curr_log10_obs_lik = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-						 config_prior_,
-						 new_type_prior_,
-						 new_subgroup_prior_, true);
+                                                 config_prior_,
+                                                 new_type_prior_,
+                                                 new_subgroup_prior_, true);
       if(curr_log10_obs_lik / log10(exp(1))
-	 < max_l10_obs_lik / log10(exp(1)) - 2.0){
-	left_configs_[i] += tick;
-	break;
+         < max_l10_obs_lik / log10(exp(1)) - 2.0){
+        left_configs_[i] += tick;
+        break;
       }
     }
     while(right_configs_[i] <= 1){
       right_configs_[i] += tick;
       if(right_configs_[i] > 1){
-	right_configs_[i] = 1;
-	break;
+        right_configs_[i] = 1;
+        break;
       }
       double diff = cp_mle - right_configs_[i];
       for(size_t j = 0; j < config_prior_.size(); ++j){
-	if(j == i)
-	  continue;
-	config_prior_[j] = config_mle[j] + diff*config_mle[j]/st;
+        if(j == i)
+          continue;
+        config_prior_[j] = config_mle[j] + diff*config_mle[j]/st;
       }
       config_prior_[i] = right_configs_[i];
       curr_log10_obs_lik = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-						 config_prior_,
-						 new_type_prior_,
-						 new_subgroup_prior_, true);
+                                                 config_prior_,
+                                                 new_type_prior_,
+                                                 new_subgroup_prior_, true);
       if(curr_log10_obs_lik / log10(exp(1))
-	 < max_l10_obs_lik / log10(exp(1)) - 2.0){
-	right_configs_[i] -= tick;
-	break;
+         < max_l10_obs_lik / log10(exp(1)) - 2.0){
+        right_configs_[i] -= tick;
+        break;
       }
     }
   }
@@ -1094,7 +1119,7 @@ void Controller::estimate_profile_ci_configs(const double & tick,
 }
 
 void Controller::estimate_profile_ci_types(const double & tick,
-					   const double & max_l10_obs_lik)
+                                           const double & max_l10_obs_lik)
 {
   vector<double> type_mle(type_prior_);
   
@@ -1107,7 +1132,7 @@ void Controller::estimate_profile_ci_types(const double & tick,
 }
 
 void Controller::estimate_profile_ci_subgroups(const double & tick,
-					       const double & max_l10_obs_lik)
+                                               const double & max_l10_obs_lik)
 {
   vector<vector<double> > subgroup_mle(dim_, vector<double>(nb_subgroups_, NaN));
   for(size_t k = 0; k < dim_; ++k)
@@ -1124,7 +1149,7 @@ void Controller::estimate_profile_ci_subgroups(const double & tick,
 }
 
 void Controller::estimate_profile_ci_grids(const double & tick,
-					   const double & max_l10_obs_lik)
+                                           const double & max_l10_obs_lik)
 {
   double curr_log10_obs_lik;
   vector<double> grid_mle(grid_wts_);
@@ -1137,47 +1162,47 @@ void Controller::estimate_profile_ci_grids(const double & tick,
     while(left_grids_[i] >= 0){
       left_grids_[i] -= tick;
       if(left_grids_[i] < 0){
-	left_grids_[i] = 0;
-	break;
+        left_grids_[i] = 0;
+        break;
       }
       double diff = cp_mle - left_grids_[i];
       for(size_t j = 0; j < grid_wts_.size(); ++j){
-	if(j == i)
-	  continue;
-	grid_wts_[j] = grid_mle[j] + diff*grid_mle[j]/st;
+        if(j == i)
+          continue;
+        grid_wts_[j] = grid_mle[j] + diff*grid_mle[j]/st;
       }
       grid_wts_[i] = left_grids_[i];
       curr_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						 new_config_prior_,
-						 new_type_prior_,
-						 new_subgroup_prior_, true);
+                                                 new_config_prior_,
+                                                 new_type_prior_,
+                                                 new_subgroup_prior_, true);
       if(curr_log10_obs_lik / log10(exp(1)) 
-	 < max_l10_obs_lik / log10(exp(1)) - 2.0){
-	left_grids_[i] += tick;
-	break;
+         < max_l10_obs_lik / log10(exp(1)) - 2.0){
+        left_grids_[i] += tick;
+        break;
       }
     }
     while(right_grids_[i] <= 1){
       right_grids_[i] += tick;
       if(right_grids_[i] > 1){
-	right_grids_[i] = 1;
-	break;
+        right_grids_[i] = 1;
+        break;
       }
       double diff = cp_mle - right_grids_[i];
       for(size_t j = 0; j < grid_wts_.size(); ++j){
-	if(j == i)
-	  continue;
-	grid_wts_[j] = grid_mle[j] + diff*grid_mle[j]/st;
+        if(j == i)
+          continue;
+        grid_wts_[j] = grid_mle[j] + diff*grid_mle[j]/st;
       }
       grid_wts_[i] = right_grids_[i];
       curr_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-						 new_config_prior_,
-						 new_type_prior_,
-						 new_subgroup_prior_, true);
+                                                 new_config_prior_,
+                                                 new_type_prior_,
+                                                 new_subgroup_prior_, true);
       if(curr_log10_obs_lik / log10(exp(1))
-	 < max_l10_obs_lik / log10(exp(1)) - 2.0){
-	right_grids_[i] -= tick;
-	break;
+         < max_l10_obs_lik / log10(exp(1)) - 2.0){
+        right_grids_[i] -= tick;
+        break;
       }
     }
   }
@@ -1193,9 +1218,9 @@ void Controller::estimate_profile_ci()
   
   double tick = 0.001,
     max_l10_obs_lik = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-					    new_config_prior_,
-					    new_type_prior_,
-					    new_subgroup_prior_, true);
+                                            new_config_prior_,
+                                            new_type_prior_,
+                                            new_subgroup_prior_, true);
   
   estimate_profile_ci_pi0(tick, max_l10_obs_lik);
   
@@ -1226,13 +1251,13 @@ void Controller::compute_log10_ICL()
 #pragma omp parallel for num_threads(nb_threads_) reduction(+:log10_icl)
     for(int g = 0; g < (int)genes_.size(); ++g)
       log10_icl += genes_[g].compute_log10_aug_lik(pi0_, grid_wts_, 
-						     type_prior_,
-						     subgroup_prior_);
+                                                   type_prior_,
+                                                   subgroup_prior_);
     
     if(verbose_ > 0)
       cout << " log10(ICL)=" << setprecision(4) << scientific << log10_icl << fixed
-	   << " (" << getElapsedTime(startTime) << " sec)"
-	   << endl;
+           << " (" << getElapsedTime(startTime) << " sec)"
+           << endl;
   }
 }
 
@@ -1251,7 +1276,7 @@ void Controller::compute_posterior()
 }
 
 void Controller::save_result(const string & out_file,
-			     const bool & skip_bf)
+                             const bool & skip_bf)
 {
   if(verbose_ > 0)
     cout << "save the results in " << out_file << " ..." << flush;
@@ -1277,11 +1302,11 @@ void Controller::save_result(const string & out_file,
     for(size_t k = 0; k < dim_; ++k){
       txt.str("");
       txt << "#config." << config_names_[k].c_str()
-	  << "\t" << config_prior_[k]
-	  << "\t" << left_configs_[k]
-	  << "\t" << right_configs_[k]
-	  << "\t" << param2fixed_["configs"]
-	  << endl;
+          << "\t" << config_prior_[k]
+          << "\t" << left_configs_[k]
+          << "\t" << right_configs_[k]
+          << "\t" << param2fixed_["configs"]
+          << endl;
       ++nb_lines;
       gzwriteLine(stream, txt.str(), out_file, nb_lines);
     }
@@ -1290,36 +1315,36 @@ void Controller::save_result(const string & out_file,
     for(size_t k = 0; k < dim_; ++k){
       txt.str("");
       txt << "#type." << k+1
-	  << "\t" << type_prior_[k]
-	  << "\t" << left_types_[k]
-	  << "\t" << right_types_[k]
-	  << "\t" << param2fixed_["types"]
-	  << endl;
+          << "\t" << type_prior_[k]
+          << "\t" << left_types_[k]
+          << "\t" << right_types_[k]
+          << "\t" << param2fixed_["types"]
+          << endl;
       ++nb_lines;
       gzwriteLine(stream, txt.str(), out_file, nb_lines);
     }
     for(size_t k = 0; k < dim_; ++k){
       for(size_t s = 0; s < nb_subgroups_; ++s){
-    	txt.str("");
-    	txt << "#subgroup." << k+1 << "-" << s+1
-    	    << "\t" << subgroup_prior_[k][s]
-    	    << "\t" << left_subgroups_[k][s]
-    	    << "\t" << right_subgroups_[k][s]
-	    << "\t" << param2fixed_["subgroups-per-type"]
-    	    << endl;
-    	++nb_lines;
-    	gzwriteLine(stream, txt.str(), out_file, nb_lines);
+        txt.str("");
+        txt << "#subgroup." << k+1 << "-" << s+1
+            << "\t" << subgroup_prior_[k][s]
+            << "\t" << left_subgroups_[k][s]
+            << "\t" << right_subgroups_[k][s]
+            << "\t" << param2fixed_["subgroups-per-type"]
+            << endl;
+        ++nb_lines;
+        gzwriteLine(stream, txt.str(), out_file, nb_lines);
       }
     }
   }
   for(size_t l = 0; l < grid_wts_.size(); ++l){
     txt.str("");
     txt << "#grid." << l+1
-	<< "\t" << grid_wts_[l]
-	<< "\t" << left_grids_[l]
-	<< "\t" << right_grids_[l]
-	<< "\t" << param2fixed_["grid-points"]
-	<< endl;
+        << "\t" << grid_wts_[l]
+        << "\t" << left_grids_[l]
+        << "\t" << right_grids_[l]
+        << "\t" << param2fixed_["grid-points"]
+        << endl;
     ++nb_lines;
     gzwriteLine(stream, txt.str(), out_file, nb_lines);
   }
@@ -1330,50 +1355,50 @@ void Controller::save_result(const string & out_file,
     txt << "gene\tgene.posterior.prob\tgene.log10.bf\tsnp\tsnp.log10.bf";
     if(model_ == "configs")
       for(size_t k = 0; k < dim_; ++k)
-	txt << "\tlog10.bf." << config_names_[k];
+        txt << "\tlog10.bf." << config_names_[k];
     else if(model_ == "types")
       for(size_t k = 0; k < dim_; ++k)
-	txt << "\tlog10.bf." << k+1;
+        txt << "\tlog10.bf." << k+1;
     txt << "\n";
     ++nb_lines;
     gzwriteLine(stream, txt.str(), out_file, nb_lines);
     
     for(size_t g = 0; g < genes_.size(); ++g){ // loop over gene
       for(size_t p = 0; p < genes_[g].snps_.size(); ++p){ // loop over snp
-	txt.str("");
-	txt << setprecision(4)
-	    << genes_[g].name_
-	    << "\t"
-	    << genes_[g].post_prob_gene_;
+        txt.str("");
+        txt << setprecision(4)
+            << genes_[g].name_
+            << "\t"
+            << genes_[g].post_prob_gene_;
 	
-	if(model_ == "configs")
-	  txt << "\t"
-	      << genes_[g].compute_log10_BF(grid_wts_, config_prior_, true);
-	else if(model_ == "types")
-	  txt << "\t"
-	      << genes_[g].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
+        if(model_ == "configs")
+          txt << "\t"
+              << genes_[g].compute_log10_BF(grid_wts_, config_prior_, true);
+        else if(model_ == "types")
+          txt << "\t"
+              << genes_[g].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
 	
-	txt << "\t"
-	    << genes_[g].snps_[p].name_;
+        txt << "\t"
+            << genes_[g].snps_[p].name_;
 	
-	if(model_ == "configs"){
-	  txt << "\t"
-	      << genes_[g].snps_[p].compute_log10_BF(grid_wts_, config_prior_, true);
-	  for(size_t k = 0; k < dim_; ++k) // loop over configs
-	    txt << "\t"
-		<< genes_[g].snps_[p].compute_log10_config_BF(k, grid_wts_);
-	}
-	else if(model_ == "types"){
-	  txt << "\t"
-	      << genes_[g].snps_[p].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
-	  for(size_t k = 0; k < dim_; ++k) // loop over types
-	    txt << "\t"
-		<< genes_[g].snps_[p].compute_log10_type_BF(k, grid_wts_, subgroup_prior_);
-	}
+        if(model_ == "configs"){
+          txt << "\t"
+              << genes_[g].snps_[p].compute_log10_BF(grid_wts_, config_prior_, true);
+          for(size_t k = 0; k < dim_; ++k) // loop over configs
+            txt << "\t"
+                << genes_[g].snps_[p].compute_log10_config_BF(k, grid_wts_);
+        }
+        else if(model_ == "types"){
+          txt << "\t"
+              << genes_[g].snps_[p].compute_log10_BF(grid_wts_, type_prior_, subgroup_prior_, true);
+          for(size_t k = 0; k < dim_; ++k) // loop over types
+            txt << "\t"
+                << genes_[g].snps_[p].compute_log10_type_BF(k, grid_wts_, subgroup_prior_);
+        }
 	
-	txt << "\n";
-	++nb_lines;
-	gzwriteLine(stream, txt.str(), out_file, nb_lines);
+        txt << "\n";
+        ++nb_lines;
+        gzwriteLine(stream, txt.str(), out_file, nb_lines);
       }
     }
   }
@@ -1412,6 +1437,7 @@ void help(char ** argv)
        << "      --thresh\tthreshold to stop the EM (default=0.05)" << endl
        << "      --maxit\tmaximum number of iterations (optional)" << endl
        << "\t\tuseful if wall-time limit (see also --init)" << endl
+       << "      --sq\tuse square EM for speed-up" << endl
        << "      --thread\tnumber of threads (default=1)" << endl
        << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
        << "      --keepgen\tkeep 'general' ABFs (useful for BMAlite)" << endl
@@ -1454,6 +1480,7 @@ void parseCmdLine(
   size_t & seed,
   double & thresh,
   size_t & max_nb_iters,
+  bool & squarem,
   int & nb_threads,
   string & file_ci,
   vector<string> & configs_tokeep,
@@ -1480,6 +1507,7 @@ void parseCmdLine(
       {"seed", required_argument, 0, 0},
       {"thresh", required_argument, 0, 0},
       {"maxit", required_argument, 0, 0},
+      {"squarem", no_argument, 0, 0},
       {"thread", required_argument, 0, 0},
       {"ci", required_argument, 0, 0},
       {"configs", required_argument, 0, 0},
@@ -1491,84 +1519,88 @@ void parseCmdLine(
     };
     int option_index = 0;
     c = getopt_long(argc, argv, "hVv:",
-		    long_options, &option_index);
+                    long_options, &option_index);
     if(c == -1)
       break;
     switch (c){
     case 0:
       if(long_options[option_index].flag != 0)
-	break;
+        break;
       if(strcmp(long_options[option_index].name, "data") == 0){
-	file_pattern = optarg;
-	break;
+        file_pattern = optarg;
+        break;
       }
       if(strcmp(long_options[option_index].name, "nsubgrp") == 0){
-	nb_subgroups = atol(optarg);
-	break;
+        nb_subgroups = atol(optarg);
+        break;
       }
       if(strcmp(long_options[option_index].name, "model") == 0){
-	model = optarg;
-	break;
+        model = optarg;
+        break;
       }
       if(strcmp(long_options[option_index].name, "dim") == 0){
-	dim = atoi(optarg);
-	break;
+        dim = atoi(optarg);
+        break;
       }
       if(strcmp(long_options[option_index].name, "ngrid") == 0){
-	nb_grid_points = atoi(optarg);
-	break;
+        nb_grid_points = atoi(optarg);
+        break;
       }
       if(strcmp(long_options[option_index].name, "out") == 0){
-	out_file = optarg;
-	break;
+        out_file = optarg;
+        break;
       }
       if(strcmp(long_options[option_index].name, "init") == 0){
-	file_init = optarg;
-	break;
+        file_init = optarg;
+        break;
       }
       if(strcmp(long_options[option_index].name, "rand") == 0){
-	rand_init = true;
-	break;
+        rand_init = true;
+        break;
       }
       if(strcmp(long_options[option_index].name, "seed") == 0){
-	seed = atol(optarg);
-	break;
-      }
-      if(strcmp(long_options[option_index].name, "maxit") == 0){
-	max_nb_iters = atol(optarg);
-	break;
+        seed = atol(optarg);
+        break;
       }
       if(strcmp(long_options[option_index].name, "thresh") == 0){
-	thresh = atof(optarg);
-	break;
+        thresh = atof(optarg);
+        break;
+      }
+      if(strcmp(long_options[option_index].name, "maxit") == 0){
+        max_nb_iters = atol(optarg);
+        break;
+      }
+      if(strcmp(long_options[option_index].name, "sq") == 0){
+        squarem = true;
+        break;
       }
       if(strcmp(long_options[option_index].name, "thread") == 0){
-	nb_threads = atoi(optarg);
-	break;
+        nb_threads = atoi(optarg);
+        break;
       }
       if(strcmp(long_options[option_index].name, "ci") == 0){
-	file_ci = optarg;
-	break;
+        file_ci = optarg;
+        break;
       }
       if(strcmp(long_options[option_index].name, "configs") == 0){
-	split(optarg, "|", configs_tokeep);
-	break;
+        split(optarg, "|", configs_tokeep);
+        break;
       }
       if(strcmp(long_options[option_index].name, "keepgen") == 0){
-	keep_gen_abfs = true;
-	break;
+        keep_gen_abfs = true;
+        break;
       }
       if(strcmp(long_options[option_index].name, "getci") == 0){
-	skip_ci = false;
-	break;
+        skip_ci = false;
+        break;
       }
       if(strcmp(long_options[option_index].name, "getbf") == 0){
-	skip_bf = false;
-	break;
+        skip_bf = false;
+        break;
       }
       if(strcmp(long_options[option_index].name, "pi0") == 0){
-	fixed_pi0 = atof(optarg);
-	break;
+        fixed_pi0 = atof(optarg);
+        break;
       }
     case 'h':
       help(argv);
@@ -1589,56 +1621,56 @@ void parseCmdLine(
   }
   if(file_pattern.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --data" << endl << endl;
+         << "ERROR: missing compulsory option --data" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(model.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --model" << endl << endl;
+         << "ERROR: missing compulsory option --model" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(model != "configs" && model != "types"){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --model " << model << " is invalid" << endl << endl;
+         << "ERROR: --model " << model << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(nb_subgroups == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --nsubgrp" << endl << endl;
+         << "ERROR: missing compulsory option --nsubgrp" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(dim == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --dim" << endl << endl;
+         << "ERROR: missing compulsory option --dim" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(model == "configs" && dim >= (size_t) pow(2, (double)nb_subgroups)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --model configs --nsubgrp " << nb_subgroups << " --dim "
-	 << dim << " is invalid" << endl << endl;
+         << "ERROR: --model configs --nsubgrp " << nb_subgroups << " --dim "
+         << dim << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(nb_grid_points == string::npos){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --ngrid" << endl << endl;
+         << "ERROR: missing compulsory option --ngrid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(out_file.empty()){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: missing compulsory option --out" << endl << endl;
+         << "ERROR: missing compulsory option --out" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(! file_init.empty() && ! doesFileExist(file_init)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_init << endl << endl;
+         << "ERROR: can't find " << file_init << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
@@ -1646,7 +1678,7 @@ void parseCmdLine(
     seed = getSeed();
   if(thresh <= 0.0){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --thresh " << thresh << " is invalid" << endl << endl;
+         << "ERROR: --thresh " << thresh << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
@@ -1654,25 +1686,25 @@ void parseCmdLine(
     nb_threads = 1;
   if(! file_ci.empty() && ! doesFileExist(file_ci)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_ci << endl << endl;
+         << "ERROR: can't find " << file_ci << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(! isNan(fixed_pi0) && (fixed_pi0 <= 0.0 || fixed_pi0 >= 1.0)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --pi0 " << fixed_pi0 << " is invalid" << endl << endl;
+         << "ERROR: --pi0 " << fixed_pi0 << " is invalid" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(! file_ci.empty() && ! doesFileExist(file_ci)){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: can't find " << file_ci << endl << endl;
+         << "ERROR: can't find " << file_ci << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
   if(! file_ci.empty() && skip_ci){
     cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
-	 << "ERROR: --getci should be given with --ci" << endl << endl;
+         << "ERROR: --getci should be given with --ci" << endl << endl;
     help(argv);
     exit(EXIT_FAILURE);
   }
@@ -1694,6 +1726,7 @@ void run(
   const size_t & seed,
   const double & thresh,
   const size_t & max_nb_iters,
+  const bool & squarem,
   const int & nb_threads,
   const string & file_ci,
   const vector<string> & configs_tokeep,
@@ -1704,7 +1737,8 @@ void run(
   const int & verbose)
 {
   Controller controller(nb_subgroups, model, nb_grid_points, dim, thresh,
-			max_nb_iters, fixed_pi0, nb_threads, verbose);
+                        max_nb_iters, squarem, fixed_pi0, nb_threads,
+                        verbose);
   
   controller.load_data(file_pattern, configs_tokeep, keep_gen_abfs);
   
@@ -1746,36 +1780,36 @@ int main(int argc, char **argv)
     max_nb_iters = string::npos;
   double thresh = 0.05, fixed_pi0 = NaN;
   vector<string> configs_tokeep;
-  bool rand_init = false, keep_gen_abfs = false, skip_ci = true,
-    skip_bf = true;
+  bool rand_init = false, squarem = false, keep_gen_abfs = false,
+    skip_ci = true, skip_bf = true;
   
   parseCmdLine(argc, argv, file_pattern, nb_subgroups, model, dim,
                nb_grid_points, out_file, file_init, rand_init, seed, thresh,
-               max_nb_iters, nb_threads, file_ci, configs_tokeep,
+               max_nb_iters, squarem, nb_threads, file_ci, configs_tokeep,
                keep_gen_abfs, skip_ci, skip_bf, fixed_pi0, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
     time (&time_start);
     cout << "START " << basename(argv[0])
-	 << " " << getDateTime(time_start) << endl
-	 << "version " << VERSION << " compiled " << __DATE__
-	 << " " << __TIME__ << endl
-	 << "cmd-line: " << getCmdLine(argc, argv) << endl
-	 << "cwd: " << getCurrentDirectory() << endl << flush;
+         << " " << getDateTime(time_start) << endl
+         << "version " << VERSION << " compiled " << __DATE__
+         << " " << __TIME__ << endl
+         << "cmd-line: " << getCmdLine(argc, argv) << endl
+         << "cwd: " << getCurrentDirectory() << endl << flush;
   }
   
   run(file_pattern, nb_subgroups, model, dim, nb_grid_points,
-      out_file, file_init, seed, thresh, max_nb_iters, nb_threads,
+      out_file, file_init, seed, thresh, max_nb_iters, squarem, nb_threads,
       file_ci, configs_tokeep, keep_gen_abfs, skip_ci, skip_bf, fixed_pi0,
       verbose);
   
   if(verbose > 0){
     time (&time_end);
     cout << "END " << basename(argv[0])
-	 << " " << getDateTime(time_end) << endl
-	 << "elapsed -> " << getElapsedTime(time_start, time_end) << endl
-	 << "max.mem -> " << getMaxMemUsedByProcess2Str() << endl;
+         << " " << getDateTime(time_end) << endl
+         << "elapsed -> " << getElapsedTime(time_start, time_end) << endl
+         << "max.mem -> " << getMaxMemUsedByProcess2Str() << endl;
   }
   
   return EXIT_SUCCESS;
