@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 ## `tutorial_eqtlbma.R' simulates data for the tutorial of the eQtlBma package
-## Copyright (C) 2013-2014 Timothée Flutre
+## Copyright (C) 2013-2015 Timothée Flutre
 ## License: GPL-3+
 
 ## This program is free software: you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 
 rm(list=ls())
 prog.name <- "tutorial_eqtlbma.R"
-prog.version <- "1.0"
+prog.version <- "1.3.0"
 
 R.v.maj <- as.numeric(R.version$major)
 R.v.min.1 <- as.numeric(strsplit(R.version$minor, "\\.")[[1]][1])

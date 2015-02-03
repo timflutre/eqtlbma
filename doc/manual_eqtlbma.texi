@@ -15,7 +15,7 @@
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
 
-Copyright @copyright{} 2012-2014 Timoth@'ee Flutre and Xiaoquan Wen.
+Copyright @copyright{} 2012-2015 Timoth@'ee Flutre and Xiaoquan Wen.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -61,6 +61,7 @@ This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}).
 * Computing Bayes factors::
 * Fitting the hierarchical model::
 * Computing the posteriors::
+* For developers::
 * Frequently asked questions::
 * GNU Free Documentation License::
 * Index::
@@ -1013,6 +1014,36 @@ eqtlbma_avg_bfs \
 
 @c=============================================================================
 
+@node For developers
+@chapter For developers
+
+@cindex Developers
+
+The eQtlBma package is freely available under the GNU General Public License version 3 or later (GPL-3+).
+The code is versioned with git and the official repository is available on @url{http://github.com/timflutre/eqtlbma,Github}, 
+so you can fork it and let us know of any pull request.
+The core of the package is written in C++, but parts of it are also in R and bash.
+In all languages, we are using the @url{https://en.wikipedia.org/wiki/CamelCase,camel case} notation with an uppercase first letter for classes and a lowercase first letter for methods, functions and variables.
+Functional tests are implemented, even though, of course, unitary tests would be preferable (see the TODO file).
+Importantly, variable and function name are chosen so as to be as explicit as possible!
+For those using @url{https://www.gnu.org/software/emacs/,Emacs}, here is the configuration:
+
+@verbatim
+(setq-default indent-tabs-mode nil)
+(setq-default tab-width 2)
+(setq c-default-style "bsd"
+      c-basic-offset 2
+      tab-width 2
+      indent-tabs-mode t)
+(setq sh-basic-offset 2
+      sh-indentation 2)
+@end verbatim
+
+In terms of versioning, the eQtlBma package follows the @url{http://semver.org/,Semantic Versioning} guidelines.
+For each release, a git tag is created, and then pushed to GitHub.
+
+@c=============================================================================
+
 @node Frequently asked questions
 @chapter Frequently asked questions
 
@@ -1233,16 +1264,6 @@ to see how to do it.
 As usual, a help message is available with the option @command{-h}.
 
 If you find a bug, please don't hesitate to contact us, thanks in advance!
-
-@sp 1
-
-@item
-@strong{How can I contribute?}
-
-The code of the package is freely available on @url{http://github.com/timflutre/eqtlbma,Github}, 
-so you can fork it and let us know of any pull request.
-
-In all languages (C++, R and bash), we are using the @url{https://en.wikipedia.org/wiki/CamelCase,camel case} notation with an uppercase first letter for classes and a lowercase first letter for methods, functions and variables.
 
 @end itemize
 

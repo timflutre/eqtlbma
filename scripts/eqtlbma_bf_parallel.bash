@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # `eqtlbma_bf_parallel.bash' is used to launch eqtlbma_bf in parallel
-# Copyright (C) 2013 Timothée Flutre
+# Copyright (C) 2013-2015 Timothée Flutre
 # License: GPL-3+
 
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-progVersion="1.3"
+progVersion="1.3.0"
 
 function help () {
     msg="\`${0##*/}' is used to launch eqtlbma_bf in parallel.\n"
