@@ -1829,7 +1829,7 @@ void parseCmdLine(
       {"seed", required_argument, 0, 0},
       {"thresh", required_argument, 0, 0},
       {"maxit", required_argument, 0, 0},
-      {"squarem", no_argument, 0, 0},
+      {"sq", no_argument, 0, 0},
       {"thread", required_argument, 0, 0},
       {"ci", required_argument, 0, 0},
       {"configs", required_argument, 0, 0},
