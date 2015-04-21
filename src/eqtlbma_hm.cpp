@@ -164,7 +164,7 @@ public:
   void em_update_grid();
   void em_update_snp_prior();
 
-  void run_EM_fixedpoint();
+  void run_EM_fixedpoint(const size_t & iter);
   void update_params(const int & squaremstep);
   
   void show_state_EM(const size_t & iter);
@@ -216,6 +216,9 @@ Controller::Controller(const size_t & nb_subgroups,
   right_pi0_ = NaN;
   
   grid_wts_.assign(grid_size_, NaN);
+  grid_wts_0.assign(grid_size_, NaN);
+  grid_wts_1.assign(grid_size_, NaN);
+  grid_wts_2.assign(grid_size_, NaN);
   new_grid_wts_.assign(grid_size_, NaN);
   grid_wts_ones_.assign(grid_size_, 1.0);
   left_grids_.assign(grid_size_, NaN);
@@ -224,6 +227,9 @@ Controller::Controller(const size_t & nb_subgroups,
   dim_ = dim;
   if(model_ == "configs"){
     config_prior_.assign(dim_, NaN);
+    config_prior_0.assign(dim_, NaN);
+    config_prior_1.assign(dim_, NaN);
+    config_prior_2.assign(dim_, NaN);
     new_config_prior_.assign(dim_, NaN);
     config_wts_ones_.assign(dim_, 1.0);
     left_configs_.assign(dim_, NaN);
@@ -231,11 +237,17 @@ Controller::Controller(const size_t & nb_subgroups,
   }
   else if(model_ == "types"){
     type_prior_.assign(dim_, NaN);
+    type_prior_0.assign(dim_, NaN);
+    type_prior_1.assign(dim_, NaN);
+    type_prior_2.assign(dim_, NaN);
     new_type_prior_.assign(dim_, NaN);
     type_wts_ones_.assign(dim_, 1.0);
     left_types_.assign(dim_, NaN);
     right_types_.assign(dim_, NaN);
     subgroup_prior_.assign(dim_, vector<double>(nb_subgroups_, NaN));
+    subgroup_prior_0.assign(dim_, vector<double>(nb_subgroups_, NaN));
+    subgroup_prior_1.assign(dim_, vector<double>(nb_subgroups_, NaN));
+    subgroup_prior_2.assign(dim_, vector<double>(nb_subgroups_, NaN));
     new_subgroup_prior_.assign(dim_, vector<double>(nb_subgroups_, NaN));
     left_subgroups_.assign(dim_, vector<double>(nb_subgroups_, NaN));
     right_subgroups_.assign(dim_, vector<double>(nb_subgroups_, NaN));
@@ -854,7 +866,7 @@ void Controller::update_params(const int & squaremstep=0)
   // for(size_t i = 0; i < genes_.size(); ++i)
   //  genes_[i].update_snp_prior();
 
-  if (squaremstep != 0){
+  if(squaremstep != 0){
     switch(squaremstep){
     case 1:{
       log10_obs_lik_1 = new_log10_obs_lik_;
@@ -905,7 +917,10 @@ void Controller::show_state_EM(const size_t & iter)
   else
     fprintf(stdout, "  loglik %f", new_log10_obs_lik_);
   
-  fprintf(stdout, "  pi0 %7.4e", pi0_);
+  if(iter == 0)
+    fprintf(stdout, "  pi0 %7.4e", pi0_);
+  else
+    fprintf(stdout, "  pi0 %7.4e", new_pi0_);
   
   if(model_ == "configs"){
     fprintf(stdout, "  configs");
@@ -1023,7 +1038,7 @@ void Controller::run_EM_classic()
     
     em_update_grid();
     em_update_snp_prior();
-    update_params();
+    update_params(); // assign new_param_ to param_
     new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
                                                new_config_prior_,
                                                new_type_prior_,
@@ -1064,8 +1079,8 @@ void Controller::run_EM_classic()
 }
 
 
-//A wrapper function serving as the fixed point in SQUAREM
-void Controller::run_EM_fixedpoint(){
+// A wrapper function serving as the fixed point in SQUAREM
+void Controller::run_EM_fixedpoint(const size_t & iter){
     em_update_pi0();
 #ifdef DEBUG
     double tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
@@ -1130,17 +1145,18 @@ void Controller::run_EM_fixedpoint(){
     
     em_update_grid();
     em_update_snp_prior();
-    //update_params();
+    
     new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
                                                new_config_prior_,
                                                new_type_prior_,
                                                new_subgroup_prior_, true);
+    show_state_EM(iter);
 }
 
 void Controller::run_EM_square()
 {
   size_t iter = 0;
-  double sr2_scalar,sv2_scalar,srv_scalar,squaremalpha_,stepmin,stepmax;
+  double sr2_scalar, sv2_scalar, srv_scalar, alpha, stepmin, stepmax;
   bool extrap;
   stepmin = stepmin0_;
   stepmax = stepmax0_;
@@ -1152,7 +1168,6 @@ void Controller::run_EM_square()
 
   // main squarem loop
   while(true){
-    ++iter;
     sr2_scalar = 0;
     sv2_scalar = 0;
     srv_scalar = 0;
@@ -1165,87 +1180,116 @@ void Controller::run_EM_square()
     type_prior_0 = type_prior_;
     subgroup_prior_0 = subgroup_prior_;
     
-    run_EM_fixedpoint();
-    update_params(1);
+    ++iter;
+    run_EM_fixedpoint(iter);
+    update_params(1); // assign new_param_ to param_ and param_1
     if(fabs(log10_obs_lik_1 - log10_obs_lik_) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
     ++iter;
-    run_EM_fixedpoint();
-    update_params(2);
+    run_EM_fixedpoint(iter);
+    update_params(2); // assign new_param_ to param_ and param_2
     if(fabs(log10_obs_lik_2 - log10_obs_lik_1) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
-    // calculating alpha
-    sr2_scalar += pow(pi0_1-pi0_0,2);
-    sv2_scalar += pow(pi0_2-2*pi0_1+pi0_0,2);
-    srv_scalar += (pi0_2-2*pi0_1+pi0_0)*(pi0_1-pi0_0);
+    // calculate step length alpha
+    sr2_scalar += pow(pi0_1 - pi0_0, 2);
+    sv2_scalar += pow(pi0_2 - 2*pi0_1 + pi0_0, 2);
+    srv_scalar += (pi0_2 - 2*pi0_1 + pi0_0) * (pi0_1 - pi0_0);
     
     if(model_ == "configs"){
       if(dim_ > 1)
         for(size_t k = 0; k < dim_; ++k){
-          sr2_scalar += pow(config_prior_1[k]-config_prior_0[k],2);
-          sv2_scalar += pow(config_prior_2[k]-2*config_prior_1[k]+config_prior_0[k],2);
-          srv_scalar += (config_prior_2[k]-2*config_prior_1[k]+config_prior_0[k])*(config_prior_1[k]-config_prior_0[k]);
+          sr2_scalar += pow(config_prior_1[k] - config_prior_0[k], 2);
+          sv2_scalar += pow(config_prior_2[k] - 2*config_prior_1[k]
+                            + config_prior_0[k], 2);
+          srv_scalar += (config_prior_2[k] - 2*config_prior_1[k]
+                         + config_prior_0[k])
+            * (config_prior_1[k] - config_prior_0[k]);
         }
     }
     else if(model_ == "types"){
       for(size_t k = 0; k < dim_; ++k){
-        sr2_scalar += pow(type_prior_1[k]-type_prior_0[k],2);
-        sv2_scalar += pow(type_prior_2[k]-2*type_prior_1[k]+type_prior_0[k],2);
-        srv_scalar += (type_prior_2[k]-2*type_prior_1[k]+type_prior_0[k])*(type_prior_1[k]-type_prior_0[k]);
-        
+        sr2_scalar += pow(type_prior_1[k] - type_prior_0[k], 2);
+        sv2_scalar += pow(type_prior_2[k] - 2*type_prior_1[k]
+                          + type_prior_0[k], 2);
+        srv_scalar += (type_prior_2[k] - 2*type_prior_1[k]
+                       + type_prior_0[k])
+          * (type_prior_1[k] - type_prior_0[k]);
         for(size_t s = 0; s < nb_subgroups_; ++s){
-          sr2_scalar += pow(subgroup_prior_1[k][s]-subgroup_prior_0[k][s],2);
-          sv2_scalar += pow(subgroup_prior_2[k][s]-2*subgroup_prior_1[k][s]+subgroup_prior_0[k][s],2);
-          srv_scalar += (subgroup_prior_2[k][s]-2*subgroup_prior_1[k][s]+subgroup_prior_0[k][s])*(subgroup_prior_1[k][s]-subgroup_prior_0[k][s]);
+          sr2_scalar += pow(subgroup_prior_1[k][s] - subgroup_prior_0[k][s], 2);
+          sv2_scalar += pow(subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
+                            + subgroup_prior_0[k][s], 2);
+          srv_scalar += (subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
+                         + subgroup_prior_0[k][s])
+            * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s]);
         }
       }
     }
     
     for(size_t l = 0; l < grid_size_; ++l){
-      sr2_scalar += pow(grid_wts_1[l]-grid_wts_0[l],2);
-      sv2_scalar += pow(grid_wts_2[l]-2*grid_wts_1[l]+grid_wts_0[l],2);
-      srv_scalar += (grid_wts_2[l]-2*grid_wts_1[l]+grid_wts_0[l])*(grid_wts_1[l]-grid_wts_0[l]);
+      sr2_scalar += pow(grid_wts_1[l] - grid_wts_0[l], 2);
+      sv2_scalar += pow(grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l], 2);
+      srv_scalar += (grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l])
+        * (grid_wts_1[l] - grid_wts_0[l]);
     }
     
     switch (method_){
-    case 1:squaremalpha_=-srv_scalar/sv2_scalar;
-    case 2:squaremalpha_=-sr2_scalar/srv_scalar;
-    case 3:squaremalpha_=sqrt(sr2_scalar/sv2_scalar);
+    case 1:
+      alpha = - srv_scalar / sv2_scalar;
+    case 2:
+      alpha = - sr2_scalar / srv_scalar;
+    case 3:
+      alpha = sqrt(sr2_scalar / sv2_scalar);
     }
-    squaremalpha_ = std::max(stepmin,std::min(stepmax,squaremalpha_));
+    alpha = max(stepmin, min(stepmax, alpha));
     
     // assigning new value
-    pi0_ = pi0_0 + 2.0*squaremalpha_*(pi0_1-pi0_0)+pow(squaremalpha_,2)*(pi0_2-2*pi0_1+pi0_0);
+    // shouldn't it be: - 2.0 * squaremalpha ... ?
+    pi0_ = pi0_0 + 2.0 * alpha * (pi0_1 - pi0_0)
+      + pow(alpha, 2) * (pi0_2 - 2 * pi0_1 + pi0_0);
+    
     if(model_ == "configs"){
       if(dim_ > 1)
         for(size_t k = 0; k < dim_; ++k){
-          config_prior_[k] = config_prior_0[k] + 2.0*squaremalpha_*(config_prior_1[k]-config_prior_0[k])
-            +pow(squaremalpha_,2)*(config_prior_2[k]-2*config_prior_1[k]+config_prior_0[k]);
+          config_prior_[k] = config_prior_0[k] + 2.0 * alpha 
+            * (config_prior_1[k] - config_prior_0[k])
+            + pow(alpha, 2) * (config_prior_2[k]
+                                       - 2 * config_prior_1[k]
+                                       + config_prior_0[k]);
         }
     }
     else if(model_ == "types"){
       for(size_t k = 0; k < dim_; ++k){
-        type_prior_[k] = type_prior_0[k] + 2.0*squaremalpha_*(type_prior_1[k]-type_prior_0[k])
-          +pow(squaremalpha_,2)*(type_prior_2[k]-2*type_prior_1[k]+type_prior_0[k]);
+        type_prior_[k] = type_prior_0[k] + 2.0 * alpha
+          * (type_prior_1[k] - type_prior_0[k])
+          + pow(alpha, 2) * (type_prior_2[k] - 2 * type_prior_1[k]
+                                     + type_prior_0[k]);
         for(size_t s = 0; s < nb_subgroups_; ++s){
-          subgroup_prior_[k][s] = subgroup_prior_0[k][s] + 2.0*squaremalpha_*(subgroup_prior_1[k][s]-subgroup_prior_0[k][s])
-            +pow(squaremalpha_,2)*(subgroup_prior_2[k][s]-2*subgroup_prior_1[k][s]+subgroup_prior_0[k][s]);
+          subgroup_prior_[k][s] = subgroup_prior_0[k][s] + 2.0 * alpha
+            * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s])
+            + pow(alpha, 2) * (subgroup_prior_2[k][s]
+                                       - 2 * subgroup_prior_1[k][s]
+                                       + subgroup_prior_0[k][s]);
         }
       }
     }
     
     for(size_t l = 0; l < grid_size_; ++l){
-      grid_wts_[l] = grid_wts_0[l] + 2*squaremalpha_*(grid_wts_1[l]-grid_wts_0[l])
-        +pow(squaremalpha_,2)*(grid_wts_2[l]-2*grid_wts_1[l]+grid_wts_0[l]);
+      grid_wts_[l] = grid_wts_0[l] +  2 * alpha
+        * (grid_wts_1[l] - grid_wts_0[l])
+        + pow(alpha, 2) * (grid_wts_2[l] - 2 * grid_wts_1[l]
+                                   + grid_wts_0[l]);
     }
     
-    // stalization
-    if(std::abs(squaremalpha_-1) > 0.01){
-      try{run_EM_fixedpoint(); ++iter;}
+    // stabilization
+    if(abs(alpha - 1) > 0.01){
+      try{
+        ++iter;
+        run_EM_fixedpoint(iter);
+      }
       catch(...){
         log10_obs_lik_ = log10_obs_lik_2;
         pi0_ = pi0_2;
@@ -1253,22 +1297,23 @@ void Controller::run_EM_square()
         config_prior_ = config_prior_2;
         type_prior_ = type_prior_2;
         subgroup_prior_ = subgroup_prior_2;
-        if(squaremalpha_ == stepmax)
-          stepmax = std::max(stepmax0_, stepmax/mstep_);
-        squaremalpha_ = 1;
+        if(alpha == stepmax)
+          stepmax = max(stepmax0_, stepmax/mstep_);
+        alpha = 1;
         extrap = false;
-        if(squaremalpha_ == stepmax)
+        if(alpha == stepmax)
           stepmax = mstep_ * stepmax;
-        if(stepmin<0 && squaremalpha_==stepmin)
+        if(stepmin<0 && alpha==stepmin)
           stepmin = mstep_ * stepmin;
         if(verbose_)
-          std::cout<<"Objective fn: "<<log10_obs_lik_<<"  Extrapolation: "<<extrap<<"  Steplength: "<<squaremalpha_<<std::endl;
+          fprintf(stdout, "(stbl) obj-fn %f  extrapol %s  step-len %f\n",
+                  log10_obs_lik_, extrap?"true":"false", alpha);
         continue;
       }
-      update_params(0); //assign _new to _
+      update_params(0); // assign new_param_ to param_
     }
     
-    // maximize the objective function,less stringent criteria when objfninc_=1
+    // maximize the objective function, less stringent criteria when objfninc_=1
     if(new_log10_obs_lik_ < log10_obs_lik_0 - objfninc_){
       log10_obs_lik_ = log10_obs_lik_2;
       pi0_ = pi0_2;
@@ -1276,18 +1321,19 @@ void Controller::run_EM_square()
       config_prior_ = config_prior_2;
       type_prior_ = type_prior_2;
       subgroup_prior_ = subgroup_prior_2;
-      if(squaremalpha_ == stepmax)
-        stepmax = std::max(stepmax0_, stepmax/mstep_);
-      squaremalpha_ = 1;
+      if(alpha == stepmax)
+        stepmax = max(stepmax0_, stepmax/mstep_);
+      alpha = 1;
       extrap = false;
     }
     
-    if(squaremalpha_ == stepmax)
+    if(alpha == stepmax)
       stepmax = mstep_ * stepmax;
-    if(stepmin<0 && squaremalpha_==stepmin)
+    if(stepmin < 0 && alpha == stepmin)
       stepmin = mstep_ * stepmin;
     if(verbose_)
-      std::cout<<"Objective fn: "<<log10_obs_lik_<<"  Extrapolation: "<<extrap<<"  Steplength: "<<squaremalpha_<<std::endl;
+      fprintf(stdout, "(norm) obj-fn %f  extrapol %s  step-len %f\n",
+              log10_obs_lik_, extrap?"true":"false", alpha);
   }
   //end of main squarem loop
   
