@@ -848,6 +848,7 @@ void Controller::em_update_grid()
 
 void Controller::update_params(const int & squaremstep=0)
 {
+  log10_obs_lik_ = new_log10_obs_lik_;
   pi0_ = new_pi0_;
   if(model_ == "configs"){
     if(dim_ > 1)
@@ -974,112 +975,28 @@ void Controller::run_EM_classic()
   while(true){
     ++iter;
     
-    em_update_pi0();
-#ifdef DEBUG
-    double tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-                                                     config_prior_,
-                                                     type_prior_,
-                                                     subgroup_prior_, false);
-    fprintf(stdout, "log obslik after pi0: %f\n", tmp_log10_obs_lik);
-    fflush(stdout);
-    if(tmp_log10_obs_lik < log10_obs_lik_){
-      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-              tmp_log10_obs_lik, log10_obs_lik_);
-      exit(EXIT_FAILURE);
-    }
-#endif
-    
-    if(model_ == "configs"){
-      em_update_config();
-#ifdef DEBUG
-      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-                                                new_config_prior_,
-                                                type_prior_,
-                                                subgroup_prior_, false);
-      fprintf(stdout, "log obslik after configs: %f\n", tmp_log10_obs_lik);
-      fflush(stdout);
-      if(tmp_log10_obs_lik < log10_obs_lik_){
-        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-                tmp_log10_obs_lik, log10_obs_lik_);
-        exit(EXIT_FAILURE);
-      }
-#endif
-    }
-    else if(model_ == "types"){
-      em_update_type();
-#ifdef DEBUG
-      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-                                                config_prior_,
-                                                new_type_prior_,
-                                                subgroup_prior_, false);
-      fprintf(stdout, "log obslik after types: %f\n", tmp_log10_obs_lik);
-      fflush(stdout);
-      if(tmp_log10_obs_lik < log10_obs_lik_){
-        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-                tmp_log10_obs_lik, log10_obs_lik_);
-        exit(EXIT_FAILURE);
-      }
-#endif
-      em_update_subgroup();
-#ifdef DEBUG
-      tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, grid_wts_,
-                                                config_prior_,
-                                                new_type_prior_,
-                                                new_subgroup_prior_, false);
-      fprintf(stdout, "log obslik after subgroups-per-type: %f\n", tmp_log10_obs_lik);
-      fflush(stdout);
-      if(tmp_log10_obs_lik < log10_obs_lik_){
-        fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-                tmp_log10_obs_lik, log10_obs_lik_);
-        exit(EXIT_FAILURE);
-      }
-#endif
-    }
-    
-    em_update_grid();
-    em_update_snp_prior();
-    update_params(); // assign new_param_ to param_
-    new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-                                               new_config_prior_,
-                                               new_type_prior_,
-                                               new_subgroup_prior_, true);
-    if(verbose_)
-      show_state_EM(iter);
+    run_EM_fixedpoint(iter);
     
     if(new_log10_obs_lik_ < log10_obs_lik_){
       fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
               new_log10_obs_lik_, log10_obs_lik_);
       exit(EXIT_FAILURE);
     }
+    
     if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
-    log10_obs_lik_ = new_log10_obs_lik_;
+    update_params(); // assign new_param_ to param_
   }
   
   // do a last update to get same results as William's initial implementation
-  ++iter;
-  em_update_pi0();
-  if(model_ == "configs")
-    em_update_config();
-  else if(model_ == "types"){
-    em_update_type();
-    em_update_subgroup();
-  }
-  em_update_grid();
-  em_update_snp_prior();
   update_params();
-  new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-                                             new_config_prior_,
-                                             new_type_prior_,
-                                             new_subgroup_prior_, true);
-  if(verbose_)
-    show_state_EM(iter);
+  ++iter;
+  run_EM_fixedpoint(iter);
+  update_params();
 }
 
-
-// A wrapper function serving as the fixed point in SQUAREM
 void Controller::run_EM_fixedpoint(const size_t & iter){
     em_update_pi0();
 #ifdef DEBUG
@@ -1150,7 +1067,8 @@ void Controller::run_EM_fixedpoint(const size_t & iter){
                                                new_config_prior_,
                                                new_type_prior_,
                                                new_subgroup_prior_, true);
-    show_state_EM(iter);
+    if(verbose_)
+      show_state_EM(iter);
 }
 
 void Controller::run_EM_square()
@@ -1183,7 +1101,7 @@ void Controller::run_EM_square()
     ++iter;
     run_EM_fixedpoint(iter);
     update_params(1); // assign new_param_ to param_ and param_1
-    if(fabs(log10_obs_lik_1 - log10_obs_lik_) < thresh_ ||
+    if(fabs(log10_obs_lik_1 - log10_obs_lik_0) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
