@@ -16,7 +16,6 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * g++ -Wall -Wextra -g eqtlbma_hm.cpp hm_methods.cpp ../eqtlbma/utils/utils_io.cpp ../eqtlbma/utils/utils_math.cpp -I../eqtlbma -lgsl -lgslcblas -lz -fopenmp -o eqtlbma_hm
  */
 
 #include <cmath>
@@ -64,7 +63,7 @@ public:
   vector<string> config_names_;
   double thresh_; // on log-lik, to stop EM
   size_t max_nb_iters_; // to stop EM
-  bool squarem_; // to speed-up EM
+  double stepmax_; // max step length for SQUAREM
   map<string,bool> param2fixed_;
   int nb_threads_; 
   int verbose_;
@@ -120,23 +119,18 @@ public:
   vector<vector<double> > subgroup_denom_genes_; // idem per type per gene
 
   // data structure for control variables in squarem
-  int squaremK_; // current implementation
-  int method_; // 1,2,3 indicates the types of step length to be used in squarem1,squarem2, 4,5 for "rre" and "mpe" in cyclem1 and cyclem2,  standing for reduced-rank ("rre") or minimal-polynomial ("mpe") extrapolation.
-  double mstep_;
-  //int maxiter=1500;max_nb_iters_
-  bool square;
-  //bool trace=true;verbose_
-  double stepmin0_;
-  double stepmax0_;
-  double kr_;
-  double objfninc_; //0 to enforce monotonicity, Inf for non-monotonic scheme, 1 for monotonicity far from solution and allows for non-monotonicity closer to solution
+  int method_steplen_; // see equations 7,8,9 from Varadhan & Rolland (2008)
+  double stepmin0_; // initial lower bound of step length
+  double stepmax0_; // initial upper bound of step length
+  double mstep_; // used to tune the interval around step length
+  double maxdist_squarem_; // 0 to enforce monotonicity, Inf for non-monotonic scheme, 1 for monotonicity far from solution and allows for non-monotonicity closer to solution
   
   Controller();
   Controller(const size_t & nb_subgroups, const string & model,
              const size_t & grid_size,
              const size_t & dim, const double & thresh,
              const size_t & max_nb_iters,
-             const bool & squarem,
+             const double & stepmax_,
              const double & fixed_pi0, const int & nb_threads,
              const int & verbose);
   
@@ -163,11 +157,14 @@ public:
   void em_update_subgroup();
   void em_update_grid();
   void em_update_snp_prior();
-
+  
   void run_EM_fixedpoint(const size_t & iter);
   void update_params(const int & squaremstep);
-  
   void show_state_EM(const size_t & iter);
+  
+  double compute_steplength(const double & stepmin,
+                            const double & stepmax);
+  void proposals_squarem(const double & alpha);
   
   void run_EM_classic();
   void run_EM_square();
@@ -203,7 +200,7 @@ Controller::Controller(const size_t & nb_subgroups,
                        const size_t & dim,
                        const double & thresh,
                        const size_t & max_nb_iters,
-                       const bool & squarem,
+                       const double & stepmax,
                        const double & fixed_pi0,
                        const int & nb_threads,
                        const int & verbose)
@@ -211,7 +208,18 @@ Controller::Controller(const size_t & nb_subgroups,
   grid_size_ = gsize;
   model_ = model;
   nb_subgroups_ = nb_subgroups;
+
+  log10_obs_lik_ = NaN;
+  log10_obs_lik_0 = NaN;
+  log10_obs_lik_1 = NaN;
+  log10_obs_lik_2 = NaN;
+  new_log10_obs_lik_ = NaN;
   
+  pi0_ = NaN;
+  pi0_0 = NaN;
+  pi0_1 = NaN;
+  pi0_2 = NaN;
+  new_pi0_ = NaN;
   left_pi0_ = NaN;
   right_pi0_ = NaN;
   
@@ -265,18 +273,15 @@ Controller::Controller(const size_t & nb_subgroups,
   
   thresh_ = thresh;
   max_nb_iters_ = max_nb_iters;
-  squarem_ = squarem;
   nb_threads_ = nb_threads;
   verbose_ = verbose;
-
-  squaremK_ = 1;
-  method_ = 3;
-  mstep_ = 4;
-  square = true;
+  
+  method_steplen_ = 3; // equation 9 from Varadhan & Rolland (2008)
+  stepmax_ = stepmax;
   stepmin0_ = 1;
   stepmax0_ = 1;
-  kr_ = 1;
-  objfninc_ = 1;
+  mstep_ = 4;
+  maxdist_squarem_ = 1;
 }
 
 void Controller::load_data_one_file(
@@ -634,11 +639,11 @@ double Controller::compute_log10_obs_lik(
   
   if(isNan(l10_sum)){
     cerr << "ERROR: log10(obslik) is NaN" << endl;
-    exit(EXIT_FAILURE);
+    throw 1;
   }
   if(isInfinite(l10_sum)){
     cerr << "ERROR: log10(obslik) is +-Inf" << endl;
-    exit(EXIT_FAILURE);
+    throw 1;
   }
   
   return l10_sum;
@@ -686,12 +691,17 @@ void Controller::em_update_config()
     }
     
     // average the contribution of all genes per config
-    for(size_t k = 0; k < dim_; ++k)
+    for(size_t k = 0; k < dim_; ++k){
       new_config_prior_[k] = log10_weighted_sum(&(config_genes_[k][0]),
                                                 &(gene_wts_ones_[0]),
                                                 genes_.size())
         + log10(config_prior_[k]);
-    
+      if(isNan(new_config_prior_[k])){
+        cerr << "ERROR: new_config_prior_[" << k << "] is NaN" << endl;
+        throw 1;
+      }
+    }
+
     // compute the normalization constant (Lagrange multiplier)
     double l10_denom = log10_weighted_sum(&(new_config_prior_[0]),
                                           &(config_wts_ones_[0]),
@@ -827,11 +837,16 @@ void Controller::em_update_grid()
     }
     
     // average the contribution of all genes per grid weight
-    for(size_t l = 0; l < grid_size_; ++l)
+    for(size_t l = 0; l < grid_size_; ++l){
       new_grid_wts_[l] = log10_weighted_sum(&(grid_genes_[l][0]),
                                             &(gene_wts_ones_[0]),
                                             genes_.size())
         + log10(grid_wts_[l]);
+      if(isNan(new_grid_wts_[l])){
+        cerr << "ERROR: new_grid_wts_[" << l << "] is NaN" << endl;
+        throw 1;
+      }
+    }
     
     // compute the normalization constant (Lagrange multiplier)
     double l10_denom = log10_weighted_sum(&(new_grid_wts_[0]),
@@ -844,69 +859,12 @@ void Controller::em_update_grid()
   } // end of "if fixed grids"
   else
     new_grid_wts_ = grid_wts_;
-}
-
-void Controller::update_params(const int & squaremstep=0)
-{
-  log10_obs_lik_ = new_log10_obs_lik_;
-  pi0_ = new_pi0_;
-  if(model_ == "configs"){
-    if(dim_ > 1)
-      for(size_t k = 0; k < dim_; ++k)
-        config_prior_[k] = new_config_prior_[k];
-  }
-  else if(model_ == "types"){
-    for(size_t k = 0; k < dim_; ++k){
-      type_prior_[k] = new_type_prior_[k];
-      for(size_t s = 0; s < nb_subgroups_; ++s)
-        subgroup_prior_[k][s] = new_subgroup_prior_[k][s];
-    }
-  }
+  
+#ifdef DEBUG
   for(size_t l = 0; l < grid_size_; ++l)
-    grid_wts_[l] = new_grid_wts_[l];
-  // for(size_t i = 0; i < genes_.size(); ++i)
-  //  genes_[i].update_snp_prior();
-
-  if(squaremstep != 0){
-    switch(squaremstep){
-    case 1:{
-      log10_obs_lik_1 = new_log10_obs_lik_;
-      pi0_1 = new_pi0_;
-      if(model_ == "configs"){
-        if(dim_ > 1)
-          for(size_t k = 0; k < dim_; ++k)
-            config_prior_1[k] = new_config_prior_[k];
-      }
-      else if(model_ == "types"){
-        for(size_t k = 0; k < dim_; ++k){
-          type_prior_1[k] = new_type_prior_[k];
-          for(size_t s = 0; s < nb_subgroups_; ++s)
-            subgroup_prior_1[k][s] = new_subgroup_prior_[k][s];
-        }
-      }
-      for(size_t l = 0; l < grid_size_; ++l)
-        grid_wts_1[l] = new_grid_wts_[l];
-    }
-    case 2:{
-      log10_obs_lik_2 = new_log10_obs_lik_;
-      pi0_2 = new_pi0_;
-      if(model_ == "configs"){
-        if(dim_ > 1)
-          for(size_t k = 0; k < dim_; ++k)
-            config_prior_2[k] = new_config_prior_[k];
-      }
-      else if(model_ == "types"){
-        for(size_t k = 0; k < dim_; ++k){
-          type_prior_2[k] = new_type_prior_[k];
-          for(size_t s = 0; s < nb_subgroups_; ++s)
-            subgroup_prior_2[k][s] = new_subgroup_prior_[k][s];
-        }
-      }
-      for(size_t l = 0; l < grid_size_; ++l)
-        grid_wts_2[l] = new_grid_wts_[l];
-    }
-    }
-  }
+    fprintf(stdout, "lambda_%zu old=%.4e new=%.4e\n", l+1, grid_wts_[l], new_grid_wts_[l]);
+  fflush(stdout);
+#endif
 }
 
 void Controller::show_state_EM(const size_t & iter)
@@ -962,39 +920,6 @@ void Controller::show_state_EM(const size_t & iter)
   
   fprintf(stdout, "\n");
   fflush(stdout);
-}
-
-void Controller::run_EM_classic()
-{
-  size_t iter = 0;
-  log10_obs_lik_ = compute_log10_obs_lik(pi0_, grid_wts_, config_prior_,
-                                         type_prior_, subgroup_prior_, true);
-  if(verbose_)
-    show_state_EM(iter);
-  
-  while(true){
-    ++iter;
-    
-    run_EM_fixedpoint(iter);
-    
-    if(new_log10_obs_lik_ < log10_obs_lik_){
-      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
-              new_log10_obs_lik_, log10_obs_lik_);
-      exit(EXIT_FAILURE);
-    }
-    
-    if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_ ||
-       (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
-      break;
-    
-    update_params(); // assign new_param_ to param_
-  }
-  
-  // do a last update to get same results as William's initial implementation
-  update_params();
-  ++iter;
-  run_EM_fixedpoint(iter);
-  update_params();
 }
 
 void Controller::run_EM_fixedpoint(const size_t & iter){
@@ -1061,6 +986,20 @@ void Controller::run_EM_fixedpoint(const size_t & iter){
     }
     
     em_update_grid();
+#ifdef DEBUG
+    tmp_log10_obs_lik = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
+                                              new_config_prior_,
+                                              new_type_prior_,
+                                              new_subgroup_prior_, false);
+    fprintf(stdout, "log obslik after grid: %f\n", tmp_log10_obs_lik);
+    fflush(stdout);
+    if(tmp_log10_obs_lik < log10_obs_lik_){
+      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+              tmp_log10_obs_lik, log10_obs_lik_);
+      exit(EXIT_FAILURE);
+    }
+#endif
+    
     em_update_snp_prior();
     
     new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
@@ -1071,26 +1010,224 @@ void Controller::run_EM_fixedpoint(const size_t & iter){
       show_state_EM(iter);
 }
 
-void Controller::run_EM_square()
+void Controller::update_params(const int & squaremstep=0)
+{
+  pi0_ = new_pi0_;
+  if(model_ == "configs"){
+    if(dim_ > 1)
+      for(size_t k = 0; k < dim_; ++k)
+        config_prior_[k] = new_config_prior_[k];
+  }
+  else if(model_ == "types"){
+    for(size_t k = 0; k < dim_; ++k){
+      type_prior_[k] = new_type_prior_[k];
+      for(size_t s = 0; s < nb_subgroups_; ++s)
+        subgroup_prior_[k][s] = new_subgroup_prior_[k][s];
+    }
+  }
+  for(size_t l = 0; l < grid_size_; ++l)
+    grid_wts_[l] = new_grid_wts_[l];
+  // for(size_t i = 0; i < genes_.size(); ++i)
+  //  genes_[i].update_snp_prior();
+  log10_obs_lik_ = new_log10_obs_lik_;
+
+  if(squaremstep != 0){
+    switch(squaremstep){
+    case 1:{
+      pi0_1 = new_pi0_;
+      if(model_ == "configs"){
+        if(dim_ > 1)
+          for(size_t k = 0; k < dim_; ++k)
+            config_prior_1[k] = new_config_prior_[k];
+      }
+      else if(model_ == "types"){
+        for(size_t k = 0; k < dim_; ++k){
+          type_prior_1[k] = new_type_prior_[k];
+          for(size_t s = 0; s < nb_subgroups_; ++s)
+            subgroup_prior_1[k][s] = new_subgroup_prior_[k][s];
+        }
+      }
+      for(size_t l = 0; l < grid_size_; ++l)
+        grid_wts_1[l] = new_grid_wts_[l];
+      log10_obs_lik_1 = new_log10_obs_lik_;
+    }
+    case 2:{
+      pi0_2 = new_pi0_;
+      if(model_ == "configs"){
+        if(dim_ > 1)
+          for(size_t k = 0; k < dim_; ++k)
+            config_prior_2[k] = new_config_prior_[k];
+      }
+      else if(model_ == "types"){
+        for(size_t k = 0; k < dim_; ++k){
+          type_prior_2[k] = new_type_prior_[k];
+          for(size_t s = 0; s < nb_subgroups_; ++s)
+            subgroup_prior_2[k][s] = new_subgroup_prior_[k][s];
+        }
+      }
+      for(size_t l = 0; l < grid_size_; ++l)
+        grid_wts_2[l] = new_grid_wts_[l];
+      log10_obs_lik_2 = new_log10_obs_lik_;
+    }
+    }
+  }
+}
+
+void Controller::run_EM_classic()
 {
   size_t iter = 0;
-  double sr2_scalar, sv2_scalar, srv_scalar, alpha, stepmin, stepmax;
-  bool extrap;
-  stepmin = stepmin0_;
-  stepmax = stepmax0_;
+  log10_obs_lik_ = compute_log10_obs_lik(pi0_, grid_wts_, config_prior_,
+                                         type_prior_, subgroup_prior_, true);
+  if(verbose_)
+    show_state_EM(iter);
+  
+  while(true){
+    ++iter;
+    
+    run_EM_fixedpoint(iter);
+    
+    if(new_log10_obs_lik_ < log10_obs_lik_){
+      fprintf(stderr, "ERROR: observed log-likelihood is decreasing (%f < %f)\n" ,
+              new_log10_obs_lik_, log10_obs_lik_);
+      exit(EXIT_FAILURE);
+    }
+    
+    if(fabs(new_log10_obs_lik_ - log10_obs_lik_) < thresh_ ||
+       (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
+      break;
+    
+    update_params(); // assign new_param/new_lik to param/lik
+  }
+  
+  // do a last update to get same results as William's initial implementation
+  update_params();
+  ++iter;
+  run_EM_fixedpoint(iter);
+  update_params();
+}
+
+double Controller::compute_steplength(const double & stepmin,
+                                      const double & stepmax){
+  double sr2_scalar, sv2_scalar, srv_scalar, alpha;
+  
+  sr2_scalar = pow(pi0_1 - pi0_0, 2);
+  sv2_scalar = pow(pi0_2 - 2*pi0_1 + pi0_0, 2);
+  srv_scalar = (pi0_2 - 2*pi0_1 + pi0_0) * (pi0_1 - pi0_0);
+  
+  if(model_ == "configs"){
+    if(dim_ > 1)
+      for(size_t k = 0; k < dim_; ++k){
+        sr2_scalar += pow(config_prior_1[k] - config_prior_0[k], 2);
+        sv2_scalar += pow(config_prior_2[k] - 2*config_prior_1[k]
+                          + config_prior_0[k], 2);
+        srv_scalar += (config_prior_2[k] - 2*config_prior_1[k]
+                       + config_prior_0[k])
+          * (config_prior_1[k] - config_prior_0[k]);
+      }
+  }
+  else if(model_ == "types"){
+    for(size_t k = 0; k < dim_; ++k){
+      sr2_scalar += pow(type_prior_1[k] - type_prior_0[k], 2);
+      sv2_scalar += pow(type_prior_2[k] - 2*type_prior_1[k]
+                        + type_prior_0[k], 2);
+      srv_scalar += (type_prior_2[k] - 2*type_prior_1[k]
+                     + type_prior_0[k])
+        * (type_prior_1[k] - type_prior_0[k]);
+      for(size_t s = 0; s < nb_subgroups_; ++s){
+        sr2_scalar += pow(subgroup_prior_1[k][s] - subgroup_prior_0[k][s], 2);
+        sv2_scalar += pow(subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
+                          + subgroup_prior_0[k][s], 2);
+        srv_scalar += (subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
+                       + subgroup_prior_0[k][s])
+          * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s]);
+      }
+    }
+  }
+  
+  for(size_t l = 0; l < grid_size_; ++l){
+    sr2_scalar += pow(grid_wts_1[l] - grid_wts_0[l], 2);
+    sv2_scalar += pow(grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l], 2);
+    srv_scalar += (grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l])
+      * (grid_wts_1[l] - grid_wts_0[l]);
+  }
+  
+  switch (method_steplen_){
+  case 1:
+    alpha = - srv_scalar / sv2_scalar; // equation 7 of Varadhan & Rolland (2008)
+  case 2:
+    alpha = - sr2_scalar / srv_scalar; // equation 8
+  case 3:
+    alpha = sqrt(sr2_scalar / sv2_scalar); // equation 9
+  }
+  
+  alpha = max(stepmin, min(stepmax, alpha));
+  alpha = min(stepmax_, alpha);
+  
+  return(alpha);
+}
+
+void Controller::proposals_squarem(const double & alpha){
+  new_pi0_ = pi0_0 + 2.0 * alpha * (pi0_1 - pi0_0)
+    + pow(alpha, 2) * (pi0_2 - 2.0 * pi0_1 + pi0_0);
+  
+  if(model_ == "configs"){
+    if(dim_ > 1)
+      for(size_t k = 0; k < dim_; ++k){
+        new_config_prior_[k] = config_prior_0[k] + 2.0 * alpha 
+          * (config_prior_1[k] - config_prior_0[k])
+          + pow(alpha, 2) * (config_prior_2[k]
+                             - 2.0 * config_prior_1[k]
+                             + config_prior_0[k]);
+      }
+  }
+  else if(model_ == "types"){
+    for(size_t k = 0; k < dim_; ++k){
+      new_type_prior_[k] = type_prior_0[k] + 2.0 * alpha
+        * (type_prior_1[k] - type_prior_0[k])
+        + pow(alpha, 2) * (type_prior_2[k] - 2.0 * type_prior_1[k]
+                           + type_prior_0[k]);
+      for(size_t s = 0; s < nb_subgroups_; ++s){
+        new_subgroup_prior_[k][s] = subgroup_prior_0[k][s] + 2.0 * alpha
+          * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s])
+          + pow(alpha, 2) * (subgroup_prior_2[k][s]
+                             - 2.0 * subgroup_prior_1[k][s]
+                             + subgroup_prior_0[k][s]);
+      }
+    }
+  }
+  
+  for(size_t l = 0; l < grid_size_; ++l){
+    new_grid_wts_[l] = grid_wts_0[l] +  2.0 * alpha
+      * (grid_wts_1[l] - grid_wts_0[l])
+      + pow(alpha, 2) * (grid_wts_2[l] - 2.0 * grid_wts_1[l]
+                         + grid_wts_0[l]);
+  }
+  
+  new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
+                                             new_config_prior_,
+                                             new_type_prior_,
+                                             new_subgroup_prior_, true);
+  
+  if(verbose_ > 0)
+    show_state_EM(99999);
+}
+
+void Controller::run_EM_square()
+{
+  size_t iter = 0, iterMain = 0;
+  double steplen = 1.0, stepmin = stepmin0_, stepmax = stepmax0_;
+  bool extrap = false;
   
   log10_obs_lik_ = compute_log10_obs_lik(pi0_, grid_wts_, config_prior_,
                                          type_prior_, subgroup_prior_, true);
   if(verbose_)
     show_state_EM(iter);
-
-  // main squarem loop
+  
   while(true){
-    sr2_scalar = 0;
-    sv2_scalar = 0;
-    srv_scalar = 0;
-    extrap = true;
-    //storing fixed point vector
+    ++iterMain;
+    if(verbose_ > 0)
+      cout << "main loop iter " << iterMain << endl;
+    
     log10_obs_lik_0 = log10_obs_lik_;
     pi0_0 = pi0_;
     grid_wts_0 = grid_wts_;
@@ -1100,186 +1237,97 @@ void Controller::run_EM_square()
     
     ++iter;
     run_EM_fixedpoint(iter);
-    update_params(1); // assign new_param_ to param_ and param_1
+    update_params(1); // assign new_param/new_lik to param/lik and param_1/lik_1
     if(fabs(log10_obs_lik_1 - log10_obs_lik_0) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
     ++iter;
     run_EM_fixedpoint(iter);
-    update_params(2); // assign new_param_ to param_ and param_2
+    update_params(2); // assign new_param/new_lik to param/lik and param_2/lik_2
     if(fabs(log10_obs_lik_2 - log10_obs_lik_1) < thresh_ ||
        (max_nb_iters_ != string::npos && iter == max_nb_iters_ - 1))
       break;
     
-    // calculate step length alpha
-    sr2_scalar += pow(pi0_1 - pi0_0, 2);
-    sv2_scalar += pow(pi0_2 - 2*pi0_1 + pi0_0, 2);
-    srv_scalar += (pi0_2 - 2*pi0_1 + pi0_0) * (pi0_1 - pi0_0);
+    steplen = compute_steplength(stepmin, stepmax);
+    if(verbose_ > 0)
+      fprintf(stdout, "steplen %f\n", steplen);
     
-    if(model_ == "configs"){
-      if(dim_ > 1)
-        for(size_t k = 0; k < dim_; ++k){
-          sr2_scalar += pow(config_prior_1[k] - config_prior_0[k], 2);
-          sv2_scalar += pow(config_prior_2[k] - 2*config_prior_1[k]
-                            + config_prior_0[k], 2);
-          srv_scalar += (config_prior_2[k] - 2*config_prior_1[k]
-                         + config_prior_0[k])
-            * (config_prior_1[k] - config_prior_0[k]);
-        }
-    }
-    else if(model_ == "types"){
-      for(size_t k = 0; k < dim_; ++k){
-        sr2_scalar += pow(type_prior_1[k] - type_prior_0[k], 2);
-        sv2_scalar += pow(type_prior_2[k] - 2*type_prior_1[k]
-                          + type_prior_0[k], 2);
-        srv_scalar += (type_prior_2[k] - 2*type_prior_1[k]
-                       + type_prior_0[k])
-          * (type_prior_1[k] - type_prior_0[k]);
-        for(size_t s = 0; s < nb_subgroups_; ++s){
-          sr2_scalar += pow(subgroup_prior_1[k][s] - subgroup_prior_0[k][s], 2);
-          sv2_scalar += pow(subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
-                            + subgroup_prior_0[k][s], 2);
-          srv_scalar += (subgroup_prior_2[k][s] - 2*subgroup_prior_1[k][s]
-                         + subgroup_prior_0[k][s])
-            * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s]);
-        }
-      }
-    }
+    proposals_squarem(steplen); // assign values to new_params and calc new_lik
+    update_params(); // assign new_param/new_lik to param/lik
+    extrap = true;
     
-    for(size_t l = 0; l < grid_size_; ++l){
-      sr2_scalar += pow(grid_wts_1[l] - grid_wts_0[l], 2);
-      sv2_scalar += pow(grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l], 2);
-      srv_scalar += (grid_wts_2[l] - 2*grid_wts_1[l] + grid_wts_0[l])
-        * (grid_wts_1[l] - grid_wts_0[l]);
-    }
-    
-    switch (method_){
-    case 1:
-      alpha = - srv_scalar / sv2_scalar;
-    case 2:
-      alpha = - sr2_scalar / srv_scalar;
-    case 3:
-      alpha = sqrt(sr2_scalar / sv2_scalar);
-    }
-    alpha = max(stepmin, min(stepmax, alpha));
-    
-    // assigning new value
-    // shouldn't it be: - 2.0 * squaremalpha ... ?
-    pi0_ = pi0_0 + 2.0 * alpha * (pi0_1 - pi0_0)
-      + pow(alpha, 2) * (pi0_2 - 2 * pi0_1 + pi0_0);
-    
-    if(model_ == "configs"){
-      if(dim_ > 1)
-        for(size_t k = 0; k < dim_; ++k){
-          config_prior_[k] = config_prior_0[k] + 2.0 * alpha 
-            * (config_prior_1[k] - config_prior_0[k])
-            + pow(alpha, 2) * (config_prior_2[k]
-                                       - 2 * config_prior_1[k]
-                                       + config_prior_0[k]);
-        }
-    }
-    else if(model_ == "types"){
-      for(size_t k = 0; k < dim_; ++k){
-        type_prior_[k] = type_prior_0[k] + 2.0 * alpha
-          * (type_prior_1[k] - type_prior_0[k])
-          + pow(alpha, 2) * (type_prior_2[k] - 2 * type_prior_1[k]
-                                     + type_prior_0[k]);
-        for(size_t s = 0; s < nb_subgroups_; ++s){
-          subgroup_prior_[k][s] = subgroup_prior_0[k][s] + 2.0 * alpha
-            * (subgroup_prior_1[k][s] - subgroup_prior_0[k][s])
-            + pow(alpha, 2) * (subgroup_prior_2[k][s]
-                                       - 2 * subgroup_prior_1[k][s]
-                                       + subgroup_prior_0[k][s]);
-        }
-      }
-    }
-    
-    for(size_t l = 0; l < grid_size_; ++l){
-      grid_wts_[l] = grid_wts_0[l] +  2 * alpha
-        * (grid_wts_1[l] - grid_wts_0[l])
-        + pow(alpha, 2) * (grid_wts_2[l] - 2 * grid_wts_1[l]
-                                   + grid_wts_0[l]);
-    }
-    
-    // stabilization
-    if(abs(alpha - 1) > 0.01){
+    // check consistency if extrapolation different enough from classical EM
+    if(abs(steplen - 1) > 0.01){
+      if(verbose_ > 0)
+        cout << "step length is large, check consistency" << endl;
       try{
         ++iter;
         run_EM_fixedpoint(iter);
       }
-      catch(...){
-        log10_obs_lik_ = log10_obs_lik_2;
+      catch(int e){
+        if(verbose_ > 0)
+          cout << "failure, go back to previous iter" << endl;
         pi0_ = pi0_2;
-        grid_wts_ = grid_wts_2;
         config_prior_ = config_prior_2;
         type_prior_ = type_prior_2;
         subgroup_prior_ = subgroup_prior_2;
-        if(alpha == stepmax)
-          stepmax = max(stepmax0_, stepmax/mstep_);
-        alpha = 1;
+        grid_wts_ = grid_wts_2;
+        log10_obs_lik_ = compute_log10_obs_lik(pi0_, grid_wts_, config_prior_,
+                                               type_prior_, subgroup_prior_,
+                                               true);
         extrap = false;
-        if(alpha == stepmax)
+        if(steplen == stepmax)
+          stepmax = max(stepmax0_, stepmax / mstep_);
+        steplen = 1;
+        if(steplen == stepmax)
           stepmax = mstep_ * stepmax;
-        if(stepmin<0 && alpha==stepmin)
+        if(stepmin < 0 && steplen == stepmin)
           stepmin = mstep_ * stepmin;
-        if(verbose_)
-          fprintf(stdout, "(stbl) obj-fn %f  extrapol %s  step-len %f\n",
-                  log10_obs_lik_, extrap?"true":"false", alpha);
         continue;
       }
-      update_params(0); // assign new_param_ to param_
+      if(verbose_ > 0)
+        cout << "success, keep going" << endl;
+      update_params(); // assign new_param_ to param_
     }
     
-    // maximize the objective function, less stringent criteria when objfninc_=1
-    if(new_log10_obs_lik_ < log10_obs_lik_0 - objfninc_){
+    // keep updates 2 if the squarem extrapolation is much worse than
+    // classical EM (i.e. it went too far...)
+    if(extrap && log10_obs_lik_ < log10_obs_lik_0 - maxdist_squarem_){
+      if(verbose_ > 0)
+        cout << "log-lik after squarem is too bad, keep classical iter" << endl;
       log10_obs_lik_ = log10_obs_lik_2;
       pi0_ = pi0_2;
       grid_wts_ = grid_wts_2;
       config_prior_ = config_prior_2;
       type_prior_ = type_prior_2;
       subgroup_prior_ = subgroup_prior_2;
-      if(alpha == stepmax)
-        stepmax = max(stepmax0_, stepmax/mstep_);
-      alpha = 1;
-      extrap = false;
+      if(steplen == stepmax)
+        stepmax = max(stepmax0_, stepmax / mstep_);
+      steplen = 1;
     }
     
-    if(alpha == stepmax)
+    if(steplen == stepmax)
       stepmax = mstep_ * stepmax;
-    if(stepmin < 0 && alpha == stepmin)
+    if(stepmin < 0 && steplen == stepmin)
       stepmin = mstep_ * stepmin;
-    if(verbose_)
-      fprintf(stdout, "(norm) obj-fn %f  extrapol %s  step-len %f\n",
-              log10_obs_lik_, extrap?"true":"false", alpha);
-  }
-  //end of main squarem loop
+    
+    if(verbose_ > 0)
+      fprintf(stdout, "extrap %s  stepmax %f  stepmin %f\n",
+              extrap?"true":"false", stepmax, stepmin);
+  } // end of main squarem loop
   
-  // do a last update to get same results as William's initial implementation
+  // do a last update to get similar results as implementation of classic EM
   ++iter;
-  em_update_pi0();
-  if(model_ == "configs")
-    em_update_config();
-  else if(model_ == "types"){
-    em_update_type();
-    em_update_subgroup();
-  }
-  em_update_grid();
-  em_update_snp_prior();
+  run_EM_fixedpoint(iter);
   update_params();
-  new_log10_obs_lik_ = compute_log10_obs_lik(new_pi0_, new_grid_wts_,
-                                             new_config_prior_,
-                                             new_type_prior_,
-                                             new_subgroup_prior_, true);
-  if(verbose_)
-    show_state_EM(iter);
 }
 
 void Controller::run_EM()
 {
   if(verbose_ > 0){
     cout << "run EM algorithm (";
-    if(squarem_)
+    if(stepmax_ > 1.0)
       cout << "square";
     else
       cout << "classic";
@@ -1288,10 +1336,10 @@ void Controller::run_EM()
   time_t startRawTime, endRawTime;
   time (&startRawTime);
   
-  if(squarem_)
-    run_EM_square();
-  else
+  if(stepmax_ == 1.0)
     run_EM_classic();
+  else
+    run_EM_square();
   
   time (&endRawTime);
   cout << "EM ran for " << getElapsedTime(startRawTime, endRawTime) << endl << flush;
@@ -1723,7 +1771,8 @@ void help(char ** argv)
        << "      --thresh\tthreshold to stop the EM (default=0.05)" << endl
        << "      --maxit\tmaximum number of iterations (optional)" << endl
        << "\t\tuseful if wall-time limit (see also --init)" << endl
-       << "      --sq\tuse square EM for speed-up" << endl
+       << "      --msl\tmaximum step length for SQUAREM" << endl
+       << "\t\tdefault=1 (meaning classical EM), around 3 is a good option" << endl
        << "      --thread\tnumber of threads (default=1)" << endl
        << "      --configs\tsubset of configurations to keep (e.g. \"1|3|1-3\")" << endl
        << "      --keepgen\tkeep 'general' ABFs (useful for BMAlite)" << endl
@@ -1766,7 +1815,7 @@ void parseCmdLine(
   size_t & seed,
   double & thresh,
   size_t & max_nb_iters,
-  bool & squarem,
+  double & stepmax,
   int & nb_threads,
   string & file_ci,
   vector<string> & configs_tokeep,
@@ -1793,7 +1842,7 @@ void parseCmdLine(
       {"seed", required_argument, 0, 0},
       {"thresh", required_argument, 0, 0},
       {"maxit", required_argument, 0, 0},
-      {"sq", no_argument, 0, 0},
+      {"msl", required_argument, 0, 0},
       {"thread", required_argument, 0, 0},
       {"ci", required_argument, 0, 0},
       {"configs", required_argument, 0, 0},
@@ -1856,8 +1905,8 @@ void parseCmdLine(
         max_nb_iters = atol(optarg);
         break;
       }
-      if(strcmp(long_options[option_index].name, "sq") == 0){
-        squarem = true;
+      if(strcmp(long_options[option_index].name, "msl") == 0){
+        stepmax = atof(optarg);
         break;
       }
       if(strcmp(long_options[option_index].name, "thread") == 0){
@@ -2012,7 +2061,7 @@ void run(
   const size_t & seed,
   const double & thresh,
   const size_t & max_nb_iters,
-  const bool & squarem,
+  const double & stepmax,
   const int & nb_threads,
   const string & file_ci,
   const vector<string> & configs_tokeep,
@@ -2023,7 +2072,7 @@ void run(
   const int & verbose)
 {
   Controller controller(nb_subgroups, model, nb_grid_points, dim, thresh,
-                        max_nb_iters, squarem, fixed_pi0, nb_threads,
+                        max_nb_iters, stepmax, fixed_pi0, nb_threads,
                         verbose);
   
   controller.load_data(file_pattern, configs_tokeep, keep_gen_abfs);
@@ -2064,14 +2113,14 @@ int main(int argc, char **argv)
   size_t nb_subgroups = string::npos, dim = string::npos,
     nb_grid_points = string::npos, seed = string::npos,
     max_nb_iters = string::npos;
-  double thresh = 0.05, fixed_pi0 = NaN;
+  double thresh = 0.05, stepmax = 1.0, fixed_pi0 = NaN;
   vector<string> configs_tokeep;
-  bool rand_init = false, squarem = false, keep_gen_abfs = false,
-    skip_ci = true, skip_bf = true;
+  bool rand_init = false, keep_gen_abfs = false, skip_ci = true,
+    skip_bf = true;
   
   parseCmdLine(argc, argv, file_pattern, nb_subgroups, model, dim,
                nb_grid_points, out_file, file_init, rand_init, seed, thresh,
-               max_nb_iters, squarem, nb_threads, file_ci, configs_tokeep,
+               max_nb_iters, stepmax, nb_threads, file_ci, configs_tokeep,
                keep_gen_abfs, skip_ci, skip_bf, fixed_pi0, verbose);
   
   time_t time_start, time_end;
@@ -2086,7 +2135,7 @@ int main(int argc, char **argv)
   }
   
   run(file_pattern, nb_subgroups, model, dim, nb_grid_points,
-      out_file, file_init, seed, thresh, max_nb_iters, squarem, nb_threads,
+      out_file, file_init, seed, thresh, max_nb_iters, stepmax, nb_threads,
       file_ci, configs_tokeep, keep_gen_abfs, skip_ci, skip_bf, fixed_pi0,
       verbose);
   
