@@ -644,10 +644,11 @@ Using @option{--bfs all} can be too costly when the number of subgroups exceeds 
 The model implemented in this package is based on a linear regression, and there are several ways of
 specifying the variance-covariance matrix of the errors.
 If the subgroups contain different individuals, we can choose @option{--error uvlr}, for univariate linear regression, as in Wen & Stephens, AoAS 2014.
+It assumes the errors are not correlated between subgroups, and thus only estimates the variances.
 If the subgroups contain exactly the same individuals, we can choose @option{--error mvlr}, for multivariate linear regression, as in Wen, Biometrics 2014.
+It assumes the errors are correlated between subgroups, and thus estimates the full variance-covariance matrix.
 If the subgroups contain some individuals in common and some not, we can choose @option{--error hybrid}.
-For the latter, the effect sizes and their variance are estimated using all individuals in each subgroup,
-whereas their covariance are estimated using each pair of subgroups with only individuals in common.
+It works as @option{--error mvlr}, except that each error covariance between any two subgroups is estimated using only individuals common to these subgroups.
 
 When using @option{--error mvlr} or @option{--error hybrid}, the option @option{--fiterr} is set by default at 0.5.
 See Wen, Biometrics 2014, for the rationale.
