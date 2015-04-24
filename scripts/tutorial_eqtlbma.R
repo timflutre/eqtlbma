@@ -3,23 +3,11 @@
 ## `tutorial_eqtlbma.R' simulates data for the tutorial of the eQtlBma package
 ## Copyright (C) 2013-2015 Timothée Flutre
 ## License: GPL-3+
-
-## This program is free software: you can redistribute it and/or modify
-## it under the terms of the GNU General Public License as published by
-## the Free Software Foundation, either version 3 of the License, or
-## (at your option) any later version.
-
-## This program is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-
-## You should have received a copy of the GNU General Public License
-## along with this program.  If not, see <http://www.gnu.org/licenses/>.
+## Persons: Timothée Flutre [cre,aut]
 
 rm(list=ls())
 prog.name <- "tutorial_eqtlbma.R"
-prog.version <- "1.3.0"
+prog.version <- "1.3.1a" # same as in configure.ac
 
 R.v.maj <- as.numeric(R.version$major)
 R.v.min.1 <- as.numeric(strsplit(R.version$minor, "\\.")[[1]][1])
@@ -71,7 +59,9 @@ help <- function(){
     txt <- paste0(txt, "\n")
     txt <- paste0(txt, "Examples:\n")
     txt <- paste0(txt, " Rscript ./", prog.name, " --pkg ~/src/eqtlbma\n")
-    message(txt)
+    txt <- paste0(txt, "\n")
+    txt <- paste0(txt, "Report bugs to <eqtlbma-users@googlegroups.com>.")
+    write(txt, stdout())
 }
 
 ##' Display version and license information on stdout
@@ -81,13 +71,13 @@ help <- function(){
 version <- function(){
     txt <- paste0(prog.name, " ", prog.version, "\n")
     txt <- paste0(txt, "\n")
-    txt <- paste0(txt, "Copyright (C) 2013-2014 Timothée Flutre.\n")
+    txt <- paste0(txt, "Copyright (C) 2013-2015 Timothée Flutre.\n")
     txt <- paste0(txt, "License GPL-3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n")
     txt <- paste0(txt, "This is free software; see the source for copying conditions. There is NO\n")
     txt <- paste0(txt, "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n")
     txt <- paste0(txt, "\n")
-    txt <- paste0(txt, "Written by Timothée Flutre.\n")
-    message(txt)
+    txt <- paste0(txt, "Written by Timothée Flutre [cre,aut].")
+    write(txt, stdout())
 }
 
 ##' Parse the command-line arguments
@@ -271,16 +261,16 @@ simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
             msg <- paste0(msg, " (same individuals in all subgroups) ...")
         } else
             msg <- paste0(msg, " (different individuals between subgroups) ...")
-        message(msg)
+        write(msg, stdout())
     }
 
-    inds <- list("1"=data.frame(name=paste0("ind", 1:nb.inds[1]),
+    inds <- list("tissue1"=data.frame(name=paste0("ind", 1:nb.inds[1]),
                      sex=sample(c(0, 1), nb.inds[1], replace=TRUE),
                      stringsAsFactors=FALSE))
     if(nb.subgroups > 1){
       if(length(nb.inds) == 1){
         for(s in 2:nb.subgroups)
-          inds[[as.character(s)]] <- inds[["1"]]
+          inds[[as.character(s)]] <- inds[[1]]
         names(inds) <- paste0("tissue", 1:nb.subgroups)
       } else{
         for(s in 2:nb.subgroups)
@@ -309,9 +299,10 @@ simulIndividuals <- function(nb.inds, nb.subgroups, verbose=1){
 simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
                                  avg.intergenic.length, verbose=1){
     if(verbose > 0)
-        message(paste0("simulate coordinates for ", nb.genes, " gene",
-                       ifelse(nb.genes > 1, "s", ""), " (",
-                       nb.chrs, " chr", ifelse(nb.chrs > 1, "s", ""), ") ..."))
+        write(paste0("simulate coordinates for ", nb.genes, " gene",
+                     ifelse(nb.genes > 1, "s", ""), " (",
+                     nb.chrs, " chr", ifelse(nb.chrs > 1, "s", ""), ") ..."),
+              stdout())
 
     chr.names <- sprintf(paste0("chr%0", floor(log10(nb.chrs))+1, "i"),
                          1:nb.chrs)
@@ -347,11 +338,12 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
     names(gene.length.chrs) <- chr.names
     gene.lengths <- do.call(c, gene.length.chrs)
     if(verbose > 0)
-        message(paste0("gene lengths: mean=", format(mean(gene.lengths), scientific=TRUE, digits=2),
-                       " sd=", format(sd(gene.lengths), scientific=TRUE, digits=2),
-                       " min=", format(min(gene.lengths), scientific=TRUE, digits=2),
-                       " med=", format(median(gene.lengths), scientific=TRUE, digits=2),
-                       " max=", format(max(gene.lengths), scientific=TRUE, digits=2)))
+        write(paste0("gene lengths: mean=", format(mean(gene.lengths), scientific=TRUE, digits=2),
+                     " sd=", format(sd(gene.lengths), scientific=TRUE, digits=2),
+                     " min=", format(min(gene.lengths), scientific=TRUE, digits=2),
+                     " med=", format(median(gene.lengths), scientific=TRUE, digits=2),
+                     " max=", format(max(gene.lengths), scientific=TRUE, digits=2)),
+              stdout())
 
     ## X ~ NB(n,p) is "intergenic length"
     E.x <- avg.intergenic.length
@@ -364,11 +356,12 @@ simulGeneCoordinates <- function(nb.genes, nb.chrs, avg.gene.length,
     names(intergenic.length.chrs) <- chr.names
     intergenic.lengths <- do.call(c, intergenic.length.chrs)
     if(verbose > 0)
-        message(paste0("intergenic lengths: mean=", format(mean(intergenic.lengths), scientific=TRUE, digits=2),
-                       " sd=", format(sd(intergenic.lengths), scientific=TRUE, digits=2),
-                       " min=", format(min(intergenic.lengths), scientific=TRUE, digits=2),
-                       " med=", format(median(intergenic.lengths), scientific=TRUE, digits=2),
-                       " max=", format(max(intergenic.lengths), scientific=TRUE, digits=2)))
+        write(paste0("intergenic lengths: mean=", format(mean(intergenic.lengths), scientific=TRUE, digits=2),
+                     " sd=", format(sd(intergenic.lengths), scientific=TRUE, digits=2),
+                     " min=", format(min(intergenic.lengths), scientific=TRUE, digits=2),
+                     " med=", format(median(intergenic.lengths), scientific=TRUE, digits=2),
+                     " max=", format(max(intergenic.lengths), scientific=TRUE, digits=2)),
+              stdout())
 
     interval.length.chrs <- lapply(chr.names, function(chr){
         c(rbind(intergenic.length.chrs[[chr]], gene.length.chrs[[chr]]))
@@ -417,7 +410,7 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
                   is.null(avg.nb.snps.per.gene)))
 
     if(verbose > 0)
-        message("simulate SNP coordinates ...")
+        write("simulate SNP coordinates ...", stdout())
 
     nb.genes <- nrow(gene.coords.bed)
     nb.genes.chrs <- tapply(gene.coords.bed$name,
@@ -443,11 +436,11 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
     nb.cis.snps.genes <- do.call(c, nb.cis.snps.per.gene)
     nb.cis.snps.per.chr <- sapply(nb.cis.snps.per.gene, sum)
     if(verbose > 0){
-        message(paste0("total nb of SNPs (in cis of at least one gene): ",
-                       sum(nb.cis.snps.genes)))
+        write(paste0("total nb of SNPs (in cis of at least one gene): ",
+                     sum(nb.cis.snps.genes)), stdout())
         ## summary(nb.cis.snps.per.gene)
-        message(paste0("nb of gene(s) with no cis SNPs: ",
-                       sum(nb.cis.snps.genes == 0)))
+        write(paste0("nb of gene(s) with no cis SNPs: ",
+                     sum(nb.cis.snps.genes == 0)), stdout())
     }
 
     snp.loci <- lapply(names(nb.genes.chrs), function(chr){
@@ -505,7 +498,8 @@ simulSnpCoordinates <- function(gene.coords.bed, anchor, cis.radius.5p,
 simulGenotypes <- function(snp.coords.bed, nb.inds, inds, maf, prop.rare,
                            verbose=1){
     if(verbose > 0)
-        message("simulate genotypes (maf=", maf, " rare=", prop.rare, ") ...")
+        write(paste0("simulate genotypes (maf=", maf, " rare=", prop.rare,
+                     ") ..."), stdout())
 
     nb.snps <- nrow(snp.coords.bed)
     tot.nb.inds <- ifelse(length(nb.inds) == 1, nb.inds, sum(nb.inds))
@@ -560,7 +554,7 @@ simulGenotypes <- function(snp.coords.bed, nb.inds, inds, maf, prop.rare,
 simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                                pi0, coverr, nb.cores=1, verbose=1){
     if(verbose > 0)
-        message("simulate gene expression levels ...")
+        write("simulate gene expression levels ...", stdout())
 
     nb.subgroups <- length(inds)
     tot.nb.inds <- ifelse(length(nb.inds) == 1, nb.inds, sum(nb.inds))
@@ -595,7 +589,8 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
                                       diag(nb.subgroups))
     }
     if(verbose > 0){
-        message("covariance matrix of the errors (same for all genes):")
+        write("covariance matrix of the errors (same for all genes):",
+              stdout())
         print(cov.err.S)
     }
 
@@ -730,8 +725,9 @@ simulGeneExpLevels <- function(nb.inds, inds, genos.dose, gn2sn,
         null.genes <- tapply(truth$config, list(truth$gene), function(configs){
             all(configs == "0")
         })
-        message(paste0("true pi0: ", sum(null.genes) / length(null.genes)))
-        message("true configuration proportions:")
+        write(paste0("true pi0: ", sum(null.genes) / length(null.genes)),
+              stdout())
+        write("true configuration proportions:", stdout())
         print(table(truth$config[truth$config != "0"]) /
               sum(truth$config != "0"))
     }
@@ -766,7 +762,7 @@ getGrids <- function(){
 writeData <- function(dir, nb.inds, inds, gene.coords.bed, snp.coords.bed,
                       genos.dose, explevels.genes, grids, gn2sn, verbose=1){
     if(verbose > 0)
-        message("write data ...")
+        write("write data ...", stdout())
 
     nb.subgroups <- length(inds)
 
@@ -953,8 +949,12 @@ main <- function(){
 
     if(params$verbose > 0){
         start.time <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
-        message(paste0("START ", prog.name, " ", start.time))
-        message(paste0("cwd: ", getwd()))
+        write(paste0("START ", prog.name, " ", prog.version, " ", start.time),
+              stdout())
+        args <- commandArgs(trailingOnly=TRUE)
+        write(paste("cmd-line:", prog.name, paste(args, collapse=" ")),
+              stdout())
+        write(paste0("cwd: ", getwd()), stdout())
     }
 
     system.time(run(params))
@@ -971,7 +971,9 @@ main <- function(){
         difft.s <- floor(((difft - difft.d - difft.h/24 - difft.m/(24*60)) *
                           24*60*60) %% (24 * 60 * 60))
         run.length <- sprintf("%02i:%02i:%02i", difft.h, difft.m, difft.s)
-        message(paste0("END ", prog.name, " ", end.time, " (", run.length, ")"))
+        write(paste0("END ", prog.name, " ", prog.version, " ", end.time,
+                     " (", run.length, ")"),
+              stdout())
         ## print(object.size(x=lapply(ls(), get)), units="Kb") # return an error I don't understand
     }
 }
