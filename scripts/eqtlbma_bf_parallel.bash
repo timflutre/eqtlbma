@@ -41,12 +41,14 @@ function help () {
     msg+="\t\tdefault=100000\n"
     msg+="      --out\tprefix for the output files\n"
     msg+="\t\tdefault=out_eqtlbma\n"
+    msg+="      --lik\tlikelihood to use (normal/poisson/quasipoisson)\n"
+    msg+="\t\tdefault=normal\n"
     msg+="      --analys\tanalysis to perform (sep/join)\n"
     msg+="\t\tdefault=sep\n"
     msg+="      --outss\twrite the output file with all summary statistics\n"
     msg+="      --outw\twrite the output file with the ABFs averaged over the grid\n"
     msg+="      --qnorm\tquantile-normalize the expression levels to a N(0,1)\n"
-    msg+="      --maf\tminimum minor allele frequency\n"
+    # msg+="      --maf\tminimum minor allele frequency\n"
     msg+="      --covar\tfile with absolute paths to covariate files\n"
     msg+="      --gridL\tfile with a 'large' grid for prior variances\n"
     msg+="\t\tdefault=grid_phi2_oma2_general.txt.gz\n"
@@ -108,7 +110,7 @@ function timer () {
 }
 
 function parseArgs () {
-    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,inssD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,analys:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
+    TEMP=`getopt -o hVv: -l help,version,verbose:,p2b:,geneD:,snpD:,inssD:,seedF:,task:,geno:,scoord:,exp:,fcoord:,anchor:,cis:,out:,lik:,analys:,outss,outw,qnorm,maf:,covar:,gridL:,gridS:,bfs:,error:,fiterr:,nperm:,trick:,tricut:,permsep:,pbf:,maxbf,thread:,sbgrp: \
 	-n "$0" -- "$@"`
     if [ $? != 0 ] ; then echo "ERROR: getopt failed" >&2 ; exit 1 ; fi
     eval set -- "$TEMP"
@@ -130,6 +132,7 @@ function parseArgs () {
 	    --anchor) anchor=$2; shift 2;;
 	    --cis) cis=$2; shift 2;;
 	    --out) out=$2; shift 2;;
+      --lik) lik=$2; shift 2;;
 	    --analys) analysis=$2; shift 2;;
 	    --outss) outss=true; shift;;
 	    --outw) outw=true; shift;;
@@ -212,6 +215,7 @@ exp=""
 anchor="TSS"
 cis=100000
 out="out_eqtlbma"
+lik="normal"
 analysis=""
 outss=false
 outw=false
@@ -282,6 +286,7 @@ if [ ! -z "${inss}" ]; then
     cmd+=" --inss ${inss}"
 fi
 cmd+=" --out ${out}_${split}"
+cmd+=" --lik ${lik}"
 cmd+=" --analys ${analysis}"
 if $outss; then
     cmd+=" --outss"
