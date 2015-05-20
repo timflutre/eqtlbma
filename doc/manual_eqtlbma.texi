@@ -15,7 +15,7 @@
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
 
-Copyright @copyright{} 2012-2015 Timoth@'ee Flutre and Xiaoquan Wen.
+Copyright @copyright{} 2012-2015 Timoth@'ee Flutre, Xiaoquan Wen.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -873,6 +873,12 @@ The default value is set at 0.05.
 The option @option{--maxit} can be used to fix the maximum number of iterations to be performed before stopping the EM algorithm.
 It can be useful if @command{eqtlbma_hm} is executed on a computer cluster with a wall-time limit shorter than the running time of the EM algorithm.
 For instance, if @command{eqtlbma_hm} is killed after 27 iterations, we can launch it a first time with @option{--maxit 25}; then extract the current estimates of the parameters and format them appropriately into an initialization file (@pxref{Frequently asked questions}); finally launch @command{eqtlbma_hm} a second time with @option{--init}.
+
+The option @option{--msl} allows to use the SQUAREM procedure to speed-up the EM algorithm (Varadhan & Roland, 2008).
+It was implemented thanks to the help of Chaoxing Dai.
+By default, @option{--msl} is fixed at 1.0, which is interpreted as asking to use the classical EM algorithm
+Otherwise, it is interpreted as the maximum value the step length can take (@math{\alpha} in the Varadhan & Roland article).
+Based on a few experiments, we recommend setting @option{--msl} at 3.
 
 In order to speed-up the computations greatly, the option @option{--thread} can be given
 a number of threads (the code uses @url{https://en.wikipedia.org/wiki/OpenMP,OpenMP}).
