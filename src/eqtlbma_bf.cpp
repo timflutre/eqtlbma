@@ -675,6 +675,18 @@ parseCmdLine(
     seed = getSeed();
 }
 
+vector<Snp*> getSnpsForChr(
+  const map<string, vector<Snp*> > & mChr2VecPtSnps,
+  const string & chromosome)
+{
+  vector<Snp*> vPtSnps;
+  map<string, vector<Snp*> >::const_iterator itVecPtSnps =
+    mChr2VecPtSnps.find(chromosome);
+  if(itVecPtSnps != mChr2VecPtSnps.end())
+    vPtSnps = itVecPtSnps->second;
+  return(vPtSnps);
+}
+
 void testForAssociations(
   const bool & hasDataNotSstats,
   const map<string,vector<Snp*> > & mChr2VecPtSnps,
@@ -717,9 +729,17 @@ void testForAssociations(
     if(verbose == 1)
       progressBar("", countGenes, gene2object.size());
     if(verbose > 1)
-      cout << "gene " << itG->first << endl;
+      cout << "gene " << itG->first << " (chr "
+           << itG->second.GetChromosome() << ")" << endl;
     
     if(hasDataNotSstats){
+      if(verbose > 1){
+        vector<Snp*> vPtSnps = getSnpsForChr(mChr2VecPtSnps,
+                                             itG->second.GetChromosome());
+        size_t nbSnps = vPtSnps.size();
+        cout << "chr " << itG->second.GetChromosome() << ": "
+             << nbSnps << " SNP" << (nbSnps > 0 ? "s" : "") << endl;
+      }
       itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
       if(verbose > 1)
         cout << itG->second.GetNbCisSnps() << " cis SNP(s)" << endl;
