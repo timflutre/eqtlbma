@@ -129,14 +129,12 @@ namespace quantgen {
   		   const std::string & anchor,
   		   const size_t & radius,
   		   const int & verbose,
-  		   std::map<std::string, Snp> & snp2object,
-  		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
+           std::map<std::string, Snp> & snp2object);
   
   void loadSnpInfo(const std::string & snpCoordsFile,
 		   const std::set<std::string> & sSnpsToKeep,
 		   const int & verbose,
-		   std::map<std::string, Snp> & snp2object,
-		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
+           std::map<std::string, Snp> & snp2object);
   
   void loadSnpInfo(const std::string & file_snpcoords,
   		   const std::set<std::string> & sSnpsToKeep,
@@ -144,14 +142,14 @@ namespace quantgen {
   		   const std::string & anchor,
   		   const size_t & radius,
   		   const int & verbose,
-  		   std::map<std::string, Snp> & snp2object,
-  		   std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
+           std::map<std::string, Snp> & snp2object);
   
   void loadGenos(
     const std::map<std::string, std::string> & subgroup2genofile,
     const float & min_maf,
     const int & verbose,
-    std::map<std::string, Snp> & snp2object);
+    std::map<std::string, Snp> & snp2object,
+  	std::map<std::string, std::vector<Snp*> > & mChr2VecPtSnps);
   
   void loadListCovarFiles(
     const std::string & file_covarpaths,
