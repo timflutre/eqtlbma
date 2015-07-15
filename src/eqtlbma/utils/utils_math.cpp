@@ -17,6 +17,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <limits>
 #include <cmath>
 #include <sys/time.h>
 
@@ -29,7 +30,6 @@
 #include <gsl/gsl_linalg.h>
 
 #include "utils/utils_math.hpp"
-
 using namespace std;
 
 namespace utils {
@@ -167,17 +167,24 @@ namespace utils {
   {
     size_t N = X->size1, P = X->size2, rank;
     double rss;
+    gsl_set_error_handler_off();
     gsl_vector * Bhat = gsl_vector_alloc(P);
     gsl_matrix * covBhat = gsl_matrix_alloc(P, P);
     gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(N, P);
-    gsl_multifit_linear_svd(X, y, GSL_DBL_EPSILON, &rank, Bhat, covBhat,
-			    &rss, work);
-    pve = 1 - rss / gsl_stats_tss(y->data, y->stride, y->size);
-    sigmahat = sqrt(rss / (double)(N-rank));
-    betahat_geno = gsl_vector_get(Bhat, 1);
-    sebetahat_geno = sqrt(gsl_matrix_get (covBhat, 1, 1));
-    betapval_geno = 2 * gsl_cdf_tdist_Q(fabs(betahat_geno / sebetahat_geno),
-					N-rank);
+    int return_code = gsl_multifit_linear_svd(X, y, GSL_DBL_EPSILON, &rank,
+                                              Bhat, covBhat, &rss, work);
+    if (!return_code) {
+      pve = 1 - rss / gsl_stats_tss(y->data, y->stride, y->size);
+      sigmahat = sqrt(rss / (double)(N-rank));
+      betahat_geno = gsl_vector_get(Bhat, 1);
+      sebetahat_geno = sqrt(gsl_matrix_get (covBhat, 1, 1));
+      betapval_geno = 2 * gsl_cdf_tdist_Q(fabs(betahat_geno / sebetahat_geno),
+                                          N-rank);
+    } else {
+      pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno
+        = numeric_limits<double>::quiet_NaN();
+    }
+
     gsl_vector_free(Bhat);
     gsl_matrix_free(covBhat);
     gsl_multifit_linear_free(work);
