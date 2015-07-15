@@ -500,8 +500,9 @@ namespace quantgen {
     map<string,Gene>::iterator it = gene2object.begin();
     while(it != gene2object.end()){
       if(! it->second.HasExplevelsInAtLeastOneSubgroup()){
-        cerr << "WARNING: skip gene " << it->second.GetName()
-             << " because it has no expression level in any subgroup" << endl;
+        if(verbose > 1)
+          cerr << "WARNING: skip gene " << it->second.GetName()
+               << " because it has no expression level in any subgroup" << endl;
         gene2object.erase(it++);
       }
       else
@@ -795,7 +796,7 @@ namespace quantgen {
     while(it != snp2object.end()){
       it->second.EraseIfMissingValuesPerSubgroup();
       if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
-        if(verbose > 0)
+        if(verbose > 1)
           cerr << "WARNING: skip SNP " << it->second.GetName()
                << " because it has missing values in each subgroup" << endl;
         snp2object.erase(it++);
@@ -810,7 +811,7 @@ namespace quantgen {
       while(it != snp2object.end()){
         it->second.EraseIfLowMafPerSubgroup(min_maf);
         if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
-          if(verbose > 0)
+          if(verbose > 1)
             cerr << "WARNING: skip SNP " << it->second.GetName()
                  << " because it has a low MAF in each subgroup" << endl;
           snp2object.erase(it++);
@@ -844,8 +845,7 @@ namespace quantgen {
   void loadSnpInfo(const string & snpCoordsFile,
                    const set<string> & sSnpsToKeep,
                    const int & verbose,
-                   map<string, Snp> & snp2object,
-                   map<string, vector<Snp*> > & mChr2VecPtSnps)
+                   map<string, Snp> & snp2object)
   {
     gzFile snpCoordsStream;
     openFile(snpCoordsFile, snpCoordsStream, "rb");
@@ -877,7 +877,8 @@ namespace quantgen {
   
   void loadGenos(const map<string, string> & subgroup2genofile,
                  const float & min_maf, const int & verbose,
-                 map<string, Snp> & snp2object)
+                 map<string, Snp> & snp2object,
+                 map<string, vector<Snp*> > & mChr2VecPtSnps)
   {
     if(snp2object.empty())
       return;
@@ -964,7 +965,7 @@ namespace quantgen {
     while(it != snp2object.end()){
       it->second.EraseIfMissingValuesPerSubgroup();
       if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
-        if(verbose > 0)
+        if(verbose > 1)
           cerr << "WARNING: skip SNP " << it->second.GetName()
                << " because it has missing values in each subgroup" << endl;
         snp2object.erase(it++);
@@ -978,10 +979,10 @@ namespace quantgen {
       map<string,Snp>::iterator it = snp2object.begin();
       while(it != snp2object.end()){
         it->second.EraseIfLowMafPerSubgroup(min_maf);
-        if(verbose > 1 &&
-           ! it->second.HasGenotypesInAtLeastOneSubgroup()){
-          cerr << "WARNING: skip SNP " << it->second.GetName()
-               << " because it has a low MAF in each subgroup" << endl;
+        if(! it->second.HasGenotypesInAtLeastOneSubgroup()){
+          if(verbose > 1)
+            cerr << "WARNING: skip SNP " << it->second.GetName()
+                 << " because it has a low MAF in each subgroup" << endl;
           snp2object.erase(it++);
         } else
           ++it;
@@ -991,6 +992,18 @@ namespace quantgen {
     if(same_files)
       duplicateGenosPerSnpInAllSubgroups(subgroup2genofile, verbose,
                                          snp2object);
+    
+    for(map<string, Snp>::const_iterator it = snp2object.begin();
+        it != snp2object.end(); ++it){
+      if(mChr2VecPtSnps.find(it->second.GetChromosome()) == mChr2VecPtSnps.end())
+        mChr2VecPtSnps.insert(make_pair(it->second.GetChromosome(), vector<Snp*>()));
+      mChr2VecPtSnps[it->second.GetChromosome()].push_back(&(snp2object[it->second.GetName()]));
+    }
+    
+    // sort the SNPs per chr
+    for(map<string,vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
+        it != mChr2VecPtSnps.end(); ++it)
+      sort(it->second.begin(), it->second.end(), pt_snp_lt_pt_snp);
     
     if(verbose > 0)
       cout << "total nb of SNPs to analyze: " << snp2object.size() << endl;
@@ -1189,8 +1202,8 @@ namespace quantgen {
                           mChr2VecPtGenes, verbose, snp2object, mChr2VecPtSnps);
     else{
       loadSnpInfo(file_snpcoords, sSnpsToKeep, gene2object, anchor, radius,
-                  verbose, snp2object, mChr2VecPtSnps);
-      loadGenos(subgroup2genofile, min_maf, verbose, snp2object);
+                  verbose, snp2object);
+      loadGenos(subgroup2genofile, min_maf, verbose, snp2object, mChr2VecPtSnps);
     }
     if(snp2object.empty())
       return;
@@ -1338,8 +1351,7 @@ namespace quantgen {
                    const string & anchor,
                    const size_t & radius,
                    const int & verbose,
-                   map<string, Snp> & snp2object,
-                   map<string, vector<Snp*> > & mChr2VecPtSnps)
+                   map<string, Snp> & snp2object)
   {
     struct stat stat_bed, stat_tbi;
     stat(file_snpcoords.c_str(), &stat_bed);
@@ -1395,8 +1407,7 @@ namespace quantgen {
                    const string & anchor,
                    const size_t & radius,
                    const int & verbose,
-                   map<string, Snp> & snp2object,
-                   map<string, vector<Snp*> > & mChr2VecPtSnps)
+                   map<string, Snp> & snp2object)
   {
     if(verbose > 0)
       cout << "load SNP coordinates";
@@ -1407,26 +1418,12 @@ namespace quantgen {
     if(doesFileExist(file_snpcoords_idx.str())){
       cout << " (tabix-indexed BED file) ..." << endl << flush;
       loadSnpInfo(file_snpcoords, file_snpcoords_idx.str(), sSnpsToKeep,
-                  gene2object, anchor, radius, verbose, snp2object,
-                  mChr2VecPtSnps);
+                  gene2object, anchor, radius, verbose, snp2object);
     }
     else{
       cout << " (unindexed BED file) ..." << endl << flush;
-      loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose,
-                  snp2object, mChr2VecPtSnps);
+      loadSnpInfo(file_snpcoords, sSnpsToKeep, verbose, snp2object);
     }
-    
-    for(map<string, Snp>::const_iterator it = snp2object.begin();
-        it != snp2object.end(); ++it){
-      if(mChr2VecPtSnps.find(it->second.GetChromosome()) == mChr2VecPtSnps.end())
-        mChr2VecPtSnps.insert(make_pair(it->second.GetChromosome(), vector<Snp*>()));
-      mChr2VecPtSnps[it->second.GetChromosome()].push_back(&(snp2object[it->second.GetName()]));
-    }
-    
-    // sort the SNPs per chr
-    for(map<string,vector<Snp*> >::iterator it = mChr2VecPtSnps.begin();
-        it != mChr2VecPtSnps.end(); ++it)
-      sort(it->second.begin(), it->second.end(), pt_snp_lt_pt_snp);
     
     if(verbose > 0)
       cout << "total nb of SNPs with coordinates: " << snp2object.size()
