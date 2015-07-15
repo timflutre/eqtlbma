@@ -1,4 +1,3 @@
-* fix the bug disabling option --maf of eqtlbma_bf
 * allow 2 radii, one for TSS and one for TES, and handle gene strand (include BEDtools? or htslib?)
 * add option to allow to skip some configs in eqtlbma_bf
 * speed-up tutorial (with Rcpp?) to simulate more subgroups quicker
