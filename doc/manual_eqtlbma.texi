@@ -1074,6 +1074,22 @@ As described in @url{http://dx.doi.org/10.1371/journal.pgen.1003486,Flutre et al
 @sp 1
 
 @item
+@strong{Who contributed to this package?}
+
+Timoth@'ee Flutre designed the package, wrote the major part of its code in C++, wrote the functional tests using R and bash, as well as the documentation using TexInfo.
+Xiaoquan (William) Wen wrote the C++ class that computes the multivariate approximate Bayes Factor, which was integrated into the package by T. Flutre without any change, as well as the C++ functions of the EM algorithm, which were also integrated into the package by T. Flutre, but this time with substantial refactoring.
+
+The SQUAREM procedure was implemented thanks to the help of Chaoxing Dai.
+
+Gao Wang fixed a bug when filtering SNPs with missing genotypes when provided in the ``custom'' format.
+
+Sarah Urbut provided useful feedback at various time points.
+
+And last, but not least, such a package would not exist without the availability of several free softwares, notably the GNU Scientific Library (GSL).
+
+@sp 1
+
+@item
 @strong{How do I make the file(s) for the grid(s)?}
 
 See the function @option{makeGrid} in the file @command{scripts/utils_eqtlbma.R}.
