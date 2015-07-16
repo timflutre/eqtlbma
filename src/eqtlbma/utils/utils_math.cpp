@@ -17,7 +17,6 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <limits>
 #include <cmath>
 #include <sys/time.h>
 
@@ -108,12 +107,15 @@ namespace utils {
     }
     for (i = 0; i < size; ++i) {
       if (vec[i] > max)
-	max = vec[i];
+        max = vec[i];
       weights[i] = (double) (1 / ((double) size));
     }
     double sum = 0.0;
     for (i = 0; i < size; ++i)
-      sum += weights[i] * pow(10, vec[i] - max);
+      if (isNan(vec[i]))
+        continue;
+      else
+        sum += weights[i] * pow(10, vec[i] - max);
     free(weights);
     res = max + log10(sum);
     
@@ -136,10 +138,13 @@ namespace utils {
     double res, max = vec[0];
     for (i = 0; i < size; ++i)
       if (vec[i] > max)
-	max = vec[i];
+        max = vec[i];
     double sum = 0.0;
     for (i = 0; i < size; ++i)
-      sum += weights[i] * pow(10, vec[i] - max);
+      if (isNan(vec[i]))
+        continue;
+      else
+        sum += weights[i] * pow(10, vec[i] - max);
     res = max + log10(sum);
     
     if (abs(res) <= DBL_EPSILON)
@@ -181,8 +186,7 @@ namespace utils {
       betapval_geno = 2 * gsl_cdf_tdist_Q(fabs(betahat_geno / sebetahat_geno),
                                           N-rank);
     } else {
-      pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno
-        = numeric_limits<double>::quiet_NaN();
+      pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno = NaN;
     }
 
     gsl_vector_free(Bhat);
