@@ -170,24 +170,26 @@ namespace utils {
 				  double & sebetahat_geno,
 				  double & betapval_geno)
   {
+    if (X->size1 < (X->size2 + 1)) {
+      // less than 1 degree of freedom (df = N - K - 1)
+      // i.e., (size1 - (size2 - 1) - 1) < 1
+      pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno = NaN;
+      return;
+    }
     size_t N = X->size1, P = X->size2, rank;
     double rss;
-    gsl_set_error_handler_off();
     gsl_vector * Bhat = gsl_vector_alloc(P);
     gsl_matrix * covBhat = gsl_matrix_alloc(P, P);
     gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(N, P);
-    int return_code = gsl_multifit_linear_svd(X, y, GSL_DBL_EPSILON, &rank,
+    int gsl_status_ = gsl_multifit_linear_svd(X, y, GSL_DBL_EPSILON, &rank,
                                               Bhat, covBhat, &rss, work);
-    if (!return_code) {
-      pve = 1 - rss / gsl_stats_tss(y->data, y->stride, y->size);
-      sigmahat = sqrt(rss / (double)(N-rank));
-      betahat_geno = gsl_vector_get(Bhat, 1);
-      sebetahat_geno = sqrt(gsl_matrix_get (covBhat, 1, 1));
-      betapval_geno = 2 * gsl_cdf_tdist_Q(fabs(betahat_geno / sebetahat_geno),
-                                          N-rank);
-    } else {
-      pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno = NaN;
-    }
+
+    pve = 1 - rss / gsl_stats_tss(y->data, y->stride, y->size);
+    sigmahat = sqrt(rss / (double)(N-rank));
+    betahat_geno = gsl_vector_get(Bhat, 1);
+    sebetahat_geno = sqrt(gsl_matrix_get (covBhat, 1, 1));
+    betapval_geno = 2 * gsl_cdf_tdist_Q(fabs(betahat_geno / sebetahat_geno),
+                                        N-rank);
 
     gsl_vector_free(Bhat);
     gsl_matrix_free(covBhat);
@@ -337,9 +339,34 @@ namespace utils {
   {
     for(size_t i = 0; i < min(M,A->size1); ++i){
       for(size_t j = 0; j < min(N,A->size2); ++j)
-	fprintf(stderr, "%e  ", gsl_matrix_get(A,i,j));
+        fprintf(stderr, "%e  ", gsl_matrix_get(A,i,j));
       fprintf(stderr, "\n");
     }
+  }
+
+  void print_matrix(const char *fname, const gsl_matrix *m)
+  {
+    ofstream f;
+    f.open(fname);
+    int status, n = 0;
+    for (size_t i = 0; i < m->size1; i++) {
+      for (size_t j = 0; j < m->size2; j++) {
+        f << gsl_matrix_get(m, i, j) << ((j + 1 == m->size2) ? "" : ",");
+      }
+      f << endl;
+    }
+    f.close();
+  }
+
+  void print_vector(const char *fname, const gsl_vector *v)
+  {
+    ofstream f;
+    f.open(fname);
+    int status, n = 0;
+    for (size_t i = 0; i < v->size; i++) {
+      f << gsl_vector_get(v, i) << endl;
+    }
+    f.close();
   }
 
   double mygsl_linalg_det(const gsl_matrix * A)
