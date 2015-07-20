@@ -257,7 +257,6 @@ namespace quantgen {
     map<string,vector<double> > & subgroup2stdsstats)
   {
     string subgroup;
-  
     for(map<string,vector<double> >::const_iterator it
 	  = subgroup2sstats_.begin(); it != subgroup2sstats_.end(); ++it) {
       subgroup = it->first;
@@ -267,6 +266,8 @@ namespace quantgen {
 	bhat = subgroup2sstats_[subgroup][0] / subgroup2sigmahat_[subgroup],
 	sebhat = subgroup2sstats_[subgroup][1] / subgroup2sigmahat_[subgroup],
 	t = bhat / sebhat;
+      if (isNan(t))
+        continue;
     
       // apply quantile-quantile transformation (Wen and Stephens, AoAS 2013)
       double nu = N - 2 - subgroup2nbcovariates_[subgroup]; // degrees of freedom
