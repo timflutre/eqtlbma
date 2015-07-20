@@ -170,13 +170,13 @@ namespace utils {
 				  double & sebetahat_geno,
 				  double & betapval_geno)
   {
-    if (X->size1 < (X->size2 + 1)) {
+    size_t N = X->size1, P = X->size2;
+    if (N < (P + 1)) {
       // less than 1 degree of freedom (df = N - K - 1)
       // i.e., (size1 - (size2 - 1) - 1) < 1
       pve = sigmahat = betahat_geno = sebetahat_geno = betapval_geno = NaN;
-      return;
-    }
-    size_t N = X->size1, P = X->size2, rank;
+    } else {
+    size_t rank;
     double rss;
     gsl_vector * Bhat = gsl_vector_alloc(P);
     gsl_matrix * covBhat = gsl_matrix_alloc(P, P);
@@ -194,6 +194,7 @@ namespace utils {
     gsl_vector_free(Bhat);
     gsl_matrix_free(covBhat);
     gsl_multifit_linear_free(work);
+    }
   }
 
   double mygsl_vector_sum(const gsl_vector * vec)
