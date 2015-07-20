@@ -2,11 +2,13 @@
 ==================
 
 Performance improvements
-* implement the SQUREM procedure to speed-um 'eqtlbma_hm' (thanks to C. Dai)
+* implement the SQUAREM procedure to speed-um 'eqtlbma_hm' (thanks to C. Dai)
 
 Bug fixes
 * filter properly SNPs with low MAF when provided in "custom" format (thanks to
 G. Wang)
+* smoothly handle cases with not enough samples compare to the number of
+predictors causing some permutations to fail (thanks to G. Wang)
 
 
 2015-03-02 v1.3.0
