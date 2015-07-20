@@ -383,7 +383,7 @@ namespace quantgen {
     const string & likelihood,
     const bool & need_qnorm,
     const Covariates & covariates,
-    const size_t & nb_permutations,
+    size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
     const gsl_rng * rngPerm,
@@ -405,13 +405,12 @@ namespace quantgen {
     bool shuffle_only = false;
   
     FindMinTruePvaluePerSubgroup(subgroup);
-  
-    for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
+    size_t nb_all_permutations_ = nb_permutations;
+    for(size_t perm_id = 0; perm_id < nb_all_permutations_; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
       if(shuffle_only)
 	continue;
     
-      ++subgroup2nbperms_[subgroup];
       pvals_perm.assign(snps_.size(), 1.0);
       pval_perm_min = 1;
 
@@ -428,7 +427,11 @@ namespace quantgen {
       }
     
       pval_perm_min = *min_element(pvals_perm.begin(), pvals_perm.end());
-    
+      if(isNan(pval_perm_min)) {
+        nb_permutations--;
+        continue;
+      }
+      ++subgroup2nbperms_[subgroup];
       if(pval_perm_min <= subgroup2trueminpval_[subgroup])
 	++subgroup2permpval_[subgroup];
       if(trick != 0 && subgroup2permpval_[subgroup] == 1 + trick_cutoff){
@@ -493,7 +496,7 @@ namespace quantgen {
     const string & likelihood,
     const bool & need_qnorm,
     const Covariates & covariates,
-    const size_t & nb_permutations,
+    size_t & nb_permutations,
     const int & trick,
     const size_t & trick_cutoff,
     const gsl_rng * rngPerm,
@@ -515,13 +518,12 @@ namespace quantgen {
     bool shuffle_only = false;
   
     FindMinTruePvalueAllSubgroups();
-  
-    for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
+    size_t nb_all_permutations_ = nb_permutations;
+    for(size_t perm_id = 0; perm_id < nb_all_permutations_; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
       if(shuffle_only)
 	continue;
     
-      ++nbpermutations_sep_allsbgrps_;
       pvals_perm.assign(snps_.size(), 1.0);
       pval_perm_min = 1;
     
@@ -545,7 +547,11 @@ namespace quantgen {
       }
     
       pval_perm_min = *min_element(pvals_perm.begin(), pvals_perm.end());
-    
+      if (isNan(pval_perm_min)) {
+        nb_permutations--;
+        continue;
+      }
+      ++nbpermutations_sep_allsbgrps_;
       if(pval_perm_min <= pval_true_min_allsbgrps_)
 	++pval_perm_sep_allsbgrps_;
       if(trick != 0 && pval_perm_sep_allsbgrps_ == 1 + trick_cutoff){
@@ -598,7 +604,7 @@ namespace quantgen {
 				  const Grid & iGridS,
 				  const string & error_model,
 				  const float & prop_cov_errors,
-				  const size_t & nb_permutations,
+				  size_t & nb_permutations,
 				  const int & trick,
 				  const size_t & trick_cutoff,
 				  const string & whichPermBf,
@@ -619,7 +625,7 @@ namespace quantgen {
     l10_abf_perm_med_ = NaN;
   
     vector<double> l10_abfs_perm_snps, // per SNP
-      l10_abfs_perms(nb_permutations, NaN); // for the median
+      l10_abfs_perms; // for the median
     double l10_abf_perm_max, l10_abf_perm_avg;
     bool shuffle_only = false;
   
@@ -627,13 +633,13 @@ namespace quantgen {
       FindMaxTrueL10Abf(whichPermBf);
     else
       AvgTrueL10Abfs(whichPermBf);
-    
-    for(size_t perm_id = 0; perm_id < nb_permutations; ++perm_id){
+
+    size_t nb_all_permutations_ = nb_permutations;
+    for(size_t perm_id = 0; perm_id < nb_all_permutations_; ++perm_id){
       gsl_ran_shuffle(rngPerm, perm->data, perm->size, sizeof(size_t));
       if(shuffle_only)
 	continue;
     
-      ++nbpermutations_join_;
       l10_abfs_perm_snps.assign(snps_.size(), 0.0);
       if(useMaxBfOverSnps)
 	l10_abf_perm_max = - numeric_limits<double>::infinity();
@@ -671,16 +677,26 @@ namespace quantgen {
       if(useMaxBfOverSnps){
 	l10_abf_perm_max = *max_element(l10_abfs_perm_snps.begin(),
 					l10_abfs_perm_snps.end());
+    if (isNan(l10_abf_perm_max)) {
+      nb_permutations--;
+      continue;
+    }
+    ++nbpermutations_join_;
 	if(l10_abf_perm_max >= l10_abf_true_max_)
 	  ++pval_perm_join_;
-	l10_abfs_perms[perm_id] = l10_abf_perm_max;
+	l10_abfs_perms.push_back(l10_abf_perm_max);
       }
       else{ // if avg over SNPs
 	l10_abf_perm_avg = log10_weighted_sum(&(l10_abfs_perm_snps[0]),
 					      l10_abfs_perm_snps.size());
+    if (isNan(l10_abf_perm_avg)) {
+      nb_permutations--;
+      continue;
+    }
+    ++nbpermutations_join_;
 	if(l10_abf_perm_avg >= l10_abf_true_avg_)
 	  ++pval_perm_join_;
-	l10_abfs_perms[perm_id] = l10_abf_perm_avg;
+	l10_abfs_perms.push_back(l10_abf_perm_avg);
       }
       if(trick != 0 && pval_perm_join_ == 1 + trick_cutoff){
 	if(trick == 1)
