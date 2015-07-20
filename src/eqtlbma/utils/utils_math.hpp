@@ -22,9 +22,9 @@
 
 #include <cstdlib>
 
-#include <string>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <iterator>
 
@@ -113,6 +113,9 @@ namespace utils {
 
   void mygsl_linalg_outer(const gsl_vector * vec1, const gsl_vector * vec2,
 			  gsl_matrix * mat);
+
+  void print_matrix(const char *fname, const gsl_matrix *m);
+  void print_vector(const char *fname, const gsl_vector *v);
 
 } // namespace utils
 
