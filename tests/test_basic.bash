@@ -116,7 +116,7 @@ function calc_obs_res () {
 	--out obs_bf --outss --outw --analys join --bfs all \
 	--gridL grid_phi2_oma2_general.txt.gz \
 	--gridS grid_phi2_oma2_with-configs.txt.gz \
-	-v 1 >& stdout_bf
+	-v 1 --wrtsize 3 >& stdout_bf
 }
 
 function comp_obs_vs_exp () {

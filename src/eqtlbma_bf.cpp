@@ -195,6 +195,9 @@ void help(char ** argv)
        << "      --sbgrp\tidentifier of the subgroup to analyze" << endl
        << "\t\tuseful for quick analysis and debugging" << endl
        << "\t\tcan be 'sbgrp1+sbgrp3' for instance" << endl
+       << "      --wrtsize\tsize (number of genes) per write to output file (default=10)" << endl
+       << "\t\tset to smaller size when each gene has large number of cis SNPs" << endl
+       << "\t\tto prevent excessive memory usage" << endl
        << endl;
 }
 
@@ -250,6 +253,7 @@ parseCmdLine(
   int & nb_threads,
   string & file_snpstokeep,
   vector<string> & subgroups_tokeep,
+  int & write_group_size,
   int & verbose)
 {
   int c = 0;
@@ -289,6 +293,7 @@ parseCmdLine(
       {"thread", required_argument, 0, 0},
       {"snp", required_argument, 0, 0},
       {"sbgrp", required_argument, 0, 0},
+      {"wrtsize", required_argument, 0, 0},
       {0, 0, 0, 0}
     };
     int option_index = 0;
@@ -432,6 +437,10 @@ parseCmdLine(
 	split(optarg, "+", subgroups_tokeep);
 	break;
       }
+      if(strcmp(long_options[option_index].name, "wrtsize") == 0){
+	write_group_size = atoi(optarg);
+	break;
+      }
     case 'h':
       help(argv);
       exit(0);
@@ -531,6 +540,13 @@ parseCmdLine(
     help(argv);
     exit(EXIT_FAILURE);
   }
+  if (write_group_size < 1){
+    cerr << "cmd-line: " << getCmdLine(argc, argv) << endl << endl
+	 << "ERROR: --wrtsize should be greater than 1" << endl << endl;
+    help(argv);
+    exit(EXIT_FAILURE);
+  }
+
   // check writing files is possible
   stringstream ssOutFile;
   ssOutFile << out_prefix << "_test.txt.gz";
@@ -704,30 +720,13 @@ void testForAssociations(
   const string & error_model,
   const float & prop_cov_errors,
   const int & verbose,
-  map<string,Gene> & gene2object)
+  map<string,Gene>::iterator & itG_begin,
+  map<string,Gene>::iterator & itG_end,
+  size_t & nbAnalyzedGenes,
+  size_t & nbAnalyzedPairs)
 {
-  if(verbose > 0){
-    cout << "test for association between each pair gene-SNP ..." << endl
-	 << "analysis=" << analysis
-	 << " likelihood=" << likelihood
-	 << " error_model=" << error_model;
-    if(error_model != "uvlr") // i.e. if 'mvlr' or 'hybrid'
-      cout << " prop_cov_errors=" << prop_cov_errors;
-    if(hasDataNotSstats)
-      cout << " anchor=" << anchor << " radius=" << radius;
-    // cout << " threads=1";
-    cout << endl << flush;
-  }
-  
-  clock_t startTime = clock();
-  size_t nbAnalyzedGenes = 0, nbAnalyzedPairs = 0;
-  size_t countGenes = 0;
-  
-  for(map<string,Gene>::iterator itG = gene2object.begin();
-       itG != gene2object.end(); ++itG){
-    ++countGenes;
-    if(verbose == 1)
-      progressBar("", countGenes, gene2object.size());
+  for(map<string,Gene>::iterator itG = itG_begin;
+      itG != itG_end; ++itG){
     if(verbose > 1)
       cout << "gene " << itG->first << " (chr "
            << itG->second.GetChromosome() << ")" << endl;
@@ -742,7 +741,8 @@ void testForAssociations(
       }
       itG->second.SetCisSnps(mChr2VecPtSnps, anchor, radius);
       if(verbose > 1)
-        cout << itG->second.GetNbCisSnps() << " cis SNP(s)" << endl;
+        cout << "gene '" << itG->first << "': " << itG->second.GetNbCisSnps()
+             << " cis SNP(s)" << endl;
       if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup()){
         if(verbose > 1)
           cerr << "WARNING: skip gene " << itG->second.GetName()
@@ -767,13 +767,6 @@ void testForAssociations(
     nbAnalyzedPairs += itG->second.GetNbGeneSnpPairs();
   }
   
-  if(verbose > 0){
-    if(verbose == 1)
-      cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
-	   << " sec)" << endl << flush;
-    cout << "nb of analyzed gene-SNP pairs: " << nbAnalyzedPairs
-	 << " (" << nbAnalyzedGenes << " genes)" << endl;
-  }
 }
 
 void makePermutationsSep(
@@ -789,22 +782,15 @@ void makePermutationsSep(
   const int & perm_sep,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
-  const int & verbose,
-  map<string, Gene> & gene2object)
+  map<string, Gene>::iterator & itG_begin,
+  map<string, Gene>::iterator & itG_end)
 {
   if(perm_sep == 1){
-    clock_t startTime = clock();
     gsl_rng_set(rngPerm, seed);
     if(trick != 0)
       gsl_rng_set(rngTrick, seed);
-    size_t countGenes = 0;
-    for(map<string,Gene>::iterator itG = gene2object.begin();
-	itG != gene2object.end(); ++itG){
-      ++countGenes;
-      if(verbose == 1)
-	progressBar("sep", countGenes, gene2object.size());
-      if(verbose > 1)
-	cerr << "gene " << itG->first << endl;
+    for(map<string,Gene>::iterator itG = itG_begin;
+	itG != itG_end; ++itG){
       if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup())
 	continue;
       itG->second.MakePermutationsSepAllSubgroups(subgroups, samples,
@@ -814,28 +800,15 @@ void makePermutationsSep(
 						  trick_cutoff,
 						  rngPerm, rngTrick);
     }
-    if(verbose == 1)
-      cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
-	   << " sec)" << endl << flush;
   }
   else if(perm_sep == 2){
-    stringstream ss;
     for(vector<string>::const_iterator it_sbgrp = subgroups.begin();
 	it_sbgrp != subgroups.end(); ++it_sbgrp){
-      clock_t startTime = clock();
       gsl_rng_set(rngPerm, seed);
       if(trick != 0)
 	gsl_rng_set(rngTrick, seed);
-      size_t countGenes = 0;
-      ss.str("");
-      ss << "sep" << (it_sbgrp - subgroups.begin()) + 1;
-      for(map<string,Gene>::iterator itG = gene2object.begin();
-	  itG != gene2object.end(); ++itG){
-	++countGenes;
-	if(verbose == 1)
-	  progressBar(ss.str(), countGenes, gene2object.size());
-	if(verbose > 1)
-	  cerr << "gene " << itG->first << endl;
+      for(map<string,Gene>::iterator itG = itG_begin;
+	  itG != itG_end; ++itG){
 	if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup())
 	  continue;
 	itG->second.MakePermutationsSepPerSubgroup(*it_sbgrp, samples,
@@ -845,9 +818,6 @@ void makePermutationsSep(
 						   trick_cutoff,
 						   rngPerm, rngTrick);
       }
-      if(verbose == 1)
-	cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
-	     << " sec)" << endl << flush;
     }
   }
 }
@@ -870,22 +840,15 @@ void makePermutationsJoin(
   const bool & use_max_bf,
   const gsl_rng * rngPerm,
   const gsl_rng * rngTrick,
-  const int & verbose,
-  map<string, Gene> & gene2object)
+  map<string, Gene>::iterator & itG_begin,
+  map<string, Gene>::iterator & itG_end)
 {
-  clock_t startTime = clock();
   gsl_rng_set(rngPerm, seed);
   if(trick != 0)
     gsl_rng_set(rngTrick, seed);
-  size_t countGenes = 0;
   
-  for(map<string,Gene>::iterator itG = gene2object.begin();
-       itG != gene2object.end(); ++itG){
-    ++countGenes;
-    if(verbose == 1)
-      progressBar("join", countGenes, gene2object.size());
-    if(verbose > 1)
-      cerr << "gene " << itG->first << endl;
+  for(map<string,Gene>::iterator itG = itG_begin;
+       itG != itG_end; ++itG){
     if(! itG->second.HasAtLeastOneCisSnpInAtLeastOneSubgroup())
       continue;
     if(error_model != "uvlr" &&
@@ -897,10 +860,6 @@ void makePermutationsJoin(
 				     trick_cutoff, permbf, use_max_bf,
 				     rngPerm, rngTrick);
   }
-  
-  if(verbose == 1)
-    cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
-	 << " sec)" << endl << flush;
 }
 
 void
@@ -922,24 +881,9 @@ makePermutations(
   const int & perm_sep,
   const string & permbf,
   const bool & use_max_bf,
-  const int & verbose,
-  map<string, Gene> & gene2object)
+  map<string, Gene>::iterator & itG_begin,
+  map<string, Gene>::iterator & itG_end)
 {
-  if(verbose > 0){
-    cout << "get gene-level p-values by permuting expression levels ..." << endl
-	 << "permutation"<< (nb_permutations > 1 ? "s=" : "=") << nb_permutations
-	 << " seed=" << seed;
-    if(trick != 0){
-      cout << " trick=" << trick
-	   << " trick_cutoff=" << trick_cutoff;
-    }
-    if(analysis == "sep")
-      cout << " perm_sep=" << perm_sep;
-    else if(analysis == "join")
-      cout << " perm_bf=" << permbf;
-    cout << " threads=" << omp_get_max_threads();
-    cout << endl << flush;
-  }
   
   gsl_rng * rngPerm = NULL, * rngTrick = NULL;
   gsl_rng_env_setup();
@@ -959,13 +903,12 @@ makePermutations(
   if(analysis == "sep" && perm_sep != 0)
     makePermutationsSep(subgroups, samples, likelihood, need_qnorm, covariates,
 			nb_permutations, seed, trick, trick_cutoff,
-			perm_sep, rngPerm, rngTrick,
-			verbose, gene2object);
+			perm_sep, rngPerm, rngTrick, itG_begin, itG_end);
   if(analysis == "join" && permbf != "none")
-    makePermutationsJoin(subgroups, samples, likelihood, need_qnorm, covariates, iGridL,
-			 iGridS, error_model, prop_cov_errors, nb_permutations,
-			 seed, trick, trick_cutoff, permbf, use_max_bf,
-			 rngPerm, rngTrick, verbose, gene2object);
+    makePermutationsJoin(subgroups, samples, likelihood, need_qnorm, covariates,
+                         iGridL, iGridS, error_model, prop_cov_errors,
+                         nb_permutations, seed, trick, trick_cutoff, permbf,
+                         use_max_bf, rngPerm, rngTrick, itG_begin, itG_end);
   
   gsl_rng_free(rngPerm);
   if(trick != 0)
@@ -975,36 +918,41 @@ makePermutations(
 void writeResSstats(
   const string & out_prefix,
   const vector<string> & subgroups,
-  const map<string,Gene> & gene2object,
+  const map<string,Gene>::iterator & itG_begin,
+  const map<string,Gene>::iterator & itG_end,
   const map<string,Snp> & snp2object,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of summary statistics in each subgroup ..."
-	 << endl << flush;
-  
   string subgroup, sep = "\t";
   
   for(size_t s = 0; s < subgroups.size(); ++s){
     subgroup = subgroups[s];
     stringstream ssOutFile, ssTxt;
     ssOutFile << out_prefix << "_sumstats_" << subgroup << ".txt.gz";
-    if(verbose > 0)
-      cout << "file " << ssOutFile.str() << endl << flush;
     gzFile outStream;
-    openFile(ssOutFile.str(), outStream, "wb");
-    
-    ssTxt << "gene" << sep << "snp" << sep << "maf" << sep << "n" << sep
-	  << "pve" << sep << "sigmahat" << sep << "betahat.geno" << sep
-	  << "sebetahat.geno" << sep << "betapval.geno";
-    ssTxt << endl;
+    string file_mode;
+    if (header_opt == "none")
+      file_mode = "ab";
+    else
+      file_mode = "wb";
+    openFile(ssOutFile.str(), outStream, file_mode.c_str());
     size_t nb_lines = 1;
-    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-    
+    if (header_opt != "none") {
+      ssTxt << "gene" << sep << "snp" << sep << "maf" << sep << "n" << sep
+            << "pve" << sep << "sigmahat" << sep << "betahat.geno" << sep
+            << "sebetahat.geno" << sep << "betapval.geno";
+      ssTxt << endl;
+      gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+    }
+    if (header_opt == "only") {
+      closeFile(ssOutFile.str(), outStream);
+      continue;
+    }
+ 
     ssTxt.precision(6);
     ssTxt.setf(ios::scientific);
-    for(map<string,Gene>::const_iterator it_gene = gene2object.begin();
-	 it_gene != gene2object.end(); ++it_gene){
+    for(map<string,Gene>::const_iterator it_gene = itG_begin;
+	 it_gene != itG_end; ++it_gene){
       if(! it_gene->second.HasAtLeastOneCisSnp(subgroup))
 	continue;
       for(vector<GeneSnpPair>::const_iterator it_pair
@@ -1036,41 +984,44 @@ void writeResSstats(
 
 void writeResSepPermPval(
   const string & out_prefix,
-  const map<string, Gene> & gene2object,
+  const map<string, Gene>::iterator & itG_begin,
+  const map<string, Gene>::iterator & itG_end,
   const vector<string> & subgroups,
   const size_t & seed,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of gene-level P-values"
-	 << " in each subgroup separately"
-	 << " (perm_sep=2) ..."
-	 << endl << flush;
-  
   string sep = "\t";
   
   for(vector<string>::const_iterator it_sbgrp  = subgroups.begin();
       it_sbgrp != subgroups.end(); ++it_sbgrp){
     stringstream ssOutFile, ssTxt;
     ssOutFile << out_prefix << "_sepPermPvals_" << *it_sbgrp << ".txt.gz";
-    if(verbose > 0)
-      cout << "file " << ssOutFile.str() << endl << flush;
     gzFile outStream;
-    openFile(ssOutFile.str(), outStream, "wb");
+    string file_mode;
+    if (header_opt == "none")
+      file_mode = "ab";
+    else
+      file_mode = "wb";
+    openFile(ssOutFile.str(), outStream, file_mode.c_str());
     size_t nb_lines = 0;
+    if (header_opt != "none") {
+      ssTxt << "# seed=" << seed << endl;
+      ++nb_lines;
+      gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+      ssTxt.str("");
+      ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
+            << sep << "nb.permutations" << sep << "true.min.pval" << endl;
+      ++nb_lines;
+      gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+    } else
+      nb_lines = 2;
+    if (header_opt == "only") {
+      closeFile(ssOutFile.str(), outStream);
+      continue;
+    }
     
-    ssTxt << "# seed=" << seed << endl;
-    ++nb_lines;
-    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-    
-    ssTxt.str("");
-    ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
-	  << sep << "nb.permutations" << sep << "true.min.pval" << endl;
-    ++nb_lines;
-    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-    
-    for(map<string,Gene>::const_iterator it_gene = gene2object.begin();
-	 it_gene != gene2object.end(); ++it_gene){
+    for(map<string,Gene>::const_iterator it_gene = itG_begin;
+	 it_gene != itG_end; ++it_gene){
       if(it_gene->second.GetNbGeneSnpPairs() > 0){
 	ssTxt.str("");
 	++nb_lines;
@@ -1092,38 +1043,41 @@ void writeResSepPermPval(
 
 void writeResSepPermPval(
   const string & out_prefix,
-  const map<string, Gene> & gene2object,
+  const map<string, Gene>::iterator & itG_begin,
+  const map<string, Gene>::iterator & itG_end,
   const size_t & seed,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of gene-level P-values"
-	 << " in each subgroup separately"
-	 << " (perm_sep=1) ..."
-	 << endl << flush;
-  
   string sep = "\t";
   
   stringstream ssOutFile, ssTxt;
   ssOutFile << out_prefix << "_sepPermPvals.txt.gz";
-  if(verbose > 0)
-    cout << "file " << ssOutFile.str() << endl << flush;
   gzFile outStream;
-  openFile(ssOutFile.str(), outStream, "wb");
+  string file_mode;
+  if (header_opt == "none")
+    file_mode = "ab";
+  else
+    file_mode = "wb";
+  openFile(ssOutFile.str(), outStream, file_mode.c_str());
   size_t nb_lines = 0;
+  if (header_opt != "none") {
+    ssTxt << "# seed=" << seed << endl;
+    ++nb_lines;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+    ssTxt.str("");
+    ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
+          << sep << "nb.permutations" << sep << "true.min.pval" << endl;
+    ++nb_lines;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+  } else
+    nb_lines = 2;
+  if (header_opt == "only") {
+    closeFile(ssOutFile.str(), outStream);
+    return;
+  }
   
-  ssTxt << "# seed=" << seed << endl;
-  ++nb_lines;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-  
-  ssTxt.str("");
-  ssTxt << "gene" << sep << "nb.snps" << sep << "sep.perm.pval"
-	<< sep << "nb.permutations" << sep << "true.min.pval" << endl;
-  ++nb_lines;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-  
-  for(map<string,Gene>::const_iterator it_gene = gene2object.begin();
-      it_gene != gene2object.end(); ++it_gene){
+  for(map<string,Gene>::const_iterator it_gene = itG_begin;
+      it_gene != itG_end; ++it_gene){
     if(it_gene->second.GetNbGeneSnpPairs() > 0){
       ssTxt.str("");
       ++nb_lines;
@@ -1148,40 +1102,45 @@ void writeResSepPermPval(
  */
 void writeResAbfsRaw(
   const string & out_prefix,
-  const map<string,Gene> & gene2object,
+  const map<string,Gene>::iterator & itG_begin,
+  const map<string,Gene>::iterator & itG_end,
   const size_t & nb_subgroups,
   const Grid & iGridL,
   const Grid & iGridS,
   const string & bfs,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of Bayes Factors (one per grid value) ..."
-	 << endl << flush;
-  
   string sep = "\t";
   
   gsl_combination * comb;
   stringstream ssOutFile, ssConfig, ssTxt;
   ssOutFile << out_prefix << "_l10abfs_raw.txt.gz";
-  if(verbose > 0)
-    cout << "file " << ssOutFile.str() << endl << flush;
   gzFile outStream;
-  openFile(ssOutFile.str(), outStream, "wb");
-  
-  // write header line
-  ssTxt << "gene" << sep << "snp" << sep << "config";
-  for(size_t i = 0; i < iGridL.size(); ++i)
-    ssTxt << sep << "l10abf.grid" << (i+1);
-  ssTxt << endl;
+  string file_mode;
+  if (header_opt == "none")
+    file_mode = "ab";
+  else
+    file_mode = "wb";
+  openFile(ssOutFile.str(), outStream, file_mode.c_str());
   size_t nb_lines = 1;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+  if (header_opt != "none") {
+    // write header line
+    ssTxt << "gene" << sep << "snp" << sep << "config";
+    for(size_t i = 0; i < iGridL.size(); ++i)
+      ssTxt << sep << "l10abf.grid" << (i+1);
+    ssTxt << endl;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+  }
+  if (header_opt == "only") {
+    closeFile(ssOutFile.str(), outStream);
+    return;
+  }
   
   // write results
   ssTxt.precision(6);
   ssTxt.setf(ios::scientific);
-  for(map<string,Gene>::const_iterator it_gene = gene2object.begin();
-       it_gene != gene2object.end(); ++it_gene){
+  for(map<string,Gene>::const_iterator it_gene = itG_begin;
+      it_gene != itG_end; ++it_gene){
     for(vector<GeneSnpPair>::const_iterator it_pair
 	   = it_gene->second.BeginPair(); it_pair != it_gene->second.EndPair();
 	 ++it_pair){
@@ -1269,64 +1228,69 @@ void writeResAbfsRaw(
 
 void writeResAbfsAvgGrids(
   const string & out_prefix,
-  const map<string, Gene> & gene2object,
+  const map<string, Gene>::iterator & itG_begin,
+  const map<string, Gene>::iterator & itG_end,
   const size_t & nb_subgroups,
   const string & bfs,
   const string & error_model,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of Bayes Factors (one per configuration) ..."
-	 << endl << flush;
-  
   string sep = "\t";
   
   gsl_combination * comb;
   stringstream ssOutFile, ssConfig, ssTxt;
   ssOutFile << out_prefix << "_l10abfs_avg-grids.txt.gz";
-  if(verbose > 0)
-    cout << "file " << ssOutFile.str() << endl << flush;
   gzFile outStream;
-  openFile(ssOutFile.str(), outStream, "wb");
-  
-  // write header line
-  ssTxt << "gene" << sep << "snp" << sep << "nb.subgroups";
-  ssTxt << sep << "l10abf.gen"
-	<< sep << "l10abf.gen.fix"
-	<< sep << "l10abf.gen.maxh";
-  if(bfs == "sin" || bfs == "all")
-    ssTxt << sep << "l10abf.gen.sin";
-  if(bfs == "all")
-    ssTxt << sep << "l10abf.all";
-  if(bfs != "gen"){
-    for(size_t k = 1; k <= nb_subgroups; ++k){
-      comb = gsl_combination_calloc(nb_subgroups, k);
-      if(comb == NULL){
-	cerr << "ERROR: can't allocate memory for the combination" << endl;
-	exit(EXIT_FAILURE);
-      }
-      while(true){
-	ssTxt << sep << "l10abf." << gsl_combination_get(comb, 0) + 1;
-	if(comb->k > 1)
-	  for(size_t i = 1; i < k; ++i)
-	    ssTxt << "-" << gsl_combination_get(comb, i) + 1;
-	if(gsl_combination_next(comb) != GSL_SUCCESS)
-	  break;
-      }
-      gsl_combination_free(comb);
-      if(bfs == "sin")
-	break;
-    }
-  }
-  ssTxt << endl;
+  string file_mode;
+  if (header_opt == "none")
+    file_mode = "ab";
+  else
+    file_mode = "wb";
+  openFile(ssOutFile.str(), outStream, file_mode.c_str());
   size_t nb_lines = 1;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-  
+  if (header_opt != "none") {
+    // write header line
+    ssTxt << "gene" << sep << "snp" << sep << "nb.subgroups";
+    ssTxt << sep << "l10abf.gen"
+          << sep << "l10abf.gen.fix"
+          << sep << "l10abf.gen.maxh";
+    if(bfs == "sin" || bfs == "all")
+      ssTxt << sep << "l10abf.gen.sin";
+    if(bfs == "all")
+      ssTxt << sep << "l10abf.all";
+    if(bfs != "gen"){
+      for(size_t k = 1; k <= nb_subgroups; ++k){
+        comb = gsl_combination_calloc(nb_subgroups, k);
+        if(comb == NULL){
+          cerr << "ERROR: can't allocate memory for the combination" << endl;
+          exit(EXIT_FAILURE);
+        }
+        while(true){
+          ssTxt << sep << "l10abf." << gsl_combination_get(comb, 0) + 1;
+          if(comb->k > 1)
+            for(size_t i = 1; i < k; ++i)
+              ssTxt << "-" << gsl_combination_get(comb, i) + 1;
+          if(gsl_combination_next(comb) != GSL_SUCCESS)
+            break;
+        }
+        gsl_combination_free(comb);
+        if(bfs == "sin")
+          break;
+      }
+    }
+    ssTxt << endl;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+  }
+  if (header_opt == "only") {
+    closeFile(ssOutFile.str(), outStream);
+    return;
+  }
+    
   // write results
   ssTxt.precision(6);
   ssTxt.setf(ios::scientific);
-  for(map<string, Gene>::const_iterator it_gene = gene2object.begin();
-       it_gene != gene2object.end(); ++it_gene){
+  for(map<string, Gene>::const_iterator it_gene = itG_begin;
+       it_gene != itG_end; ++it_gene){
     for(vector<GeneSnpPair>::const_iterator it_pair
 	   = it_gene->second.BeginPair(); it_pair != it_gene->second.EndPair();
 	 ++it_pair){
@@ -1370,44 +1334,50 @@ void writeResAbfsAvgGrids(
     }
   }
   
-  closeFile (ssOutFile.str(), outStream);
+  closeFile(ssOutFile.str(), outStream);
 }
 
 void writeResJoinPermPval(
   const string & out_prefix,
-  const map<string,Gene> & gene2object,
+  const map<string,Gene>::iterator & itG_begin,
+  const map<string,Gene>::iterator & itG_end,
   const size_t & seed,
   const string & permbf,
   const bool & use_max_bf,
-  const int & verbose)
+  const string & header_opt)
 {
-  if(verbose > 0)
-    cout << "write results of gene-level P-values, all subgroups jointly ..."
-	 << endl << flush;
-  
   string sep = "\t";
   
   stringstream ssOutFile, ssTxt;
   ssOutFile << out_prefix << "_joinPermPvals.txt.gz";
-  if(verbose > 0)
-    cout << "file " << ssOutFile.str() << endl << flush;
   gzFile outStream;
-  openFile (ssOutFile.str(), outStream, "wb");
+  string file_mode;
+  if (header_opt == "none")
+    file_mode = "ab";
+  else
+    file_mode = "wb";
+  openFile(ssOutFile.str(), outStream, file_mode.c_str());
   size_t nb_lines = 0;
+  if (header_opt != "none") {
+    ssTxt << "# perm.bf=" << permbf << " seed=" << seed << endl;
+    ++nb_lines;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
   
-  ssTxt << "# perm.bf=" << permbf << " seed=" << seed << endl;
-  ++nb_lines;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-  
-  ssTxt.str("");
-  ssTxt << "gene" << sep << "nb.snps" << sep << "join.perm.pval"
-	<< sep << "nb.permutations" << sep << "true.l10abf"
-	<< sep << "med.perm.l10abf" << endl;
-  ++nb_lines;
-  gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
-  
-  for(map<string,Gene>::const_iterator it_gene = gene2object.begin();
-      it_gene != gene2object.end(); ++it_gene){
+    ssTxt.str("");
+    ssTxt << "gene" << sep << "nb.snps" << sep << "join.perm.pval"
+          << sep << "nb.permutations" << sep << "true.l10abf"
+          << sep << "med.perm.l10abf" << endl;
+    ++nb_lines;
+    gzwriteLine(outStream, ssTxt.str(), ssOutFile.str(), nb_lines);
+  } else
+    nb_lines = 2;
+  if (header_opt == "only") {
+    closeFile(ssOutFile.str(), outStream);
+    return;
+  }
+
+  for(map<string,Gene>::const_iterator it_gene = itG_begin;
+      it_gene != itG_end; ++it_gene){
     if(it_gene->second.GetNbGeneSnpPairs() > 0){
       ssTxt.str("");
       ++nb_lines;
@@ -1432,7 +1402,8 @@ void writeRes(
   const bool & save_sstats,
   const bool & save_weighted_abfs,
   const vector<string> & subgroups,
-  const map<string, Gene> & gene2object,
+  const map<string, Gene>::iterator & itG_begin,
+  const map<string, Gene>::iterator & itG_end,
   const map<string, Snp> & snp2object,
   const string & analysis,
   const Grid & iGridL,
@@ -1444,32 +1415,34 @@ void writeRes(
   const size_t & seed,
   const string & permbf,
   const bool & use_max_bf,
-  const int & verbose)
+  const string & header_opt)
 {
   if(analysis == "sep" ||
      (analysis == "join" && save_sstats &&
       error_model != "mvlr"))
-    writeResSstats(out_prefix, subgroups, gene2object, snp2object, verbose);
+    writeResSstats(out_prefix, subgroups, itG_begin, itG_end, snp2object,
+                   header_opt);
   
   if(analysis == "sep" && nb_permutations > 0 &&
      perm_sep != 0){
     if(perm_sep == 1)
-      writeResSepPermPval(out_prefix, gene2object, seed, verbose);
+      writeResSepPermPval(out_prefix, itG_begin, itG_end, seed, header_opt);
     else if(perm_sep == 2)
-      writeResSepPermPval(out_prefix, gene2object, subgroups, seed, verbose);;
+      writeResSepPermPval(out_prefix, itG_begin, itG_end, subgroups, seed,
+                          header_opt);
   }
   
   if(analysis == "join"){
-    writeResAbfsRaw(out_prefix, gene2object, subgroups.size(), iGridL, iGridS,
-		    bfs, verbose);
+    writeResAbfsRaw(out_prefix, itG_begin, itG_end, subgroups.size(),
+                    iGridL, iGridS, bfs, header_opt);
     if(save_weighted_abfs)
-      writeResAbfsAvgGrids(out_prefix, gene2object, subgroups.size(), bfs,
-			   error_model, verbose);
+      writeResAbfsAvgGrids(out_prefix, itG_begin, itG_end, subgroups.size(),
+                           bfs, error_model, header_opt);
   }
   
   if(analysis == "join" && nb_permutations > 0)
-    writeResJoinPermPval(out_prefix, gene2object, seed, permbf,
-			 use_max_bf, verbose);
+    writeResJoinPermPval(out_prefix, itG_begin, itG_end, seed, permbf,
+                         use_max_bf, header_opt);
 }
 
 void run(const string & file_genopaths,
@@ -1502,7 +1475,8 @@ void run(const string & file_genopaths,
 	 const int & nb_threads,
 	 const string & file_snpstokeep,
 	 const vector<string> & subgroups_tokeep,
-	 const int & verbose)
+     const int & write_group_size,
+     const int & verbose)
 {
   set<string> sSnpsToKeep;
   if(! file_snpstokeep.empty()){
@@ -1531,28 +1505,85 @@ void run(const string & file_genopaths,
   
   Grid iGridL(file_largegrid, true, verbose);
   Grid iGridS(file_smallgrid, false, verbose);
+  // write header
+  writeRes(out_prefix, save_sstats, save_weighted_abfs, subgroups,
+           gene2object.begin(), gene2object.end(),
+           snp2object, analysis, iGridL, iGridS, bfs, nb_permutations,
+           perm_sep, error_model, seed, permbf, use_max_bf, "only");
   
-  testForAssociations(file_sstats.empty(), mChr2VecPtSnps, anchor, radius,
-		      subgroups, samples, likelihood, analysis,
-		      need_qnorm, covariates, iGridL, iGridS, bfs,
-		      error_model, prop_cov_errors, verbose, gene2object);
-  if(nb_permutations > 0 &&
-     (perm_sep != 0 || permbf != "none")){
-    omp_set_num_threads(nb_threads);
-    makePermutations(subgroups, samples, likelihood, analysis, need_qnorm,
-		     covariates, iGridL, iGridS, error_model, prop_cov_errors,
-		     nb_permutations, seed, trick, trick_cutoff, perm_sep,
-		     permbf, use_max_bf, verbose, gene2object);
+  size_t countGenes = 0;
+  size_t totalGenes = gene2object.size();
+  bool is_perm = nb_permutations > 0 && (perm_sep != 0 || permbf != "none");
+  if(verbose > 0){
+    cout << "test for association between each pair gene-SNP ..." << endl
+	 << "analysis=" << analysis
+	 << " likelihood=" << likelihood
+	 << " error_model=" << error_model;
+    if(error_model != "uvlr") // i.e. if 'mvlr' or 'hybrid'
+      cout << " prop_cov_errors=" << prop_cov_errors;
+    if(file_sstats.empty())
+      cout << " anchor=" << anchor << " radius=" << radius;
+    if(is_perm) {
+      cout << endl << "permutation"<< (nb_permutations > 1 ? "s=" : "=")
+           << nb_permutations << " seed=" << seed;
+      if(trick != 0){
+        cout << " trick=" << trick
+             << " trick_cutoff=" << trick_cutoff;
+      }
+      if(analysis == "sep")
+        cout << " perm_sep=" << perm_sep;
+      else if(analysis == "join")
+        cout << " perm_bf=" << permbf;
+      cout << " threads=" << omp_get_max_threads();
+    }
+    cout << endl << flush;
   }
-  
-  writeRes(out_prefix, save_sstats, save_weighted_abfs, subgroups, gene2object,
-	   snp2object, analysis, iGridL, iGridS, bfs, nb_permutations,
-	   perm_sep, error_model, seed, permbf, use_max_bf, verbose);
+  clock_t startTime = clock();
+  size_t nbAnalyzedGenes = 0, nbAnalyzedPairs = 0;
+  if(verbose == 1)
+    progressBar("", 0, totalGenes);
+  for(map<string,Gene>::iterator itG = gene2object.begin();
+      itG != gene2object.end();) {
+    map<string,Gene>::iterator itG_begin = itG;
+    size_t step_size = min((int)distance(itG, gene2object.end()), write_group_size);
+    advance(itG, step_size);
+    testForAssociations(file_sstats.empty(), mChr2VecPtSnps, anchor, radius,
+                        subgroups, samples, likelihood, analysis,
+                        need_qnorm, covariates, iGridL, iGridS, bfs,
+                        error_model, prop_cov_errors, verbose,
+                        itG_begin, itG, nbAnalyzedGenes, nbAnalyzedPairs);
+    if(is_perm){
+      omp_set_num_threads(nb_threads);
+      makePermutations(subgroups, samples, likelihood, analysis, need_qnorm,
+                       covariates, iGridL, iGridS, error_model, prop_cov_errors,
+                       nb_permutations, seed, trick, trick_cutoff, perm_sep,
+                       permbf, use_max_bf, itG_begin, itG);
+    }
+    // write results
+    writeRes(out_prefix, save_sstats, save_weighted_abfs, subgroups,
+             itG_begin, itG, snp2object, analysis, iGridL, iGridS, bfs,
+             nb_permutations, perm_sep, error_model, seed, permbf,
+             use_max_bf, "none");
+    // progress tracker
+    countGenes += step_size;
+    if(verbose == 1)
+      progressBar("", countGenes, totalGenes);
+    // delete processed object to release RAM 
+    gene2object.erase(itG_begin, itG);
+  }
+  if(verbose > 0){
+    if(verbose == 1)
+      cout << " (" << fixed << setprecision(2) << getElapsedTime(startTime)
+	   << " sec)" << endl << flush;
+    cout << "nb of analyzed gene-SNP pairs: " << nbAnalyzedPairs
+	 << " (" << nbAnalyzedGenes << " genes)" << endl;
+  }
 }
 
 int main(int argc, char ** argv)
 {
-  int verbose = 1, trick = 0, perm_sep = 0, nb_threads = 1;
+  int verbose = 1, trick = 0, perm_sep = 0, nb_threads = 1,
+    write_group_size = 10;
   size_t radius = 100000, nb_types = string::npos, nb_permutations = 0,
     seed = string::npos, trick_cutoff = 10;
   float min_maf = 0.0, prop_cov_errors = 0.5;
@@ -1571,8 +1602,8 @@ int main(int argc, char ** argv)
 	       need_qnorm, min_maf, file_covarpaths, file_largegrid,
 	       file_smallgrid, bfs, error_model, prop_cov_errors, nb_types,
 	       nb_permutations, seed, trick, trick_cutoff, perm_sep,
-	       permbf, use_max_bf, nb_threads, file_snpstokeep,
-	       subgroups_tokeep, verbose);
+           permbf, use_max_bf, nb_threads, file_snpstokeep,
+	       subgroups_tokeep, write_group_size, verbose);
   
   time_t time_start, time_end;
   if(verbose > 0){
@@ -1584,13 +1615,14 @@ int main(int argc, char ** argv)
 	 << "cmd-line: " << getCmdLine(argc, argv) << endl
 	 << "cwd: " << getCurrentDirectory() << endl << flush;
   }
-  
+
   run(file_genopaths, file_snpcoords, file_exppaths, file_genecoords, anchor,
       radius, file_sstats, out_prefix, save_sstats, save_weighted_abfs,
       likelihood, analysis, need_qnorm, min_maf, file_covarpaths,
       file_largegrid, file_smallgrid, bfs, error_model, prop_cov_errors,
       nb_permutations, seed, trick, trick_cutoff, perm_sep, permbf,
-      use_max_bf, nb_threads, file_snpstokeep, subgroups_tokeep, verbose);
+      use_max_bf, nb_threads, file_snpstokeep, subgroups_tokeep,
+      write_group_size, verbose);
   
   if(verbose > 0){
     time (&time_end);
