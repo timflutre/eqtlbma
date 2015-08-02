@@ -588,6 +588,9 @@ At some point we will have to improve the code to also handle the strand, if spe
 The option @option{--out} requires a character string which will be used as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
 That is, all output files are readable by @command{gzip} and @command{zcat}.
+The option @option{--wrtsize} controls the amount of output at a time.
+It requires a positive integer, which specifies how many genes to analyze before their results are written to disk and released from memory.
+This option prevents @command{eqtlbma_bf} from using too much memory if there are large number of cis SNPs per gene.
 
 The program @command{eqtlbma_bf} can perform several analyzes.
 The option @option{--analys sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
