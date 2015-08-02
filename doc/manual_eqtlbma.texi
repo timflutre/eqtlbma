@@ -15,7 +15,7 @@
 This manual is for eQtlBma (version @value{VERSION}, @value{UPDATED}),
 which implements Bayesian methods for eQTL detection.
 
-Copyright @copyright{} 2012-2015 Timoth@'ee Flutre, Xiaoquan Wen.
+Copyright @copyright{} 2012-2015 eQtlBma authors.
 
 @quotation
 Permission is granted to copy, distribute and/or modify this document
@@ -40,7 +40,7 @@ supports it in developing GNU and promoting software freedom.''
 @titlepage
 @title eQtlBma
 @subtitle for version @value{VERSION}, @value{UPDATED}
-@author T. Flutre and X. Wen (@email{eqtlbma-users@@googlegroups.com})
+@author eQtlBma authors (@email{eqtlbma-users@@googlegroups.com})
 @page
 @vskip 0pt plus 1filll
 @insertcopying
@@ -588,9 +588,10 @@ At some point we will have to improve the code to also handle the strand, if spe
 The option @option{--out} requires a character string which will be used as a prefix to name the output files.
 Moreover, all output files are directly written in a compressed mode using @url{http://www.zlib.net/,zlib}.
 That is, all output files are readable by @command{gzip} and @command{zcat}.
-The option @option{--wrtsize} controls the amount of output at a time.
+
+Moreover, the option @option{--wrtsize} controls the amount of output at a time.
 It requires a positive integer, which specifies how many genes to analyze before their results are written to disk and released from memory.
-This option prevents @command{eqtlbma_bf} from using too much memory if there are large number of cis SNPs per gene.
+This option prevents @command{eqtlbma_bf} from using too much memory if there are many @emph{cis} SNPs per gene.
 
 The program @command{eqtlbma_bf} can perform several analyzes.
 The option @option{--analys sep} means that the gene-SNP pairs will be tested for association using the subgroup-by-subgroup analysis (``separate'' analysis).
@@ -1085,6 +1086,7 @@ Xiaoquan (William) Wen wrote the C++ class that computes the multivariate approx
 The SQUAREM procedure was implemented thanks to the help of Chaoxing Dai.
 
 Gao Wang fixed a bug when filtering SNPs with missing genotypes when provided in the ``custom'' format.
+He also reduced memory requirement of @command{eqtlbma_bf} by adding @option{--wrtsize}.
 
 Sarah Urbut provided useful feedback at various time points.
 

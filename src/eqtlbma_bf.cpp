@@ -1,7 +1,7 @@
 /** \file eqtlbma_bf.cpp
  *
  *  `eqtlbma_bf' performs eQTL mapping in multiple subgroups via a Bayesian model.
- *  Copyright (C) 2012-2014 Timothée Flutre
+ *  Copyright (C) 2012-2015 Timothée Flutre
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -195,9 +195,9 @@ void help(char ** argv)
        << "      --sbgrp\tidentifier of the subgroup to analyze" << endl
        << "\t\tuseful for quick analysis and debugging" << endl
        << "\t\tcan be 'sbgrp1+sbgrp3' for instance" << endl
-       << "      --wrtsize\tsize (number of genes) per write to output file (default=10)" << endl
-       << "\t\tset to smaller size when each gene has large number of cis SNPs" << endl
+       << "      --wrtsize\tnumber of genes which results are written at once (default=10)" << endl
        << "\t\tto prevent excessive memory usage" << endl
+       << "\t\ttune it depending on the average number of cis SNPs per gene" << endl
        << endl;
 }
 
