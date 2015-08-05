@@ -711,6 +711,8 @@ The output file will contain the total number of permutations performed.
 The option @option{--tricut} allows to tune the speed gain of the trick:
 the smaller the faster (i.e. less permutations are performed when there is no association).
 In our experience, using @option{--tricut 10} gives good results.
+This scheme is described in details in the @url{http://projecteuclid.org/euclid.aoas/1437397106,supplemental material} of Shim & Stephens (Annals of Applied Statistics, 2015).
+As mentioned there, it is based on the @url{http://dx.doi.org/10.1093/biomet/78.2.301,article} by Besag & Clifford (Biometrika, 1991).
 
 If we want to compare the two approaches (``separate'' versus ``joint'' analysis), we may want
 to use the exact same permutations for both.
