@@ -1,5 +1,5 @@
-2015-08-02 v1.3.1b
-==================
+2015-08-10 v1.3.1
+=================
 
 Performance improvements
 * implement the SQUAREM procedure to speed-um 'eqtlbma_hm' (thanks to C. Dai)
