@@ -130,7 +130,7 @@ function comp_obs_vs_exp () {
 	gunzip obs_bf_sumstats_s${i}.txt.gz
 	gunzip exp_bf_sumstats_s${i}.txt.gz
 	if ! cmp -s obs_bf_sumstats_s${i}.txt exp_bf_sumstats_s${i}.txt; then
-	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
+	    echo "file 'obs_bf_sumstats_s${i}.txt' has differences with exp"
 	    exit 1
 	fi
 	gzip obs_bf_sumstats_s${i}.txt
@@ -140,7 +140,7 @@ function comp_obs_vs_exp () {
     gunzip obs_bf_l10abfs_raw.txt.gz
     gunzip exp_bf_l10abfs_raw.txt.gz
     if ! cmp -s obs_bf_l10abfs_raw.txt exp_bf_l10abfs_raw.txt; then
-    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
+    	echo "file 'obs_bf_l10abfs_raw.txt' has differences with exp"
 		exit 1
     fi
     gzip obs_bf_l10abfs_raw.txt
@@ -149,7 +149,7 @@ function comp_obs_vs_exp () {
     gunzip obs_bf_l10abfs_avg-grids.txt.gz
     gunzip exp_bf_l10abfs_avg-grids.txt.gz
     if ! cmp -s obs_bf_l10abfs_avg-grids.txt exp_bf_l10abfs_avg-grids.txt; then
-    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt' has differences with exp"
 		exit 1
     fi
     gzip obs_bf_l10abfs_avg-grids.txt
