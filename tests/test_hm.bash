@@ -6,7 +6,7 @@
 
 progVersion="1.0"
 
-#------------------------------------------------------------------------------
+#----------------------------------------------------------------------------
 
 # Display the help on stdout.
 # The format complies with help2man (http://www.gnu.org/s/help2man)
