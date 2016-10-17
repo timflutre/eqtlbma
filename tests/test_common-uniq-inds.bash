@@ -128,22 +128,34 @@ function comp_obs_vs_exp () {
     
     for i in {1..3}; do
     # nbDiffs=$(diff <(zcat obs_bf_sumstats_s${i}.txt.gz) <(zcat exp_bf_sumstats_s${i}.txt.gz) | wc -l)
-    # if [ ! $nbDiffs -eq 0 ]; then
-	if ! zcmp -s obs_bf_sumstats_s${i}.txt.gz exp_bf_sumstats_s${i}.txt.gz; then
-	    echo "file 'obs_bf_sumstats_s${i}.txt.gz' has differences with exp"
+	# if [ ! $nbDiffs -eq 0 ]; then
+	gunzip obs_bf_sumstats_s${i}.txt.gz
+	gunzip exp_bf_sumstats_s${i}.txt.gz
+	if ! cmp -s obs_bf_sumstats_s${i}.txt exp_bf_sumstats_s${i}.txt; then
+	    echo "file 'obs_bf_sumstats_s${i}.txt' has differences with exp"
 	    exit 1
 	fi
+	gzip obs_bf_sumstats_s${i}.txt
+	gzip exp_bf_sumstats_s${i}.txt
     done
-    
-    if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
+
+    gunzip obs_bf_l10abfs_raw.txt.gz
+    gunzip exp_bf_l10abfs_raw.txt.gz
+    if ! cmp -s obs_bf_l10abfs_raw.txt exp_bf_l10abfs_raw.txt; then
+    	echo "file 'obs_bf_l10abfs_raw.txt' has differences with exp"
+  	    exit 1
+    fi
+    gzip obs_bf_l10abfs_raw.txt
+    gzip exp_bf_l10abfs_raw.txt
+
+    gunzip obs_bf_l10abfs_avg-grids.txt.gz
+    gunzip exp_bf_l10abfs_avg-grids.txt.gz
+    if ! cmp -s obs_bf_l10abfs_avg-grids.txt exp_bf_l10abfs_avg-grids.txt; then
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt' has differences with exp"
 		exit 1
     fi
-    
-    if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
-		exit 1
-    fi
+    gzip obs_bf_l10abfs_avg-grids.txt
+    gzip exp_bf_l10abfs_avg-grids.txt
     
     if [ $verbose -gt "0" ]; then
 	echo "all tests passed successfully!"
