@@ -124,16 +124,24 @@ function comp_obs_vs_exp () {
     if [ $verbose -gt "0" ]; then
 	echo "compare obs vs exp results ..."
     fi
-    
-    if ! zcmp -s obs_bf_l10abfs_raw.txt.gz exp_bf_l10abfs_raw.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_raw.txt.gz' has differences with exp"
+
+    gunzip obs_bf_l10abfs_raw.txt.gz
+    gunzip exp_bf_l10abfs_raw.txt.gz
+    if ! cmp -s obs_bf_l10abfs_raw.txt exp_bf_l10abfs_raw.txt; then
+    	echo "file 'obs_bf_l10abfs_raw.txt' has differences with exp"
 		exit 1
     fi
-    
-    if ! zcmp -s obs_bf_l10abfs_avg-grids.txt.gz exp_bf_l10abfs_avg-grids.txt.gz; then
-    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
+    gzip obs_bf_l10abfs_raw.txt
+    gzip exp_bf_l10abfs_raw.txt
+
+    gunzip obs_bf_l10abfs_avg-grids.txt.gz
+    gunzip exp_bf_l10abfs_avg-grids.txt.gz
+    if ! cmp -s obs_bf_l10abfs_avg-grids.txt exp_bf_l10abfs_avg-grids.txt; then
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt' has differences with exp"
 		exit 1
     fi
+    gzip obs_bf_l10abfs_avg-grids.txt
+    gzip exp_bf_l10abfs_avg-grids.txt
     
     if [ $verbose -gt "0" ]; then
 	echo "all tests passed successfully!"
