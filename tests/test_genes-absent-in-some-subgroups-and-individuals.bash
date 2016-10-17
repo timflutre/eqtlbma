@@ -150,7 +150,7 @@ function comp_obs_vs_exp () {
     gunzip obs_bf_l10abfs_avg-grids.txt.gz
     gunzip exp_bf_l10abfs_avg-grids.txt.gz
     if ! cmp -s obs_bf_l10abfs_avg-grids.txt exp_bf_l10abfs_avg-grids.txt; then
-    	echo "file 'obs_bf_l10abfs_avg-grids.txt.gz' has differences with exp"
+    	echo "file 'obs_bf_l10abfs_avg-grids.txt' has differences with exp"
 		exit 1
     fi
     gzip obs_bf_l10abfs_avg-grids.txt
