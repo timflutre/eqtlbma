@@ -38,6 +38,7 @@
 #include <numeric>
 using namespace std;
 
+#include <gsl/gsl_version.h>
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_sort.h>
@@ -1612,6 +1613,7 @@ int main(int argc, char ** argv)
 	 << " " << getDateTime(time_start) << endl
 	 << "version " << VERSION << " compiled " << __DATE__
 	 << " " << __TIME__ << endl
+   << "with GSL " << GSL_VERSION << " and ZLIB " << ZLIB_VERSION << endl
 	 << "cmd-line: " << getCmdLine(argc, argv) << endl
 	 << "cwd: " << getCurrentDirectory() << endl << flush;
   }

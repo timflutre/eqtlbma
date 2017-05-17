@@ -20,6 +20,7 @@
 #include <cmath>
 #include <sys/time.h>
 
+#include <gsl/gsl_version.h>
 #include <gsl/gsl_sort.h>
 #include <gsl/gsl_sort_vector.h>
 #include <gsl/gsl_cdf.h>
@@ -80,7 +81,7 @@ namespace utils {
   {
     size_t * order = (size_t*) calloc(n, sizeof(size_t));
     if (order == NULL) {
-      fprintf(stderr, "ERROR: can't allocate memory for order in qqnorm\n");;
+      fprintf(stderr, "ERROR: can't allocate memory for order in qqnorm\n");
       exit(EXIT_FAILURE);
     }
     gsl_sort_index(order, ptData, 1, n);
@@ -181,8 +182,18 @@ namespace utils {
     gsl_vector * Bhat = gsl_vector_alloc(P);
     gsl_matrix * covBhat = gsl_matrix_alloc(P, P);
     gsl_multifit_linear_workspace * work = gsl_multifit_linear_alloc(N, P);
+#if GSL_MAJOR_VERSION == 1 && GSL_MINOR_VERSION < 17
     int gsl_status_ = gsl_multifit_linear_svd(X, y, GSL_DBL_EPSILON, &rank,
                                               Bhat, covBhat, &rss, work);
+#elif GSL_MAJOR_VERSION == 2 && GSL_MINOR_VERSION > 2
+    int gsl_status = gsl_multifit_linear(X, y, Bhat, covBhat, &rss, work);
+    rank = gsl_multifit_linear_rank(GSL_DBL_EPSILON, work);
+#else
+    fprintf(stderr,
+            "\nERROR: your GSL is %s, but should be <= 1.16 or >= 2.3\n",
+            gsl_version);
+    exit(EXIT_FAILURE);
+#endif
 
     pve = 1 - rss / gsl_stats_tss(y->data, y->stride, y->size);
     sigmahat = sqrt(rss / (double)(N-rank));
