@@ -1,3 +1,10 @@
+2017-11-15 v1.3.2
+=================
+
+Bug fixes
+* handle the GSL dependency at run time, requiring it to be <= 1.16 or >= 2.3
+
+
 2015-08-10 v1.3.1
 =================
 
