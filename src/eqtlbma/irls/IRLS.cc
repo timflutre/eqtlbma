@@ -1,7 +1,7 @@
 /** \file IRLS.cc
 *
 * `IRLS' is a C++ implementation of the IRLS algorithm for GLM
-* Copyright (C) 2013 Xioaquan Wen, Timothee Flutre
+* Copyright (C) 2013,2017 Xioaquan Wen, Timothee Flutre
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 
 #include <cstring>
 
+#include <gsl/gsl_version.h>
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_vector.h>
@@ -104,7 +105,17 @@ void IRLS::fit_model()
     link->compute_weights(mv, w);
     
     // weighted least square fitting
+#if GSL_MAJOR_VERSION == 1 && GSL_MINOR_VERSION < 17
     gsl_multifit_wlinear_svd(X, w, z, GSL_DBL_EPSILON, &rank, bv, cov, &chisq, work);
+#elif GSL_MAJOR_VERSION == 2 && GSL_MINOR_VERSION > 2
+    gsl_multifit_wlinear(X, w, z, bv, cov, &chisq, work);
+    rank = gsl_multifit_linear_rank(GSL_DBL_EPSILON, work);
+#else
+    fprintf(stderr,
+            "ERROR: your GSL is %s, but should be <= 1.16 or >= 2.3\n",
+            gsl_version);
+    exit(EXIT_FAILURE);
+#endif
     
     if(fabs(chisq - old_chisq) < 1e-6){ // check convergence
       psi = link->compute_dispersion(y, X, bv, offset, mv, rank, link->quasi);
